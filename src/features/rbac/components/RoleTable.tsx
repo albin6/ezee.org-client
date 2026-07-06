@@ -21,7 +21,7 @@ interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
   'data-row-key': string;
 }
 
-const Row = (props: RowProps) => {
+const SortableRow = (props: RowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props['data-row-key'],
   });
@@ -35,6 +35,13 @@ const Row = (props: RowProps) => {
   };
 
   return <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners} />;
+};
+
+const Row = (props: RowProps) => {
+  if (props.className?.includes('ant-table-placeholder')) {
+    return <tr {...props} />;
+  }
+  return <SortableRow {...props} />;
 };
 
 export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, onDelete }) => {
