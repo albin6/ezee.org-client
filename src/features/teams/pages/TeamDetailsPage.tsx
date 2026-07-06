@@ -46,7 +46,7 @@ export const TeamDetailsPage: React.FC = () => {
             <Descriptions.Item label="Status">
               <Tag color={team.status === 'ACTIVE' ? 'success' : 'error'}>{team.status}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Description" span={2}>{team.description || 'N/A'}</Descriptions.Item>
+            <Descriptions.Item label="Description">{team.description || 'N/A'}</Descriptions.Item>
             <Descriptions.Item label="Created At">{new Date(team.createdAt).toLocaleString()}</Descriptions.Item>
             <Descriptions.Item label="Updated At">{new Date(team.updatedAt).toLocaleString()}</Descriptions.Item>
           </Descriptions>
@@ -76,7 +76,7 @@ export const TeamDetailsPage: React.FC = () => {
         title={`Team Details: ${team.name}`} 
       />
       <div className="bg-white p-6 rounded-lg shadow-sm">
-        <Tabs defaultActiveKey="1" items={items} destroyInactiveTabPane={true} />
+        <Tabs defaultActiveKey="1" items={items} destroyOnHidden={true} />
       </div>
     </PageContainer>
   );

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, List, Select } from 'antd';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select } from 'antd';
 import { UserOutlined, SendOutlined, ReloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -36,8 +36,9 @@ export const TicketDetailsPage: React.FC = () => {
   if (!ticket) return <PageContainer>Ticket not found</PageContainer>;
 
   const authUser: any = user;
-  const isAssignee = ticket.assignees?.some(a => a.user.id === authUser?.sub);
-  const isCreator = ticket.createdBy?.id === authUser?.sub;
+  const authUserId = authUser?.id || authUser?.sub;
+  const isAssignee = ticket.assignees?.some((a: any) => a.user.id === authUserId);
+  const isCreator = ticket.createdBy?.id === authUserId;
   const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
 
   const canEditStatus = isAssignee || isAdmin || isCreator;
@@ -54,8 +55,10 @@ export const TicketDetailsPage: React.FC = () => {
     }
 
     if (ticket.status === 'OPEN' && isAssignee) return [{ value: 'OPEN', label: 'Open' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
+    if (ticket.status === 'REOPENED' && isAssignee) return [{ value: 'REOPENED', label: 'Reopened' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
     if (ticket.status === 'IN_PROGRESS' && isAssignee) return [{ value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'RESOLVED', label: 'Resolved' }];
     if (ticket.status === 'RESOLVED' && isCreator) return [{ value: 'RESOLVED', label: 'Resolved' }, { value: 'CLOSED', label: 'Closed' }, { value: 'REOPENED', label: 'Reopened' }];
+    if (ticket.status === 'CLOSED' && isCreator) return [{ value: 'CLOSED', label: 'Closed' }, { value: 'REOPENED', label: 'Reopened' }];
     
     return [{ value: ticket.status, label: ticket.status }];
   };
@@ -83,19 +86,19 @@ export const TicketDetailsPage: React.FC = () => {
             <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
           </Card>
 
-          <Card 
+          <Card
             title={
               <div className="flex justify-between items-center">
                 <span>Conversation</span>
-                <Button 
-                  type="text" 
-                  icon={<ReloadOutlined />} 
-                  onClick={() => id && fetchTicket(id)} 
+                <Button
+                  type="text"
+                  icon={<ReloadOutlined />}
+                  onClick={() => id && fetchTicket(id)}
                   loading={loading}
                   title="Refresh Conversation"
                 />
               </div>
-            } 
+            }
             className="flex flex-col"
           >
             <div className="flex flex-col gap-4">
@@ -116,12 +119,12 @@ export const TicketDetailsPage: React.FC = () => {
                 <Text type="secondary" className="text-center py-4 block">No messages yet.</Text>
               )}
             </div>
-            
+
             {(hasPermission('tickets:comment') || isAssignee || isCreator || isAdmin) && ticket.status !== 'CLOSED' && (
               <div className="mt-4 flex gap-2">
-                <Input.TextArea 
-                  rows={2} 
-                  placeholder="Type your message..." 
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Type your message..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                 />
@@ -139,9 +142,9 @@ export const TicketDetailsPage: React.FC = () => {
               <div>
                 <Text type="secondary" className="block mb-1">Status</Text>
                 {canEditStatus ? (
-                  <Select 
-                    value={ticket.status} 
-                    onChange={handleStatusChange} 
+                  <Select
+                    value={ticket.status}
+                    onChange={handleStatusChange}
                     className="w-full"
                     disabled={statusOptions.length <= 1}
                     options={statusOptions}
@@ -150,7 +153,7 @@ export const TicketDetailsPage: React.FC = () => {
                   <Tag>{ticket.status}</Tag>
                 )}
               </div>
-              
+
               <div>
                 <Text type="secondary" className="block mb-1">Priority</Text>
                 <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>

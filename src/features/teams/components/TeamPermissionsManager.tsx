@@ -89,9 +89,12 @@ export const TeamPermissionsManager: React.FC<TeamPermissionsManagerProps> = ({ 
         )}
       </div>
 
-      <Collapse defaultActiveKey={Object.keys(permissionsByModule)}>
-        {Object.entries(permissionsByModule).map(([module, perms]) => (
-          <Collapse.Panel header={<span className="font-semibold capitalize">{module}</span>} key={module}>
+      <Collapse 
+        defaultActiveKey={Object.keys(permissionsByModule)}
+        items={Object.entries(permissionsByModule).map(([module, perms]) => ({
+          key: module,
+          label: <span className="font-semibold capitalize">{module}</span>,
+          children: (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {perms.map(perm => (
                 <Checkbox
@@ -104,9 +107,9 @@ export const TeamPermissionsManager: React.FC<TeamPermissionsManagerProps> = ({ 
                 </Checkbox>
               ))}
             </div>
-          </Collapse.Panel>
-        ))}
-      </Collapse>
+          )
+        }))}
+      />
     </div>
   );
 };
