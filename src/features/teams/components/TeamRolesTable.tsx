@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Select } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, MenuOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { DndContext, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { teamService } from '../api/team.service';
 import { rbacService } from '@/features/rbac/api/rbac.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -9,6 +13,26 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 interface TeamRolesTableProps {
   teamId: string;
 }
+
+interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  'data-row-key': string;
+}
+
+const Row = (props: RowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props['data-row-key'],
+  });
+
+  const style: React.CSSProperties = {
+    ...props.style,
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    cursor: 'move',
+    ...(isDragging ? { position: 'relative', zIndex: 9999, background: '#f5f5f5' } : {}),
+  };
+
+  return <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners} />;
+};
 
 export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
   const { hasPermission } = usePermissions();
@@ -20,6 +44,29 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<any | null>(null);
   const [form] = Form.useForm();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 1 },
+    })
+  );
+
+  const onDragEnd = async ({ active, over }: DragEndEvent) => {
+    if (active.id !== over?.id) {
+      const activeIndex = roles.findIndex((i) => i.id === active.id);
+      const overIndex = roles.findIndex((i) => i.id === over?.id);
+      const newRoles = arrayMove(roles, activeIndex, overIndex);
+      
+      setRoles(newRoles);
+      try {
+        const hierarchy = newRoles.map((role, index) => ({ id: role.id, level: index }));
+        await teamService.updateRoleHierarchy(teamId, hierarchy);
+      } catch (error) {
+        message.error('Failed to update hierarchy');
+        fetchData();
+      }
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -98,7 +145,12 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
 
   const columns: ColumnsType<any> = [
     {
-      title: 'Name',
+      key: 'sort',
+      width: 50,
+      render: () => <MenuOutlined style={{ cursor: 'grab', color: '#999' }} />,
+    },
+    {
+      title: 'Name (Highest Authority Top)',
       dataIndex: 'name',
       key: 'name',
     },
@@ -113,7 +165,7 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       render: (_: any, record: any) => (
         <Space>
           {hasPermission('teams:write') && (
-            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenModal(record)} />
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenModal(record)} onPointerDown={(e) => e.stopPropagation()} />
           )}
           {hasPermission('teams:write') && (
             <Popconfirm
@@ -123,7 +175,7 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
               cancelText="No"
               okButtonProps={{ danger: true }}
             >
-              <Button type="text" danger icon={<DeleteOutlined />} />
+              <Button type="text" danger icon={<DeleteOutlined />} onPointerDown={(e) => e.stopPropagation()} />
             </Popconfirm>
           )}
         </Space>
@@ -146,13 +198,25 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
         )}
       </div>
 
-      <Table 
-        columns={columns} 
-        dataSource={roles} 
-        rowKey="id" 
-        loading={loading}
-        pagination={false}
-      />
+      <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+        <SortableContext
+          items={roles.map((i) => i.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <Table 
+            components={{
+              body: {
+                row: Row,
+              },
+            }}
+            columns={columns} 
+            dataSource={roles} 
+            rowKey="id" 
+            loading={loading}
+            pagination={false}
+          />
+        </SortableContext>
+      </DndContext>
 
       <Modal
         title={editingRole ? 'Edit Role' : 'Create Role'}

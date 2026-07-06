@@ -40,6 +40,10 @@ export const rbacService = {
     await api.post(`/rbac/roles/${roleId}/permissions`, { permissionIds });
   },
 
+  updateHierarchy: async (hierarchy: { id: string; level: number }[]): Promise<void> => {
+    await api.put('/rbac/roles/hierarchy', hierarchy);
+  },
+
   getPermissions: async (): Promise<Permission[]> => {
     const response = await api.get('/rbac/permissions');
     return response.data.data;

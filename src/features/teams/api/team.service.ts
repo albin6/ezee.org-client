@@ -83,6 +83,9 @@ export const teamService = {
   deleteTeamRole: async (teamId: string, roleId: string): Promise<void> => {
     await apiClient.delete(`/teams/${teamId}/roles/${roleId}`);
   },
+  updateRoleHierarchy: async (teamId: string, hierarchy: { id: string; level: number }[]): Promise<void> => {
+    await apiClient.put(`/teams/${teamId}/roles/hierarchy`, hierarchy);
+  },
 
   // --- Members ---
   getTeamMembers: async (teamId: string, params?: { page?: number; limit?: number; search?: string }): Promise<any> => {

@@ -11,8 +11,10 @@ interface RbacState {
   fetchPermissions: () => Promise<void>;
   createRole: (data: { name: string; description?: string }) => Promise<Role>;
   updateRole: (id: string, data: { name: string; description?: string }) => Promise<void>;
+  updateRole: (id: string, data: { name: string; description?: string }) => Promise<void>;
   deleteRole: (id: string) => Promise<void>;
   assignPermissions: (roleId: string, permissionIds: string[]) => Promise<void>;
+  updateHierarchy: (roles: Role[]) => Promise<void>;
 }
 
 export const useRbacStore = create<RbacState>((set, get) => ({
@@ -81,6 +83,21 @@ export const useRbacStore = create<RbacState>((set, get) => ({
       await get().fetchRoles();
     } catch (error) {
       set({ error: (error as Error).message || 'Failed to assign permissions', isLoading: false });
+      throw error;
+    }
+  },
+
+  updateHierarchy: async (orderedRoles: Role[]) => {
+    // Optimistic UI update
+    set({ roles: orderedRoles });
+    
+    try {
+      const hierarchy = orderedRoles.map((role, index) => ({ id: role.id, level: index }));
+      await rbacService.updateHierarchy(hierarchy);
+      await get().fetchRoles();
+    } catch (error) {
+      set({ error: (error as Error).message || 'Failed to update hierarchy', isLoading: false });
+      await get().fetchRoles(); // Revert on failure
       throw error;
     }
   },

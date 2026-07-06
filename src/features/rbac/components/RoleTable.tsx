@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Table, Button, Space, Tag, Popconfirm } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, MenuOutlined } from '@ant-design/icons';
 import type { Role } from '../api/rbac.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { DndContext, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useRbacStore } from '../store/rbac.store';
 
 interface RoleTableProps {
   roles: Role[];
@@ -11,11 +16,53 @@ interface RoleTableProps {
   onDelete: (id: string) => void;
 }
 
+interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  'data-row-key': string;
+}
+
+const Row = (props: RowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props['data-row-key'],
+  });
+
+  const style: React.CSSProperties = {
+    ...props.style,
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    cursor: 'move',
+    ...(isDragging ? { position: 'relative', zIndex: 9999, background: '#f5f5f5' } : {}),
+  };
+
+  return <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners} />;
+};
+
 export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, onDelete }) => {
   const { hasPermission } = usePermissions();
+  const { updateHierarchy } = useRbacStore();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 1 },
+    })
+  );
+
+  const onDragEnd = async ({ active, over }: DragEndEvent) => {
+    if (active.id !== over?.id) {
+      const activeIndex = roles.findIndex((i) => i.id === active.id);
+      const overIndex = roles.findIndex((i) => i.id === over?.id);
+      const newRoles = arrayMove(roles, activeIndex, overIndex);
+      await updateHierarchy(newRoles);
+    }
+  };
+
   const columns = [
     {
-      title: 'Role Name',
+      key: 'sort',
+      width: 50,
+      render: () => <MenuOutlined style={{ cursor: 'grab', color: '#999' }} />,
+    },
+    {
+      title: 'Role Name (Highest Authority Top)',
       dataIndex: 'name',
       key: 'name',
       render: (text: string) => <strong className="text-gray-800 capitalize">{text}</strong>,
@@ -58,6 +105,7 @@ export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, 
               icon={<EditOutlined />}
               onClick={() => onEdit(record)}
               className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+              onPointerDown={(e) => e.stopPropagation()} // Prevent drag on button click
             >
               Edit
             </Button>
@@ -75,6 +123,7 @@ export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, 
                 type="text"
                 danger
                 icon={<DeleteOutlined />}
+                onPointerDown={(e) => e.stopPropagation()} // Prevent drag on button click
               >
                 Delete
               </Button>
@@ -87,13 +136,25 @@ export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, 
 
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      <Table
-        columns={columns}
-        dataSource={roles}
-        rowKey="id"
-        loading={isLoading}
-        pagination={{ pageSize: 10 }}
-      />
+      <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+        <SortableContext
+          items={roles.map((i) => i.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <Table
+            components={{
+              body: {
+                row: Row,
+              },
+            }}
+            rowKey="id"
+            columns={columns}
+            dataSource={roles}
+            loading={isLoading}
+            pagination={false}
+          />
+        </SortableContext>
+      </DndContext>
     </div>
   );
 };
