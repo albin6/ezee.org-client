@@ -305,6 +305,16 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
                 <Input placeholder="e.g. Software Engineer" readOnly={isExistingUserMode} />
               </Form.Item>
 
+              {!isExistingUserMode && (
+                <Form.Item
+                  name="password"
+                  label="Password"
+                  rules={[{ required: true, message: 'Please enter a password' }, { min: 6, message: 'Password must be at least 6 characters' }]}
+                >
+                  <Input.Password placeholder="Set user password" />
+                </Form.Item>
+              )}
+
               <Form.Item
                 name="roleId"
                 label="Role"

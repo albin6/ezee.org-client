@@ -89,7 +89,7 @@ export const teamService = {
     const response = await apiClient.get(`/teams/${teamId}/members`, { params });
     return response.data; // Includes .data and .meta
   },
-  addTeamMember: async (teamId: string, data: { name: string; email: string; designation: string; roleId: string }): Promise<any> => {
+  addTeamMember: async (teamId: string, data: { name: string; email: string; designation: string; roleId: string; password?: string }): Promise<any> => {
     const response = await apiClient.post(`/teams/${teamId}/members`, data);
     return response.data.data;
   },
