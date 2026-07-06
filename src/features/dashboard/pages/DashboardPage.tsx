@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Row, Col, Statistic } from 'antd';
-import { UserOutlined, SettingOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { UserOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 
@@ -11,8 +11,8 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <PageContainer>
-      <PageHeader 
-        title="Dashboard Overview" 
+      <PageHeader
+        title="Dashboard Overview"
         description={user?.type === 'user' ? "Welcome to the User Portal." : "Welcome to the Enterprise Admin Dashboard."}
       />
 
@@ -47,7 +47,7 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </Col>
       </Row>
-      
+
       <Card className="mt-6">
         <div className="h-64 flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-300">
           Analytics Chart Placeholder
