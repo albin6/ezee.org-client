@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/v1/:path*",
+      "destination": "http://support-system-prod-alb-828249787.us-east-1.elb.amazonaws.com/api/v1/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
