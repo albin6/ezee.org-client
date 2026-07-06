@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Row, Col, Statistic } from 'antd';
-import { UserOutlined, SettingOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { UserOutlined, SettingOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 
