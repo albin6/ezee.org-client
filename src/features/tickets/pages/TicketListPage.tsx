@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Space, Input, Select, DatePicker } from 'antd';
+import { Table, Button, Tag, Input, Select, DatePicker } from 'antd';
 import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -26,7 +26,7 @@ export const TicketListPage: React.FC = () => {
     fetchUsers({ page: 1, limit: 100 }).catch(console.error);
   }, [fetchUsers]);
 
-  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+  const handleTableChange = (pagination: any, _filters: any, sorter: any) => {
     setParams((prev: any) => ({
       ...prev,
       page: pagination.current,
@@ -107,14 +107,14 @@ export const TicketListPage: React.FC = () => {
             <FilterOutlined className="text-gray-400" />
             <span className="font-medium text-gray-600">Filters</span>
           </div>
-          
+
           <Input.Search
             placeholder="Search title, desc, ID..."
             onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
             style={{ width: 220 }}
             allowClear
           />
-          
+
           <Select
             placeholder="Status"
             allowClear
@@ -161,7 +161,7 @@ export const TicketListPage: React.FC = () => {
             onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
             options={users.map((u: any) => ({ value: u.id, label: u.name }))}
           />
-          
+
           <Select
             placeholder="Assignee"
             allowClear
