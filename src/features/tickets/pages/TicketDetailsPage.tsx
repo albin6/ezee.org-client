@@ -42,6 +42,26 @@ export const TicketDetailsPage: React.FC = () => {
 
   const canEditStatus = isAssignee || isAdmin || isCreator;
 
+  const getStatusOptions = () => {
+    if (isAdmin) {
+      return [
+        { value: 'OPEN', label: 'Open' },
+        { value: 'IN_PROGRESS', label: 'In Progress' },
+        { value: 'RESOLVED', label: 'Resolved' },
+        { value: 'CLOSED', label: 'Closed' },
+        { value: 'REOPENED', label: 'Reopened' }
+      ];
+    }
+
+    if (ticket.status === 'OPEN' && isAssignee) return [{ value: 'OPEN', label: 'Open' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
+    if (ticket.status === 'IN_PROGRESS' && isAssignee) return [{ value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'RESOLVED', label: 'Resolved' }];
+    if (ticket.status === 'RESOLVED' && isCreator) return [{ value: 'RESOLVED', label: 'Resolved' }, { value: 'CLOSED', label: 'Closed' }, { value: 'REOPENED', label: 'Reopened' }];
+    
+    return [{ value: ticket.status, label: ticket.status }];
+  };
+
+  const statusOptions = getStatusOptions();
+
   return (
     <PageContainer>
       <div className="flex justify-between items-center mb-6">
@@ -83,7 +103,7 @@ export const TicketDetailsPage: React.FC = () => {
               )}
             />
             
-            {hasPermission('tickets:comment') && ticket.status !== 'CLOSED' && (
+            {(hasPermission('tickets:comment') || isAssignee || isCreator || isAdmin) && ticket.status !== 'CLOSED' && (
               <div className="mt-4 flex gap-2">
                 <Input.TextArea 
                   rows={2} 
@@ -104,18 +124,13 @@ export const TicketDetailsPage: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <Text type="secondary" className="block mb-1">Status</Text>
-                {canEditStatus && hasPermission('tickets:update') ? (
+                {canEditStatus ? (
                   <Select 
                     value={ticket.status} 
                     onChange={handleStatusChange} 
                     className="w-full"
-                    options={[
-                      { value: 'OPEN', label: 'Open' },
-                      { value: 'IN_PROGRESS', label: 'In Progress' },
-                      { value: 'RESOLVED', label: 'Resolved' },
-                      { value: 'CLOSED', label: 'Closed' },
-                      { value: 'REOPENED', label: 'Reopened' }
-                    ]}
+                    disabled={statusOptions.length <= 1}
+                    options={statusOptions}
                   />
                 ) : (
                   <Tag>{ticket.status}</Tag>
