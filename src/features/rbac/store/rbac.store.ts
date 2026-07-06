@@ -11,7 +11,6 @@ interface RbacState {
   fetchPermissions: () => Promise<void>;
   createRole: (data: { name: string; description?: string }) => Promise<Role>;
   updateRole: (id: string, data: { name: string; description?: string }) => Promise<void>;
-  updateRole: (id: string, data: { name: string; description?: string }) => Promise<void>;
   deleteRole: (id: string) => Promise<void>;
   assignPermissions: (roleId: string, permissionIds: string[]) => Promise<void>;
   updateHierarchy: (roles: Role[]) => Promise<void>;

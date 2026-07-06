@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Table, Button, Space, Tag, Popconfirm } from 'antd';
 import { EditOutlined, DeleteOutlined, MenuOutlined } from '@ant-design/icons';
 import type { Role } from '../api/rbac.service';
