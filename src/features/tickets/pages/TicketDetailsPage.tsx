@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, List, Select } from 'antd';
-import { UserOutlined, SendOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, ReloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -83,7 +83,21 @@ export const TicketDetailsPage: React.FC = () => {
             <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
           </Card>
 
-          <Card title="Conversation" className="flex flex-col">
+          <Card 
+            title={
+              <div className="flex justify-between items-center">
+                <span>Conversation</span>
+                <Button 
+                  type="text" 
+                  icon={<ReloadOutlined />} 
+                  onClick={() => id && fetchTicket(id)} 
+                  loading={loading}
+                  title="Refresh Conversation"
+                />
+              </div>
+            } 
+            className="flex flex-col"
+          >
             <List
               itemLayout="horizontal"
               dataSource={ticket.messages || []}
