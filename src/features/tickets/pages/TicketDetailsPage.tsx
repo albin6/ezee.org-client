@@ -98,24 +98,24 @@ export const TicketDetailsPage: React.FC = () => {
             } 
             className="flex flex-col"
           >
-            <List
-              itemLayout="horizontal"
-              dataSource={ticket.messages || []}
-              renderItem={(msg: any) => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={<Avatar icon={<UserOutlined />} />}
-                    title={
-                      <Space>
+            <div className="flex flex-col gap-4">
+              {ticket.messages && ticket.messages.length > 0 ? (
+                ticket.messages.map((msg: any) => (
+                  <div key={msg.id} className="flex items-start gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                    <Avatar icon={<UserOutlined />} className="mt-1 flex-shrink-0" />
+                    <div className="flex flex-col flex-1">
+                      <div className="flex items-center gap-2 mb-1">
                         <Text strong>{msg.user.name}</Text>
                         <Text type="secondary" className="text-xs">{new Date(msg.createdAt).toLocaleString()}</Text>
-                      </Space>
-                    }
-                    description={<Text className="text-gray-800 whitespace-pre-wrap">{msg.content}</Text>}
-                  />
-                </List.Item>
+                      </div>
+                      <Text className="text-gray-800 whitespace-pre-wrap">{msg.content}</Text>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <Text type="secondary" className="text-center py-4 block">No messages yet.</Text>
               )}
-            />
+            </div>
             
             {(hasPermission('tickets:comment') || isAssignee || isCreator || isAdmin) && ticket.status !== 'CLOSED' && (
               <div className="mt-4 flex gap-2">
@@ -168,14 +168,14 @@ export const TicketDetailsPage: React.FC = () => {
               <div>
                 <Text type="secondary" className="block mb-2">Assignees</Text>
                 {ticket.assignees?.length ? (
-                  <Space direction="vertical" className="w-full">
+                  <div className="flex flex-col gap-2 w-full">
                     {ticket.assignees.map((a: any) => (
                       <div key={a.user.id} className="flex items-center gap-2">
                         <Avatar size="small" icon={<UserOutlined />} />
                         <Text>{a.user.name}</Text>
                       </div>
                     ))}
-                  </Space>
+                  </div>
                 ) : (
                   <Text type="secondary">Unassigned</Text>
                 )}

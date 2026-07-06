@@ -90,7 +90,7 @@ export const LoginPage: React.FC = () => {
 
         {error && (
           <Alert
-            message={error}
+            title={error}
             type="error"
             showIcon
             className="mb-6"

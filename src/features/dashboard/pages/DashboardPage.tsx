@@ -18,7 +18,7 @@ export const DashboardPage: React.FC = () => {
 
       <Row gutter={[24, 24]}>
         <Col xs={24} sm={12} lg={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Active Users"
               value={1128}
@@ -27,21 +27,22 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="System Status"
               value="Healthy"
-              valueStyle={{ color: '#16a34a' }}
+              styles={{ content: { color: '#16a34a' } }}
               prefix={<SafetyCertificateOutlined />}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={8}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
-              title="Configuration Issues"
-              value={0}
-              prefix={<SettingOutlined className="text-gray-400" />}
+              title="Avg. Response Time"
+              value={1.2}
+              suffix="ms"
+              prefix={<ThunderboltOutlined className="text-yellow-500" />}
             />
           </Card>
         </Col>

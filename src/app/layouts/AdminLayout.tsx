@@ -180,7 +180,6 @@ export const AdminLayout: React.FC = () => {
         onClose={() => setMobileMenuOpen(false)}
         open={mobileMenuOpen}
         styles={{ body: { padding: 0, backgroundColor: '#111827' } }}
-        width={250}
         className="lg:hidden"
       >
         <div className="h-full flex flex-col">
