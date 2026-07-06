@@ -17,13 +17,13 @@ export const CreateTicketPage: React.FC = () => {
 
   useEffect(() => {
     // Fetch user's teams
-    apiClient.get('/teams').then((res: any) => setTeams(res.data.data)).catch(console.error);
+    apiClient.get('/tickets/teams-lookup').then((res: any) => setTeams(res.data.data)).catch(console.error);
   }, []);
 
   const handleTeamChange = async (teamId: string) => {
     form.setFieldValue('assignees', []);
     try {
-      const res: any = await apiClient.get(`/teams/${teamId}/members`);
+      const res: any = await apiClient.get(`/tickets/teams/${teamId}/members-lookup`);
       setTeamMembers(res.data.data);
     } catch (e) {
       console.error(e);
