@@ -242,7 +242,37 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
             name="permissions"
             label="Role Permissions"
             rules={[{ required: true, message: 'Please select at least one permission' }]}
-            extra="Only permissions assigned to this team are available."
+            extra={
+              <div className="flex justify-between items-start mt-1">
+                <span className="text-gray-500 text-xs">Only permissions assigned to this team are available.</span>
+                {!editingRole && (
+                  <Space size="small">
+                    <Button 
+                      type="link" 
+                      size="small" 
+                      onClick={() => {
+                        const allValues = availablePermOptions.map(p => p.value);
+                        form.setFieldsValue({ permissions: allValues });
+                      }}
+                      className="p-0 h-auto text-xs"
+                    >
+                      Select All
+                    </Button>
+                    <span className="text-gray-300 text-xs">|</span>
+                    <Button 
+                      type="link" 
+                      size="small" 
+                      onClick={() => {
+                        form.setFieldsValue({ permissions: [] });
+                      }}
+                      className="p-0 h-auto text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Deselect All
+                    </Button>
+                  </Space>
+                )}
+              </div>
+            }
           >
             <Select 
               mode="multiple" 
