@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select } from 'antd';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal } from 'antd';
 import { UserOutlined, SendOutlined, ReloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -21,15 +21,29 @@ export const TicketDetailsPage: React.FC = () => {
     if (id) fetchTicket(id);
   }, [id, fetchTicket]);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [ticket?.messages]);
+
   const handleSendMessage = async () => {
     if (!message.trim() || !id) return;
     await addMessage(id, message);
     setMessage('');
   };
 
-  const handleStatusChange = async (status: string) => {
+  const handleStatusChange = (status: string) => {
     if (!id) return;
-    await updateStatus(id, status);
+    Modal.confirm({
+      title: 'Confirm Status Change',
+      content: `Are you sure you want to change the ticket status to ${status}?`,
+      okText: 'Yes',
+      cancelText: 'No',
+      onOk: async () => {
+        await updateStatus(id, status);
+      }
+    });
   };
 
   if (loading && !ticket) return <PageContainer>Loading...</PageContainer>;
@@ -58,7 +72,6 @@ export const TicketDetailsPage: React.FC = () => {
     if (ticket.status === 'REOPENED' && isAssignee) return [{ value: 'REOPENED', label: 'Reopened' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
     if (ticket.status === 'IN_PROGRESS' && isAssignee) return [{ value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'RESOLVED', label: 'Resolved' }];
     if (ticket.status === 'RESOLVED' && isCreator) return [{ value: 'RESOLVED', label: 'Resolved' }, { value: 'CLOSED', label: 'Closed' }, { value: 'REOPENED', label: 'Reopened' }];
-    if (ticket.status === 'CLOSED' && isCreator) return [{ value: 'CLOSED', label: 'Closed' }, { value: 'REOPENED', label: 'Reopened' }];
     
     return [{ value: ticket.status, label: ticket.status }];
   };
@@ -101,23 +114,39 @@ export const TicketDetailsPage: React.FC = () => {
             }
             className="flex flex-col"
           >
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto p-4 border border-gray-200 rounded-md bg-gray-50">
               {ticket.messages && ticket.messages.length > 0 ? (
-                ticket.messages.map((msg: any) => (
-                  <div key={msg.id} className="flex items-start gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                    <Avatar icon={<UserOutlined />} className="mt-1 flex-shrink-0" />
-                    <div className="flex flex-col flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Text strong>{msg.user.name}</Text>
-                        <Text type="secondary" className="text-xs">{new Date(msg.createdAt).toLocaleString()}</Text>
+                ticket.messages.map((msg: any) => {
+                  if (msg.isSystem) {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-2">
+                        <div className="bg-gray-200/60 text-gray-600 text-xs px-4 py-1.5 rounded-full text-center">
+                          {msg.content} by {msg.user.name} • {new Date(msg.createdAt).toLocaleString()}
+                        </div>
                       </div>
-                      <Text className="text-gray-800 whitespace-pre-wrap">{msg.content}</Text>
+                    );
+                  }
+
+                  const isMe = msg.user.id === authUserId;
+                  return (
+                    <div key={msg.id} className={`flex items-end gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+                      <Avatar icon={<UserOutlined />} className="flex-shrink-0 bg-gray-300" />
+                      <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <Text strong className="text-xs">{isMe ? 'You' : msg.user.name}</Text>
+                          <Text type="secondary" className="text-[10px]">{new Date(msg.createdAt).toLocaleString()}</Text>
+                        </div>
+                        <div className={`px-4 py-2 shadow-sm ${isMe ? 'bg-[#1677ff] text-white rounded-2xl rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm'}`}>
+                          <Text className={isMe ? "text-white whitespace-pre-wrap" : "text-gray-800 whitespace-pre-wrap"}>{msg.content}</Text>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <Text type="secondary" className="text-center py-4 block">No messages yet.</Text>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {(hasPermission('tickets:comment') || isAssignee || isCreator || isAdmin) && ticket.status !== 'CLOSED' && (
