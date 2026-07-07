@@ -71,11 +71,11 @@ export const PWAInstallPrompt: React.FC = () => {
         <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 z-50 bg-white p-4 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between gap-4 max-w-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-bold text-xs">
-              BRO
+              EZEE
             </div>
             <div>
-              <Text strong className="block">Exclusive Support Platform</Text>
-              <Text type="secondary" className="text-xs">support.brototype.com</Text>
+              <Text strong className="block">Ezee Org</Text>
+              <Text type="secondary" className="text-xs">ezee-org-client.vercel.app</Text>
             </div>
           </div>
           <Button type="primary" shape="round" onClick={handleInstallClick}>
@@ -98,7 +98,7 @@ export const PWAInstallPrompt: React.FC = () => {
       >
         <div className="text-center flex flex-col items-center">
           <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center text-white font-bold text-sm mb-4">
-            BROTOTYPE
+            EZEE ORG
           </div>
           <Title level={4} style={{ marginBottom: 8 }}>Install Web App</Title>
           <Paragraph className="text-gray-500 mb-6">

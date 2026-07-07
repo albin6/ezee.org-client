@@ -1,7 +1,7 @@
 {
-  "name": "Exclusive Support Platform",
-  "short_name": "Support",
-  "description": "Exclusive Support Platform by Brototype",
+  "name": "Ezee Org",
+  "short_name": "Ezee Org",
+  "description": "Ezee Org Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
