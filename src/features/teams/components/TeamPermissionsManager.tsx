@@ -72,7 +72,7 @@ export const TeamPermissionsManager: React.FC<TeamPermissionsManagerProps> = ({ 
 
   return (
     <div>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
         <div>
           <h3 className="text-lg font-medium">Team Permissions</h3>
           <p className="text-gray-500 text-sm">Select the maximum permissions this team can distribute to its roles.</p>

@@ -145,12 +145,13 @@ export const BatchesPage: React.FC = () => {
         } 
       />
       
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <div className="mb-4 w-64">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+        <div className="mb-4 w-full sm:w-64 sm:max-w-md">
           <Input.Search placeholder="Search batches..." onSearch={handleSearch} allowClear />
         </div>
 
         <Table 
+          scroll={{ x: 'max-content' }}
           columns={columns} 
           dataSource={batches} 
           rowKey="id" 

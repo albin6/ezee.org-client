@@ -91,11 +91,13 @@ export const CreateTicketPage: React.FC = () => {
             <Input.TextArea rows={5} placeholder="Describe the issue in detail..." />
           </Form.Item>
 
-          <Form.Item className="mb-0 flex justify-end">
-            <Button className="mr-2" onClick={() => navigate('/tickets')}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              Create Ticket
-            </Button>
+          <Form.Item className="mb-0">
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <Button onClick={() => navigate('/tickets')}>Cancel</Button>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                Create Ticket
+              </Button>
+            </div>
           </Form.Item>
         </Form>
       </Card>

@@ -101,8 +101,8 @@ export const TicketListPage: React.FC = () => {
           )
         }
       />
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-        <div className="mb-6 flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-md border border-gray-200">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-100">
+        <div className="mb-6 flex flex-col sm:flex-row flex-wrap gap-4 items-start sm:items-center bg-gray-50 p-4 rounded-md border border-gray-200">
           <div className="flex items-center gap-2 mr-2">
             <FilterOutlined className="text-gray-400" />
             <span className="font-medium text-gray-600">Filters</span>
@@ -185,6 +185,7 @@ export const TicketListPage: React.FC = () => {
         </div>
 
         <Table
+          scroll={{ x: 'max-content' }}
           dataSource={tickets}
           columns={columns}
           rowKey="id"

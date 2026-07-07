@@ -217,7 +217,7 @@ export const AdminLayout: React.FC = () => {
             </Dropdown>
           </div>
         </Header>
-        <Content className="p-6 lg:p-8 bg-gray-50 flex-1 overflow-y-auto">
+        <Content className="p-4 sm:p-6 lg:p-8 bg-gray-50 flex-1 overflow-y-auto">
           {(() => {
             const path = location.pathname;
             if (path === '/tickets/new' && !hasPermission('tickets:create')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;

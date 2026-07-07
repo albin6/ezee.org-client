@@ -172,19 +172,21 @@ export const TeamsPage: React.FC = () => {
         } 
       />
       
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <div className="mb-4 flex gap-4">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+        <div className="mb-4 flex flex-col sm:flex-row gap-4">
           <Input.Search
             placeholder="Search teams..."
             allowClear
             onSearch={(value) => setSearch(value)}
-            style={{ width: 300 }}
+            className="w-full sm:w-auto"
+            style={{ maxWidth: 300 }}
           />
           <Select
             placeholder="Filter by Status"
             allowClear
             onChange={(value) => setStatusFilter(value)}
-            style={{ width: 200 }}
+            className="w-full sm:w-auto"
+            style={{ minWidth: 200 }}
             options={[
               { label: 'Active', value: 'ACTIVE' },
               { label: 'Blocked', value: 'BLOCKED' },
@@ -193,6 +195,7 @@ export const TeamsPage: React.FC = () => {
         </div>
 
         <Table 
+          scroll={{ x: 'max-content' }}
           columns={columns} 
           dataSource={teams} 
           rowKey="id" 

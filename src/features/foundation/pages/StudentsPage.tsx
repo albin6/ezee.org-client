@@ -206,19 +206,20 @@ export const StudentsPage: React.FC = () => {
         } 
       />
       
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <div className="mb-4 flex gap-4">
-          <Input.Search placeholder="Search students..." onSearch={handleSearch} allowClear className="w-64" />
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+        <div className="mb-4 flex flex-col sm:flex-row gap-4">
+          <Input.Search placeholder="Search students..." onSearch={handleSearch} allowClear className="w-full sm:w-64" />
           <Select
             placeholder="Filter by Batch"
             allowClear
             onChange={(val) => { setBatchFilter(val); setPage(1); }}
-            className="w-48"
+            className="w-full sm:w-48"
             options={batches.map(b => ({ label: b.name, value: b.id }))}
           />
         </div>
 
         <Table 
+          scroll={{ x: 'max-content' }}
           columns={columns} 
           dataSource={students} 
           rowKey="id" 

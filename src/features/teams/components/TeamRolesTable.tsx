@@ -197,8 +197,8 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between">
-        <h3 className="text-lg font-medium">Team Roles</h3>
+      <div className="mb-4 flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
+        <h3 className="text-lg font-medium m-0">Team Roles</h3>
         {hasPermission('teams:write') && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
             Add Role
@@ -212,6 +212,7 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
           strategy={verticalListSortingStrategy}
         >
           <Table 
+            scroll={{ x: 'max-content' }}
             components={{
               body: {
                 row: Row,

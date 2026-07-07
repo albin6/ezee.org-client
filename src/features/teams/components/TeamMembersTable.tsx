@@ -193,12 +193,13 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
         <Input.Search
           placeholder="Search members..."
           allowClear
           onSearch={setSearch}
-          style={{ width: 300 }}
+          className="w-full sm:w-auto"
+          style={{ maxWidth: 300 }}
         />
         {hasPermission('teams:write') && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
@@ -208,6 +209,7 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
       </div>
 
       <Table 
+        scroll={{ x: 'max-content' }}
         columns={columns} 
         dataSource={members} 
         rowKey="id" 

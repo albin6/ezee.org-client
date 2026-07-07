@@ -150,6 +150,7 @@ export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, 
           strategy={verticalListSortingStrategy}
         >
           <Table
+            scroll={{ x: 'max-content' }}
             components={{
               body: {
                 row: Row,

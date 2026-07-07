@@ -16,7 +16,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, extr
         <Title level={3} className="!mb-1 text-gray-900">{title}</Title>
         {description && <Text className="text-gray-500">{description}</Text>}
       </div>
-      {extra && <div className="flex items-center gap-3">{extra}</div>}
+      {extra && <div className="flex items-center gap-3 flex-wrap">{extra}</div>}
     </div>
   );
 };
