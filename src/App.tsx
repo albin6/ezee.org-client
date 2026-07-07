@@ -1,8 +1,19 @@
 import { RouterProvider } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { router } from '@/app/router';
+import { PWAInstallPrompt } from '@/shared/components/PWAInstallPrompt';
+import { useEffect } from 'react';
 
 function App() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+      });
+    }
+  }, []);
   return (
     <ConfigProvider
       theme={{
@@ -35,6 +46,7 @@ function App() {
       }}
     >
       <RouterProvider router={router} />
+      <PWAInstallPrompt />
     </ConfigProvider>
   );
 }
