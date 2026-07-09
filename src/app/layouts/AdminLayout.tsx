@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
 import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { PushNotificationManager } from '@/shared/components/PushNotificationManager';
 
 const { Header, Content, Sider } = Layout;
 
@@ -206,7 +208,8 @@ export const AdminLayout: React.FC = () => {
                location.pathname === '/users' ? 'User Management' : ''}
             </div>
           </div>
-          <div>
+          <div className="flex items-center gap-4">
+            <PushNotificationManager />
             <Dropdown menu={{ items: userMenu.props.items }} placement="bottomRight" arrow>
               <Button type="text" className="flex items-center gap-2 h-auto py-1">
                 <Avatar icon={<UserOutlined />} className="bg-purple-600" />
