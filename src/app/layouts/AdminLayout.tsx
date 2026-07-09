@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
 import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { PushNotificationManager } from '@/shared/components/PushNotificationManager';
@@ -76,7 +75,7 @@ export const AdminLayout: React.FC = () => {
 
   if (hasPermission('foundation:read')) {
     const foundationChildren: any[] = [];
-    
+
     if (hasPermission('batches:read')) {
       foundationChildren.push({
         key: '/batches',
@@ -202,10 +201,10 @@ export const AdminLayout: React.FC = () => {
               />
             </div>
             <div className="text-xl font-semibold text-gray-800">
-              {location.pathname === '/dashboard' ? 'Dashboard' : 
-               location.pathname === '/profile' ? 'Profile' : 
-               location.pathname === '/roles' ? 'Roles & Permissions' : 
-               location.pathname === '/users' ? 'User Management' : ''}
+              {location.pathname === '/dashboard' ? 'Dashboard' :
+                location.pathname === '/profile' ? 'Profile' :
+                  location.pathname === '/roles' ? 'Roles & Permissions' :
+                    location.pathname === '/users' ? 'User Management' : ''}
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -224,14 +223,14 @@ export const AdminLayout: React.FC = () => {
           {(() => {
             const path = location.pathname;
             if (path === '/tickets/new' && !hasPermission('tickets:create')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
-            
+
             if (path.startsWith('/roles') && !hasPermission('roles:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
             if (path.startsWith('/batches') && !hasPermission('batches:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
             if (path.startsWith('/students') && !hasPermission('students:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
             if (path.startsWith('/teams') && !hasPermission('teams:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
             if (path.startsWith('/users') && !hasPermission('users:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
             if (path.startsWith('/tickets') && !hasPermission('tickets:read')) return <div className="text-center p-8 text-gray-500">Access Denied</div>;
-            
+
             return <Outlet />;
           })()}
         </Content>
