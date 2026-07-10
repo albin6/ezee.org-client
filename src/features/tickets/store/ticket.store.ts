@@ -11,7 +11,7 @@ interface TicketState {
   fetchTickets: (params: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (payload: any) => Promise<void>;
-  updateStatus: (id: string, status: string) => Promise<void>;
+  updateStatus: (id: string, status: string, version?: number) => Promise<void>;
   addMessage: (id: string, content: string) => Promise<void>;
 }
 
@@ -53,10 +53,10 @@ export const useTicketStore = create<TicketState>((set) => ({
     }
   },
 
-  updateStatus: async (id, status) => {
+  updateStatus: async (id, status, version) => {
     set({ loading: true, error: null });
     try {
-      const response = await ticketService.updateStatus(id, status);
+      const response = await ticketService.updateStatus(id, status, version);
       set({ currentTicket: response.data, loading: false });
     } catch (error: any) {
       set({ error: error.message || 'Failed to update ticket status', loading: false });

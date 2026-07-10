@@ -41,7 +41,7 @@ export const TicketDetailsPage: React.FC = () => {
       okText: 'Yes',
       cancelText: 'No',
       onOk: async () => {
-        await updateStatus(id, status);
+        await updateStatus(id, status, ticket?.version);
       }
     });
   };

@@ -16,6 +16,7 @@ export interface Ticket {
   team?: { id: string; name: string };
   assignees?: { user: { id: string; name: string; email: string } }[];
   messages?: { id: string; content: string; createdAt: string; user: { id: string; name: string } }[];
+  version: number;
 }
 
 export const ticketService = {
@@ -34,8 +35,8 @@ export const ticketService = {
     return data;
   },
 
-  updateStatus: async (id: string, status: string) => {
-    const { data } = await apiClient.patch(`/tickets/${id}/status`, { status });
+  updateStatus: async (id: string, status: string, version?: number) => {
+    const { data } = await apiClient.patch(`/tickets/${id}/status`, { status, version });
     return data;
   },
 
