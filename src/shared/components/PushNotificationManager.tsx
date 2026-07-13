@@ -29,7 +29,11 @@ export const PushNotificationManager: React.FC = () => {
 
   const checkSubscription = async () => {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        setIsSubscribed(false);
+        return;
+      }
       const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
     } catch (error) {
@@ -50,7 +54,17 @@ export const PushNotificationManager: React.FC = () => {
       const { data } = await pushNotificationsApi.getVapidPublicKey();
       const convertedVapidKey = urlBase64ToUint8Array(data.publicKey);
 
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        registration = await navigator.serviceWorker.register('/sw.js');
+      }
+      if (!registration) {
+         throw new Error("Service Worker registration failed");
+      }
+      
+      // Ensure the service worker is active before subscribing
+      registration = await navigator.serviceWorker.ready;
+      
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: convertedVapidKey,
@@ -70,7 +84,11 @@ export const PushNotificationManager: React.FC = () => {
   const handleUnsubscribe = async () => {
     setLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        setIsSubscribed(false);
+        return;
+      }
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         await pushNotificationsApi.unsubscribe(subscription.endpoint);
