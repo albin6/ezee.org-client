@@ -30,7 +30,17 @@ self.addEventListener('push', function(event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      const isFocused = clientList.some((client) => client.visibilityState === 'visible');
+      
+      // If the app is open and visible, rely on the in-app SSE notification Toast
+      if (isFocused) {
+        return null;
+      }
+      
+      // Otherwise, show the native OS push notification
+      return self.registration.showNotification(title, options);
+    })
   );
 });
 

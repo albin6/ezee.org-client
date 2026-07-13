@@ -4,21 +4,31 @@ import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuO
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
-import { PushNotificationManager } from '@/shared/components/PushNotificationManager';
+import { useNotificationStore } from '@/features/notifications/store/notification.store';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 
 const { Header, Content, Sider } = Layout;
 
 export const AdminLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuthStore();
+  const { user, logout, accessToken } = useAuthStore();
+  const { connectSSE, disconnectSSE } = useNotificationStore();
   const { hasPermission } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
     logout();
+    disconnectSSE();
     navigate('/login');
   };
+
+  React.useEffect(() => {
+    if (accessToken) {
+      connectSSE(accessToken);
+    }
+    return () => disconnectSSE();
+  }, [accessToken, connectSSE, disconnectSSE]);
 
   const userMenu = (
     <Menu
@@ -208,7 +218,7 @@ export const AdminLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <PushNotificationManager />
+            <NotificationBell />
             <Dropdown menu={{ items: userMenu.props.items }} placement="bottomRight" arrow>
               <Button type="text" className="flex items-center gap-2 h-auto py-1">
                 <Avatar icon={<UserOutlined />} className="bg-purple-600" />

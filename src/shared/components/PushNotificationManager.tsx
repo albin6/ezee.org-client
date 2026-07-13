@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Tooltip, message } from 'antd';
-import { BellOutlined, BellFilled } from '@ant-design/icons';
+import { Switch, Typography, message } from 'antd';
 import { pushNotificationsApi } from '@/features/notifications/api/pushNotifications';
+
+const { Text } = Typography;
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -88,14 +89,14 @@ export const PushNotificationManager: React.FC = () => {
   if (!isSupported) return null;
 
   return (
-    <Tooltip title={isSubscribed ? "Disable Notifications" : "Enable Notifications"}>
-      <Button
-        type="text"
-        icon={isSubscribed ? <BellFilled className="text-purple-600 text-lg" /> : <BellOutlined className="text-gray-500 text-lg" />}
-        onClick={isSubscribed ? handleUnsubscribe : handleSubscribe}
+    <div className="flex items-center justify-between gap-4 w-full">
+      <Text className="text-sm">OS Push Notifications</Text>
+      <Switch 
+        checked={isSubscribed}
         loading={loading}
-        className="flex items-center justify-center"
+        onChange={(checked) => checked ? handleSubscribe() : handleUnsubscribe()}
+        size="small"
       />
-    </Tooltip>
+    </div>
   );
 };
