@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Popover, List, Typography, Button, Space } from 'antd';
-import { BellOutlined, CheckOutlined } from '@ant-design/icons';
+import { Badge, Popover, List, Typography, Button } from 'antd';
+import { BellOutlined } from '@ant-design/icons';
 import { useNotificationStore } from '../store/notification.store';
 import { useNavigate } from 'react-router-dom';
 import { PushNotificationManager } from '@/shared/components/PushNotificationManager';
@@ -27,14 +27,14 @@ export const NotificationBell: React.FC = () => {
   };
 
   const content = (
-    <div style={{ width: 350, maxHeight: 400, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: 'clamp(280px, 90vw, 350px)', maxHeight: 400, display: 'flex', flexDirection: 'column' }}>
       <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <Text strong className="text-base">Notifications</Text>
-          <Button 
-            type="link" 
-            size="small" 
-            onClick={() => markAllAsRead()} 
+          <Button
+            type="link"
+            size="small"
+            onClick={() => markAllAsRead()}
             disabled={unreadCount === 0}
             className="px-0"
           >
@@ -57,16 +57,16 @@ export const NotificationBell: React.FC = () => {
             >
               <List.Item.Meta
                 title={
-                  <div className="flex justify-between items-start">
-                    <Text strong={!item.isRead} className="text-sm">
+                  <div className="flex justify-between items-start gap-2">
+                    <Text strong={!item.isRead} className="text-sm flex-1 break-words">
                       {item.title}
                     </Text>
-                    {!item.isRead && <Badge status="processing" />}
+                    {!item.isRead && <Badge status="processing" className="mt-1 flex-shrink-0" />}
                   </div>
                 }
                 description={
                   <div className="flex flex-col gap-1 mt-1">
-                    <Text type="secondary" className="text-xs line-clamp-2">{item.body}</Text>
+                    <Text type="secondary" className="text-xs break-words whitespace-pre-wrap">{item.body}</Text>
                     <Text type="secondary" className="text-[10px]">
                       {new Date(item.createdAt).toLocaleString()}
                     </Text>
@@ -81,9 +81,9 @@ export const NotificationBell: React.FC = () => {
   );
 
   return (
-    <Popover 
-      content={content} 
-      title={null} 
+    <Popover
+      content={content}
+      title={null}
       trigger="click"
       open={open}
       onOpenChange={setOpen}
