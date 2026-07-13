@@ -75,7 +75,11 @@ export const PushNotificationManager: React.FC = () => {
       message.success('Push notifications enabled!');
     } catch (error: any) {
       console.error('Failed to subscribe:', error);
-      message.error(error?.response?.data?.message || 'Failed to enable notifications');
+      let errorMsg = error?.response?.data?.message || 'Failed to enable notifications';
+      if (error?.name === 'AbortError' || error?.message?.includes('push service error')) {
+         errorMsg = 'Push service unavailable. If using Brave, enable Google Push Services in settings.';
+      }
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
