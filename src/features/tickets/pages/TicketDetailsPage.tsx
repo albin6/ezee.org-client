@@ -101,7 +101,7 @@ export const TicketDetailsPage: React.FC = () => {
 
   return (
     <PageContainer>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <Title level={3} className="!mb-1">{ticket.title}</Title>
           <Space>
@@ -114,7 +114,7 @@ export const TicketDetailsPage: React.FC = () => {
       </div>
 
       {ticket.status === 'RESOLVED' && (isCreator || isAdmin) && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <Text strong className="text-blue-800 block text-base mb-1">This ticket has been marked as Resolved.</Text>
             <Text className="text-blue-600">Please review the resolution. You can close it permanently or reopen it if you need further clarification.</Text>
@@ -126,8 +126,8 @@ export const TicketDetailsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="col-span-1 lg:col-span-2 space-y-6">
           <Card>
             <Title level={5}>Description</Title>
             <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
@@ -171,12 +171,12 @@ export const TicketDetailsPage: React.FC = () => {
                   return (
                     <div key={msg.id} className={`flex items-end gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                       <Avatar icon={<UserOutlined />} className="flex-shrink-0 bg-gray-300" />
-                      <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          <Text strong className="text-xs">{isMe ? 'You' : msg.user.name}</Text>
-                          <Text type="secondary" className="text-[10px]">{new Date(msg.createdAt).toLocaleString()}</Text>
+                      <div className={`flex flex-col max-w-[90%] sm:max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1 px-1">
+                          <Text strong className="text-xs whitespace-nowrap">{isMe ? 'You' : msg.user.name}</Text>
+                          <Text type="secondary" className="text-[10px] whitespace-nowrap">{new Date(msg.createdAt).toLocaleString()}</Text>
                           <button 
-                            className="text-[10px] text-gray-400 hover:text-blue-500 flex items-center cursor-pointer bg-transparent border-none p-0 ml-1"
+                            className="text-[10px] text-gray-400 hover:text-blue-500 flex items-center cursor-pointer bg-transparent border-none p-0 ml-1 whitespace-nowrap"
                             onClick={() => setReplyingTo({ id: msg.id, name: isMe ? 'You' : msg.user.name, content: msg.content })}
                           >
                             <EnterOutlined /> Reply

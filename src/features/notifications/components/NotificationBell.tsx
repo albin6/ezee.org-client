@@ -27,7 +27,7 @@ export const NotificationBell: React.FC = () => {
   };
 
   const content = (
-    <div className="flex flex-col w-[350px] max-w-[calc(100vw-32px)] max-h-[75vh] sm:max-h-[400px]">
+    <div className="flex flex-col w-[300px] sm:w-[350px] max-h-[75vh] sm:max-h-[400px]">
       <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <Text strong className="text-base">Notifications</Text>
