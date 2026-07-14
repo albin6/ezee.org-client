@@ -76,23 +76,36 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       socket.off('NEW_NOTIFICATION');
       socket.on('NEW_NOTIFICATION', (newNotif: InAppNotification) => {
         console.log('Received NEW_NOTIFICATION in store:', newNotif);
-        set((state) => ({
-          notifications: [newNotif, ...state.notifications],
-          unreadCount: state.unreadCount + 1,
-        }));
 
-        notification.info({
-          message: newNotif.title,
-          description: newNotif.body,
-          placement: 'topRight',
-          duration: 5,
-          onClick: () => {
-            if (newNotif.linkUrl) {
-              window.location.href = newNotif.linkUrl;
+        const isCurrentPage = newNotif.linkUrl && window.location.pathname === newNotif.linkUrl;
+
+        if (isCurrentPage) {
+          // User is currently looking at this exact page (e.g., ticket chat)
+          // Mark as read immediately and don't increment badge or show toast
+          newNotif.isRead = true;
+          set((state) => ({
+            notifications: [newNotif, ...state.notifications],
+          }));
+          get().markAsRead(newNotif.id);
+        } else {
+          set((state) => ({
+            notifications: [newNotif, ...state.notifications],
+            unreadCount: state.unreadCount + 1,
+          }));
+
+          notification.info({
+            message: newNotif.title,
+            description: newNotif.body,
+            placement: 'topRight',
+            duration: 5,
+            onClick: () => {
+              if (newNotif.linkUrl) {
+                window.location.href = newNotif.linkUrl;
+              }
+              get().markAsRead(newNotif.id);
             }
-            get().markAsRead(newNotif.id);
-          }
-        });
+          });
+        }
       });
 
       set({ isSocketConnected: true });
