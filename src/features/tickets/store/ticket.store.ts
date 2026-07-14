@@ -129,6 +129,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     // We only attach listeners once per room join to avoid duplicates
     socket.off('NEW_MESSAGE');
     socket.off('REACTION_UPDATED');
+    socket.off('TICKET_UPDATED');
 
     socket.on('NEW_MESSAGE', (message: any) => {
       get().handleNewMessage(message);
@@ -136,6 +137,13 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
     socket.on('REACTION_UPDATED', (data: any) => {
       get().handleReactionUpdated(data);
+    });
+
+    socket.on('TICKET_UPDATED', (updatedTicket: any) => {
+      const ct = get().currentTicket;
+      if (ct && ct.id === updatedTicket.id) {
+        set({ currentTicket: updatedTicket });
+      }
     });
   },
 
@@ -145,6 +153,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       socket.emit('leaveTicket', { ticketId });
       socket.off('NEW_MESSAGE');
       socket.off('REACTION_UPDATED');
+      socket.off('TICKET_UPDATED');
     }
   },
 

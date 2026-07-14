@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { inAppNotificationService } from '../api/notification.service';
 import type { InAppNotification } from "../api/notification.service"
-import { message } from 'antd';
+import { notification } from 'antd';
 import { socketService } from '@/shared/services/socket.service';
 
 interface NotificationState {
@@ -75,13 +75,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       
       socket.off('NEW_NOTIFICATION');
       socket.on('NEW_NOTIFICATION', (newNotif: InAppNotification) => {
+        console.log('Received NEW_NOTIFICATION in store:', newNotif);
         set((state) => ({
           notifications: [newNotif, ...state.notifications],
           unreadCount: state.unreadCount + 1,
         }));
 
-        message.info({
-          content: newNotif.title,
+        notification.info({
+          message: newNotif.title,
+          description: newNotif.body,
+          placement: 'topRight',
+          duration: 5,
           onClick: () => {
             if (newNotif.linkUrl) {
               window.location.href = newNotif.linkUrl;
