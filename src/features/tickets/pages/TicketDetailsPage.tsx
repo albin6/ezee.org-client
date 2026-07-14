@@ -92,6 +92,19 @@ export const TicketDetailsPage: React.FC = () => {
         <Button onClick={() => navigate('/tickets')}>Back to Tickets</Button>
       </div>
 
+      {ticket.status === 'RESOLVED' && (isCreator || isAdmin) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div>
+            <Text strong className="text-blue-800 block text-base mb-1">This ticket has been marked as Resolved.</Text>
+            <Text className="text-blue-600">Please review the resolution. You can close it permanently or reopen it if you need further clarification.</Text>
+          </div>
+          <Space>
+            <Button onClick={() => handleStatusChange('REOPENED')}>Reopen Ticket</Button>
+            <Button type="primary" onClick={() => handleStatusChange('CLOSED')}>Close Permanently</Button>
+          </Space>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-6">
           <Card>
