@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Popover, List, Typography, Button } from 'antd';
+import { Badge, Popover, List, Typography, Button, Grid } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 import { useNotificationStore } from '../store/notification.store';
 import { useNavigate } from 'react-router-dom';
 import { PushNotificationManager } from '@/shared/components/PushNotificationManager';
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export const NotificationBell: React.FC = () => {
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead } = useNotificationStore();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const screens = useBreakpoint();
 
   useEffect(() => {
     fetchNotifications();
@@ -27,7 +29,7 @@ export const NotificationBell: React.FC = () => {
   };
 
   const content = (
-    <div className="flex flex-col w-[300px] sm:w-[350px] max-h-[75vh] sm:max-h-[400px]">
+    <div className="flex flex-col w-[90vw] sm:w-[350px] max-h-[75vh] sm:max-h-[400px]">
       <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <Text strong className="text-base">Notifications</Text>
@@ -52,7 +54,7 @@ export const NotificationBell: React.FC = () => {
           locale={{ emptyText: 'No notifications' }}
           renderItem={(item) => (
             <List.Item
-              className={`cursor-pointer transition-colors px-4 py-3 hover:bg-gray-50 ${!item.isRead ? 'bg-blue-50/30' : ''}`}
+              className={`cursor-pointer transition-colors !px-4 !py-3 hover:bg-gray-50 ${!item.isRead ? 'bg-blue-50/30' : ''}`}
               onClick={() => handleNotificationClick(item)}
             >
               <List.Item.Meta
@@ -88,9 +90,9 @@ export const NotificationBell: React.FC = () => {
       trigger="click"
       open={open}
       onOpenChange={setOpen}
-      placement="bottomRight"
+      placement={screens.sm ? "bottomRight" : "bottom"}
       overlayInnerStyle={{ padding: 0 }}
-      overlayStyle={{ maxWidth: 'calc(100vw - 32px)' }}
+      overlayStyle={screens.sm ? { maxWidth: 'calc(100vw - 32px)' } : { maxWidth: '100vw' }}
     >
       <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]}>
         <Button type="text" shape="circle" icon={<BellOutlined className="text-lg" />} />
