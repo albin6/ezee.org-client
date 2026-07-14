@@ -45,7 +45,7 @@ export const NotificationBell: React.FC = () => {
           <PushNotificationManager />
         </div>
       </div>
-      <div className="overflow-y-auto flex-1">
+      <div className="overflow-y-auto overflow-x-hidden flex-1">
         <List
           itemLayout="horizontal"
           dataSource={notifications}
@@ -56,17 +56,18 @@ export const NotificationBell: React.FC = () => {
               onClick={() => handleNotificationClick(item)}
             >
               <List.Item.Meta
+                className="w-full min-w-0"
                 title={
-                  <div className="flex justify-between items-start gap-2">
-                    <Text strong={!item.isRead} className="text-sm flex-1 break-words">
+                  <div className="flex justify-between items-start gap-2 w-full min-w-0">
+                    <Text strong={!item.isRead} className="text-sm flex-1 min-w-0 break-words">
                       {item.title}
                     </Text>
                     {!item.isRead && <Badge status="processing" className="mt-1 flex-shrink-0" />}
                   </div>
                 }
                 description={
-                  <div className="flex flex-col gap-1 mt-1">
-                    <Text type="secondary" className="text-xs break-words whitespace-pre-wrap">{item.body}</Text>
+                  <div className="flex flex-col gap-1 mt-1 w-full min-w-0">
+                    <Text type="secondary" className="text-xs break-words whitespace-pre-wrap min-w-0">{item.body}</Text>
                     <Text type="secondary" className="text-[10px]">
                       {new Date(item.createdAt).toLocaleString()}
                     </Text>
