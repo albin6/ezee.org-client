@@ -40,8 +40,12 @@ export const ticketService = {
     return data;
   },
 
-  addMessage: async (id: string, content: string) => {
-    const { data } = await apiClient.post(`/tickets/${id}/messages`, { content });
+  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => {
+    const payload: any = { content };
+    if (statusChange) {
+      payload.statusChange = statusChange;
+    }
+    const { data } = await apiClient.post(`/tickets/${ticketId}/messages`, payload);
     return data;
   }
 };

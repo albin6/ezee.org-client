@@ -12,7 +12,7 @@ interface TicketState {
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (payload: any) => Promise<void>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
-  addMessage: (id: string, content: string) => Promise<void>;
+  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => Promise<void>;
 }
 
 export const useTicketStore = create<TicketState>((set) => ({
@@ -64,14 +64,16 @@ export const useTicketStore = create<TicketState>((set) => ({
     }
   },
 
-  addMessage: async (id, content) => {
-    set({ loading: true, error: null });
+  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => {
     try {
-      const response = await ticketService.addMessage(id, content);
-      set({ currentTicket: response.data, loading: false });
+      set({ loading: true, error: null });
+      const response = await ticketService.addMessage(id, content, statusChange);
+      set({ currentTicket: response.data });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to add message', loading: false });
+      set({ error: error.message || 'Failed to add message' });
       throw error;
+    } finally {
+      set({ loading: false });
     }
-  }
+  },
 }));

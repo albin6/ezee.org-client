@@ -16,6 +16,7 @@ export const TicketDetailsPage: React.FC = () => {
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
   const [message, setMessage] = useState('');
+  const [showResolvePrompt, setShowResolvePrompt] = useState(false);
 
   useEffect(() => {
     if (id) fetchTicket(id);
@@ -29,6 +30,17 @@ export const TicketDetailsPage: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!message.trim() || !id) return;
+    
+    const authUser: any = user;
+    const authUserId = authUser?.id || authUser?.sub;
+    const isCreator = ticket.createdBy?.id === authUserId;
+    const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
+
+    if (ticket.status === 'RESOLVED' && (isCreator || isAdmin)) {
+      setShowResolvePrompt(true);
+      return;
+    }
+
     await addMessage(id, message);
     setMessage('');
   };
@@ -229,6 +241,41 @@ export const TicketDetailsPage: React.FC = () => {
           </Card>
         </div>
       </div>
+      <Modal
+        title="Ticket is Resolved"
+        open={showResolvePrompt}
+        onCancel={() => setShowResolvePrompt(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setShowResolvePrompt(false)}>
+            Cancel
+          </Button>,
+          <Button 
+            key="reopen" 
+            onClick={async () => {
+              if (!id) return;
+              await addMessage(id, message, 'REOPENED');
+              setMessage('');
+              setShowResolvePrompt(false);
+            }}
+          >
+            Reopen Ticket
+          </Button>,
+          <Button 
+            key="close" 
+            type="primary" 
+            onClick={async () => {
+              if (!id) return;
+              await addMessage(id, message, 'CLOSED');
+              setMessage('');
+              setShowResolvePrompt(false);
+            }}
+          >
+            Close Permanently
+          </Button>,
+        ]}
+      >
+        <p>This ticket is currently marked as Resolved. How would you like to proceed with your message?</p>
+      </Modal>
     </PageContainer>
   );
 };
