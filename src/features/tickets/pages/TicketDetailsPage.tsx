@@ -19,6 +19,7 @@ export const TicketDetailsPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showResolvePrompt, setShowResolvePrompt] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string, name: string, content: string } | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -37,7 +38,7 @@ export const TicketDetailsPage: React.FC = () => {
   }, [ticket?.messages]);
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !id) return;
+    if (!message.trim() || !id || isSending) return;
     
     const authUser: any = user;
     const authUserId = authUser?.id || authUser?.sub;
@@ -49,9 +50,14 @@ export const TicketDetailsPage: React.FC = () => {
       return;
     }
 
-    await addMessage(id, message, undefined, replyingTo?.id);
-    setMessage('');
-    setReplyingTo(null);
+    setIsSending(true);
+    try {
+      await addMessage(id, message, undefined, replyingTo?.id);
+      setMessage('');
+      setReplyingTo(null);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleStatusChange = (status: string) => {
@@ -239,8 +245,9 @@ export const TicketDetailsPage: React.FC = () => {
                     placeholder="Type your message..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    disabled={isSending}
                   />
-                  <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage}>
+                  <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage} loading={isSending}>
                     Send
                   </Button>
                 </div>
@@ -305,17 +312,23 @@ export const TicketDetailsPage: React.FC = () => {
         open={showResolvePrompt}
         onCancel={() => setShowResolvePrompt(false)}
         footer={[
-          <Button key="cancel" onClick={() => setShowResolvePrompt(false)}>
+          <Button key="cancel" onClick={() => setShowResolvePrompt(false)} disabled={isSending}>
             Cancel
           </Button>,
           <Button 
             key="reopen" 
+            loading={isSending}
             onClick={async () => {
-              if (!id) return;
-              await addMessage(id, message, 'REOPENED', replyingTo?.id);
-              setMessage('');
-              setReplyingTo(null);
-              setShowResolvePrompt(false);
+              if (!id || isSending) return;
+              setIsSending(true);
+              try {
+                await addMessage(id, message, 'REOPENED', replyingTo?.id);
+                setMessage('');
+                setReplyingTo(null);
+                setShowResolvePrompt(false);
+              } finally {
+                setIsSending(false);
+              }
             }}
           >
             Reopen Ticket
@@ -323,12 +336,18 @@ export const TicketDetailsPage: React.FC = () => {
           <Button 
             key="close" 
             type="primary" 
+            loading={isSending}
             onClick={async () => {
-              if (!id) return;
-              await addMessage(id, message, 'CLOSED', replyingTo?.id);
-              setMessage('');
-              setReplyingTo(null);
-              setShowResolvePrompt(false);
+              if (!id || isSending) return;
+              setIsSending(true);
+              try {
+                await addMessage(id, message, 'CLOSED', replyingTo?.id);
+                setMessage('');
+                setReplyingTo(null);
+                setShowResolvePrompt(false);
+              } finally {
+                setIsSending(false);
+              }
             }}
           >
             Close Permanently
