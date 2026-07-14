@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Ticket } from '../api/ticket.service';
 import { ticketService } from '../api/ticket.service';
+import { socketService } from '@/shared/services/socket.service';
 
 interface TicketState {
   tickets: Ticket[];
@@ -12,10 +13,15 @@ interface TicketState {
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (payload: any) => Promise<void>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
-  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => Promise<void>;
+  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => Promise<void>;
+  toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
+  joinTicketRoom: (ticketId: string) => void;
+  leaveTicketRoom: (ticketId: string) => void;
+  handleNewMessage: (message: any) => void;
+  handleReactionUpdated: (data: { messageId: string, message: any }) => void;
 }
 
-export const useTicketStore = create<TicketState>((set) => ({
+export const useTicketStore = create<TicketState>((set, get) => ({
   tickets: [],
   total: 0,
   loading: false,
@@ -64,16 +70,108 @@ export const useTicketStore = create<TicketState>((set) => ({
     }
   },
 
-  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => {
+  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => {
     try {
       set({ loading: true, error: null });
-      const response = await ticketService.addMessage(id, content, statusChange);
-      set({ currentTicket: response.data });
+      const response = await ticketService.addMessage(id, content, statusChange, replyToId);
+      // Let the socket handle real-time append if connected, but also update local state as fallback
+      // Actually, response.data returns the full ticket in the API. 
+      // But since we have websockets, NEW_MESSAGE will append it anyway.
+      // To prevent duplicate UI issues, we can just let NEW_MESSAGE handle it, but for safety:
+      set({ currentTicket: response.data, loading: false });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to add message' });
+      set({ error: error.message || 'Failed to add message', loading: false });
       throw error;
-    } finally {
-      set({ loading: false });
     }
   },
+
+  toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {
+    try {
+      await ticketService.toggleReaction(ticketId, messageId, reaction);
+      // UI update is handled via socket REACTION_UPDATED
+    } catch (error: any) {
+      console.error('Failed to toggle reaction', error);
+      throw error;
+    }
+  },
+
+  joinTicketRoom: (ticketId: string) => {
+    const socket = socketService.connect();
+    
+    // We pass lastTimestamp to fetch any missed messages while disconnected
+    const currentTicket = get().currentTicket;
+    let lastTimestamp: string | undefined = undefined;
+    
+    if (currentTicket && currentTicket.id === ticketId && currentTicket.messages && currentTicket.messages.length > 0) {
+      // Find latest message timestamp
+      lastTimestamp = currentTicket.messages[currentTicket.messages.length - 1].createdAt;
+    }
+
+    socket.emit('joinTicket', { ticketId, lastTimestamp }, (response: any) => {
+      if (response && response.status === 'success' && response.missedMessages) {
+        const { currentTicket: ct } = get();
+        if (ct && ct.id === ticketId) {
+          const existingIds = new Set(ct.messages?.map(m => m.id) || []);
+          const newMessages = response.missedMessages.filter((m: any) => !existingIds.has(m.id));
+          
+          if (newMessages.length > 0) {
+            set({ 
+              currentTicket: {
+                ...ct,
+                messages: [...(ct.messages || []), ...newMessages]
+              }
+            });
+          }
+        }
+      }
+    });
+
+    // We only attach listeners once per room join to avoid duplicates
+    socket.off('NEW_MESSAGE');
+    socket.off('REACTION_UPDATED');
+
+    socket.on('NEW_MESSAGE', (message: any) => {
+      get().handleNewMessage(message);
+    });
+
+    socket.on('REACTION_UPDATED', (data: any) => {
+      get().handleReactionUpdated(data);
+    });
+  },
+
+  leaveTicketRoom: (ticketId: string) => {
+    const socket = socketService.getSocket();
+    if (socket) {
+      socket.emit('leaveTicket', { ticketId });
+      socket.off('NEW_MESSAGE');
+      socket.off('REACTION_UPDATED');
+    }
+  },
+
+  handleNewMessage: (message: any) => {
+    const ct = get().currentTicket;
+    if (!ct || ct.id !== message.ticketId) return;
+
+    const existingMsg = ct.messages?.find(m => m.id === message.id);
+    if (!existingMsg) {
+      set({
+        currentTicket: {
+          ...ct,
+          messages: [...(ct.messages || []), message]
+        }
+      });
+    }
+  },
+
+  handleReactionUpdated: ({ messageId, message }) => {
+    const ct = get().currentTicket;
+    if (!ct) return;
+
+    set({
+      currentTicket: {
+        ...ct,
+        messages: ct.messages?.map(m => (m.id === messageId ? message : m))
+      }
+    });
+  }
 }));

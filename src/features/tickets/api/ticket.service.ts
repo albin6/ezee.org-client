@@ -15,7 +15,7 @@ export interface Ticket {
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
   assignees?: { user: { id: string; name: string; email: string } }[];
-  messages?: { id: string; content: string; createdAt: string; user: { id: string; name: string } }[];
+  messages?: { id: string; content: string; createdAt: string; isSystem: boolean; user: { id: string; name: string }; replyTo?: any; reactions?: any[] }[];
   version: number;
 }
 
@@ -40,12 +40,16 @@ export const ticketService = {
     return data;
   },
 
-  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED') => {
+  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => {
     const payload: any = { content };
-    if (statusChange) {
-      payload.statusChange = statusChange;
-    }
+    if (statusChange) payload.statusChange = statusChange;
+    if (replyToId) payload.replyToId = replyToId;
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages`, payload);
+    return data;
+  },
+
+  toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {
+    const { data } = await apiClient.post(`/tickets/${ticketId}/messages/${messageId}/reactions`, { reaction });
     return data;
   }
 };

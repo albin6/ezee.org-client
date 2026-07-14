@@ -27,7 +27,7 @@ export const NotificationBell: React.FC = () => {
   };
 
   const content = (
-    <div style={{ width: 'clamp(280px, 90vw, 350px)', maxHeight: 400, display: 'flex', flexDirection: 'column' }}>
+    <div className="flex flex-col w-[350px] max-w-[calc(100vw-32px)] max-h-[75vh] sm:max-h-[400px]">
       <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <Text strong className="text-base">Notifications</Text>
@@ -90,6 +90,7 @@ export const NotificationBell: React.FC = () => {
       onOpenChange={setOpen}
       placement="bottomRight"
       overlayInnerStyle={{ padding: 0 }}
+      overlayStyle={{ maxWidth: 'calc(100vw - 32px)' }}
     >
       <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]}>
         <Button type="text" shape="circle" icon={<BellOutlined className="text-lg" />} />

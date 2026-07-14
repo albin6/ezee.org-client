@@ -2,19 +2,20 @@ import { create } from 'zustand';
 import { inAppNotificationService } from '../api/notification.service';
 import type { InAppNotification } from "../api/notification.service"
 import { message } from 'antd';
+import { socketService } from '@/shared/services/socket.service';
 
 interface NotificationState {
   notifications: InAppNotification[];
   unreadCount: number;
   loading: boolean;
   error: string | null;
-  eventSource: EventSource | null;
+  isSocketConnected: boolean;
 
   fetchNotifications: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  connectSSE: (token: string) => void;
-  disconnectSSE: () => void;
+  connectSocket: () => void;
+  disconnectSocket: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -22,7 +23,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   loading: false,
   error: null,
-  eventSource: null,
+  isSocketConnected: false,
 
   fetchNotifications: async () => {
     set({ loading: true, error: null });
@@ -65,64 +66,45 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
   },
 
-  connectSSE: (token: string) => {
-    const { eventSource } = get();
-    if (eventSource) return; // Already connected
+  connectSocket: () => {
+    const { isSocketConnected } = get();
+    if (isSocketConnected) return;
 
-    // Use token in query param or rely on cookie depending on backend auth strategy
-    // We append the token to the URL for SSE since we can't set headers easily in EventSource
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
-    const source = new EventSource(`${baseUrl}/notifications/stream?token=${token}`);
+    try {
+      const socket = socketService.connect();
+      
+      socket.off('NEW_NOTIFICATION');
+      socket.on('NEW_NOTIFICATION', (newNotif: InAppNotification) => {
+        set((state) => ({
+          notifications: [newNotif, ...state.notifications],
+          unreadCount: state.unreadCount + 1,
+        }));
 
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.event === 'NEW_NOTIFICATION') {
-          const newNotif = payload.data as InAppNotification;
-
-          set((state) => ({
-            notifications: [newNotif, ...state.notifications],
-            unreadCount: state.unreadCount + 1,
-          }));
-
-          // Show Toast
-          message.info({
-            content: newNotif.title,
-            onClick: () => {
-              if (newNotif.linkUrl) {
-                window.location.href = newNotif.linkUrl;
-              }
-              get().markAsRead(newNotif.id);
+        message.info({
+          content: newNotif.title,
+          onClick: () => {
+            if (newNotif.linkUrl) {
+              window.location.href = newNotif.linkUrl;
             }
-          });
-        }
-      } catch (err) {
-        console.error('Error parsing SSE data', err);
-      }
-    };
+            get().markAsRead(newNotif.id);
+          }
+        });
+      });
 
-    source.onerror = (err) => {
-      console.error('SSE connection error:', err);
-      source.close();
-      set({ eventSource: null });
-
-      // Auto-reconnect logic could go here
-      setTimeout(() => {
-        const store = get();
-        if (!store.eventSource && token) {
-          store.connectSSE(token);
-        }
-      }, 5000);
-    };
-
-    set({ eventSource: source });
+      set({ isSocketConnected: true });
+    } catch (err) {
+      console.error('Failed to connect socket for notifications', err);
+    }
   },
 
-  disconnectSSE: () => {
-    const { eventSource } = get();
-    if (eventSource) {
-      eventSource.close();
-      set({ eventSource: null });
+  disconnectSocket: () => {
+    const socket = socketService.getSocket();
+    if (socket) {
+      socket.off('NEW_NOTIFICATION');
+      // We don't necessarily want to disconnect the entire socket here 
+      // because other features (tickets) might use it.
+      // The auth store logout will handle socketService.disconnect()
     }
+    set({ isSocketConnected: false });
   }
 }));

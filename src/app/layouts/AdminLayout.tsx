@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
 import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -11,24 +11,30 @@ const { Header, Content, Sider } = Layout;
 
 export const AdminLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout, accessToken } = useAuthStore();
-  const { connectSSE, disconnectSSE } = useNotificationStore();
+  const { user, logout, accessToken, isAuthenticated } = useAuthStore();
+  const { connectSocket, disconnectSocket } = useNotificationStore();
   const { hasPermission } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
     logout();
-    disconnectSSE();
     navigate('/login');
   };
 
-  React.useEffect(() => {
-    if (accessToken) {
-      connectSSE(accessToken);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      disconnectSocket();
+      navigate('/login');
     }
-    return () => disconnectSSE();
-  }, [accessToken, connectSSE, disconnectSSE]);
+  }, [isAuthenticated, navigate, disconnectSocket]);
+
+  useEffect(() => {
+    if (accessToken) {
+      connectSocket();
+    }
+    return () => disconnectSocket();
+  }, [accessToken, connectSocket, disconnectSocket]);
 
   const userMenu = (
     <Menu
