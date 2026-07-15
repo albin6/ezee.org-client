@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover } from 'antd';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image } from 'antd';
 import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -30,6 +30,7 @@ export const TicketDetailsPage: React.FC = () => {
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string, name: string, type: string } | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -348,7 +349,7 @@ export const TicketDetailsPage: React.FC = () => {
                                 if (isImage) {
                                   return (
                                     <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px]">
-                                      <img src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
+                                      <Image src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
                                     </div>
                                   );
                                 }
@@ -362,12 +363,10 @@ export const TicketDetailsPage: React.FC = () => {
                                 }
 
                                 return (
-                                  <a 
+                                  <div 
                                     key={att.id} 
-                                    href={att.fileUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className={`flex items-center gap-2 p-2 rounded border text-sm max-w-[250px] sm:max-w-[300px] hover:bg-gray-50 transition-colors ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30 hover:text-white' : 'bg-white border-gray-200 text-blue-600 hover:bg-blue-50'}`}
+                                    onClick={() => setPreviewFile({ url: att.fileUrl, name: att.fileName, type: att.fileType })}
+                                    className={`flex items-center gap-2 p-2 rounded border text-sm max-w-[250px] sm:max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30 hover:text-white' : 'bg-white border-gray-200 text-blue-600 hover:bg-blue-50'}`}
                                   >
                                     <FileOutlined className="text-lg flex-shrink-0" />
                                     <div className="flex flex-col overflow-hidden">
@@ -375,7 +374,7 @@ export const TicketDetailsPage: React.FC = () => {
                                       <span className="text-[10px] opacity-80 leading-tight">{(att.fileSize / 1024).toFixed(1)} KB</span>
                                     </div>
                                     <DownloadOutlined className="ml-auto flex-shrink-0 opacity-70" />
-                                  </a>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -433,11 +432,20 @@ export const TicketDetailsPage: React.FC = () => {
                         return (
                           <div key={index} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1 text-sm max-w-[200px]">
                             {isImage ? (
-                              <img src={URL.createObjectURL(file)} alt={file.name} className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                              <Image src={URL.createObjectURL(file)} alt={file.name} width={24} height={24} className="object-cover rounded flex-shrink-0" />
                             ) : (
                               <FileOutlined className="text-gray-400 flex-shrink-0" />
                             )}
-                            <span className="truncate max-w-[120px] text-gray-700">{file.name}</span>
+                            <span 
+                              className={`truncate max-w-[120px] text-gray-700 ${!isImage ? 'cursor-pointer hover:text-blue-500 hover:underline' : ''}`}
+                              onClick={() => {
+                                if (!isImage) {
+                                  setPreviewFile({ url: URL.createObjectURL(file), name: file.name, type: file.type });
+                                }
+                              }}
+                            >
+                              {file.name}
+                            </span>
                             <Button type="text" size="small" className="p-0 min-w-0 h-auto text-gray-400 hover:text-red-500" icon={<CloseOutlined className="text-[10px]" />} onClick={() => removeAttachment(index)} disabled={isSending || isUploadingAttachments} />
                           </div>
                         );
@@ -611,6 +619,27 @@ export const TicketDetailsPage: React.FC = () => {
         ]}
       >
         <p>This ticket is currently marked as Resolved. How would you like to proceed with your message?</p>
+      </Modal>
+
+      <Modal
+        title={previewFile?.name}
+        open={!!previewFile}
+        onCancel={() => setPreviewFile(null)}
+        footer={[
+          <Button key="download" type="primary" icon={<DownloadOutlined />} href={previewFile?.url} target="_blank" download>
+            Download
+          </Button>,
+          <Button key="close" onClick={() => setPreviewFile(null)}>Close</Button>
+        ]}
+        width={800}
+        centered
+        styles={{ body: { padding: 0, height: '70vh' } }}
+      >
+        {previewFile?.type.startsWith('video/') ? (
+          <video src={previewFile.url} controls autoPlay className="w-full h-full bg-black object-contain" />
+        ) : (
+          <iframe src={previewFile?.url} className="w-full h-full border-none" title={previewFile?.name} />
+        )}
       </Modal>
     </PageContainer>
   );
