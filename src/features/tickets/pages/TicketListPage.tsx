@@ -96,7 +96,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         className={isMobile ? 'w-full' : ''}
         style={isMobile ? undefined : { width: 140 }}
-        value={params.status}
+        value={params.status || undefined}
         onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
         options={[
           { value: 'OPEN', label: 'Open' },
@@ -112,7 +112,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         className={isMobile ? 'w-full' : ''}
         style={isMobile ? undefined : { width: 120 }}
-        value={params.priority}
+        value={params.priority || undefined}
         onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
         options={[
           { value: 'LOW', label: 'Low' },
@@ -129,7 +129,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : ''}
         style={isMobile ? undefined : { width: 160 }}
-        value={params.teamId}
+        value={params.teamId || undefined}
         onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
         options={teams.map(t => ({ value: t.id, label: t.name }))}
       />
@@ -141,7 +141,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : ''}
         style={isMobile ? undefined : { width: 160 }}
-        value={params.createdById}
+        value={params.createdById || undefined}
         onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
       />
@@ -153,7 +153,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : ''}
         style={isMobile ? undefined : { width: 160 }}
-        value={params.assigneeId}
+        value={params.assigneeId || undefined}
         onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
       />
