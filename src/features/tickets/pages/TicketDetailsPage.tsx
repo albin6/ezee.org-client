@@ -7,6 +7,7 @@ import { useTicketStore } from '../store/ticket.store';
 import { ticketService } from '../api/ticket.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
 import EmojiPicker from 'emoji-picker-react';
 
 const { Title, Text, Paragraph } = Typography;
@@ -36,6 +37,7 @@ export const TicketDetailsPage: React.FC = () => {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [openReactionPopoverId, setOpenReactionPopoverId] = useState<string | null>(null);
 
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -395,8 +397,8 @@ export const TicketDetailsPage: React.FC = () => {
                           <div className="flex flex-col">
                             <span className="whitespace-pre-wrap break-words text-[15px] leading-snug">{msg.content}</span>
                             {msg.audioUrl && (
-                              <div className="mt-1 mb-1 w-full max-w-[250px]">
-                                <audio controls src={msg.audioUrl} className="w-full h-10 rounded shadow-sm" />
+                              <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
+                                <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} userName={msg.user.name} />
                               </div>
                             )}
                             {msg.attachments && msg.attachments.length > 0 && (
@@ -463,9 +465,20 @@ export const TicketDetailsPage: React.FC = () => {
                           
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             <Popover 
-                              content={<EmojiPicker onEmojiClick={(e) => id && toggleReaction(id, msg.id, e.emoji)} height={350} width={300} />}
+                              content={
+                                <EmojiPicker 
+                                  onEmojiClick={(e) => {
+                                    if (id) toggleReaction(id, msg.id, e.emoji);
+                                    setOpenReactionPopoverId(null);
+                                  }} 
+                                  height={350} 
+                                  width={300} 
+                                />
+                              }
                               trigger="click"
                               placement={isMe ? "bottomRight" : "bottomLeft"}
+                              open={openReactionPopoverId === msg.id}
+                              onOpenChange={(open) => setOpenReactionPopoverId(open ? msg.id : null)}
                             >
                               <button className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm">
                                 <SmileOutlined />
