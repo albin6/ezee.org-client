@@ -13,7 +13,7 @@ interface TicketState {
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (payload: any) => Promise<void>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
-  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => Promise<void>;
+  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
   joinTicketRoom: (ticketId: string) => void;
   leaveTicketRoom: (ticketId: string) => void;
@@ -70,10 +70,10 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     }
   },
 
-  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => {
+  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string) => {
     try {
       set({ loading: true, error: null });
-      const response = await ticketService.addMessage(id, content, statusChange, replyToId);
+      const response = await ticketService.addMessage(id, content, statusChange, replyToId, audioUrl);
       // Let the socket handle real-time append if connected, but also update local state as fallback
       // Actually, response.data returns the full ticket in the API. 
       // But since we have websockets, NEW_MESSAGE will append it anyway.

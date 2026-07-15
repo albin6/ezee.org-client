@@ -15,7 +15,7 @@ export interface Ticket {
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
   assignees?: { user: { id: string; name: string; email: string } }[];
-  messages?: { id: string; content: string; createdAt: string; isSystem: boolean; user: { id: string; name: string }; replyTo?: any; reactions?: any[] }[];
+  messages?: { id: string; content: string; audioUrl?: string; createdAt: string; isSystem: boolean; user: { id: string; name: string }; replyTo?: any; reactions?: any[] }[];
   version: number;
 }
 
@@ -40,12 +40,26 @@ export const ticketService = {
     return data;
   },
 
-  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string) => {
+  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string) => {
     const payload: any = { content };
     if (statusChange) payload.statusChange = statusChange;
     if (replyToId) payload.replyToId = replyToId;
+    if (audioUrl) payload.audioUrl = audioUrl;
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages`, payload);
     return data;
+  },
+
+  uploadAudio: async (audioBlob: Blob): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'voice-message.webm');
+    
+    // We send this as multipart/form-data
+    const { data } = await apiClient.post('/upload/audio', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return data.data; // ApiResponse format: { status: 'success', data: { url: '...' } }
   },
 
   toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover } from 'antd';
-import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
+import { ticketService } from '../api/ticket.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import EmojiPicker from 'emoji-picker-react';
@@ -20,6 +21,26 @@ export const TicketDetailsPage: React.FC = () => {
   const [showResolvePrompt, setShowResolvePrompt] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string, name: string, content: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
+
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<any>(null);
+
+  // Cleanup object URLs to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (audioPreviewUrl) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+    };
+  }, [audioPreviewUrl]);
 
   useEffect(() => {
     if (id) {
@@ -38,7 +59,7 @@ export const TicketDetailsPage: React.FC = () => {
   }, [ticket?.messages]);
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !id || isSending) return;
+    if ((!message.trim() && !audioBlob) || !id || isSending) return;
     
     const authUser: any = user;
     const authUserId = authUser?.id || authUser?.sub;
@@ -52,12 +73,103 @@ export const TicketDetailsPage: React.FC = () => {
 
     setIsSending(true);
     try {
-      await addMessage(id, message, undefined, replyingTo?.id);
+      let finalAudioUrl = undefined;
+      if (audioBlob) {
+        const { url } = await ticketService.uploadAudio(audioBlob);
+        finalAudioUrl = url;
+      }
+      const finalMessage = message.trim() || '🎤 Voice Message';
+      await addMessage(id, finalMessage, undefined, replyingTo?.id, finalAudioUrl);
       setMessage('');
       setReplyingTo(null);
+      cancelRecording();
+    } catch (err) {
+      console.error('Failed to send message:', err);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        setAudioPreviewUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start(200);
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordingDuration(0);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+    }
+  };
+
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused')) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+    setIsRecording(false);
+    setIsPaused(false);
+    clearInterval(timerRef.current);
+    setAudioBlob(null);
+    if (audioPreviewUrl) {
+      URL.revokeObjectURL(audioPreviewUrl);
+    }
+    setAudioPreviewUrl(null);
+    setRecordingDuration(0);
+    audioChunksRef.current = [];
+  };
+
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleStatusChange = (status: string) => {
@@ -194,7 +306,12 @@ export const TicketDetailsPage: React.FC = () => {
                               <span className="font-semibold">{msg.replyTo.user.name}</span>: {msg.replyTo.content.substring(0, 50)}{msg.replyTo.content.length > 50 ? '...' : ''}
                             </div>
                           )}
-                          <Text className={isMe ? "text-white whitespace-pre-wrap" : "text-gray-800 whitespace-pre-wrap"}>{msg.content}</Text>
+                          <Text className={isMe ? "text-white whitespace-pre-wrap break-words" : "text-gray-800 whitespace-pre-wrap break-words"}>{msg.content}</Text>
+                          {msg.audioUrl && (
+                            <div className="mt-2 w-full max-w-[250px] sm:max-w-[300px]">
+                              <audio controls src={msg.audioUrl} className="w-full h-10 rounded shadow-sm" />
+                            </div>
+                          )}
                         </div>
                         
                         <div className={`flex gap-1 mt-1 flex-wrap ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -239,17 +356,50 @@ export const TicketDetailsPage: React.FC = () => {
                     <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyingTo(null)} />
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Input.TextArea
-                    rows={2}
-                    placeholder="Type your message..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    disabled={isSending}
-                  />
-                  <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage} loading={isSending}>
-                    Send
-                  </Button>
+                <div className="flex flex-col gap-2 relative border rounded bg-white p-2">
+                  
+                  {isRecording || audioBlob ? (
+                    <div className="flex items-center gap-3 bg-gray-50 p-2 rounded justify-between">
+                      <div className="flex items-center gap-3">
+                        {audioBlob && audioPreviewUrl ? (
+                           <audio controls src={audioPreviewUrl} className="h-10 max-w-[200px]" />
+                        ) : (
+                          <>
+                            <div className={`w-3 h-3 rounded-full ${isPaused ? 'bg-orange-400' : 'bg-red-500 animate-pulse'}`}></div>
+                            <span className="text-red-500 font-mono text-sm">{formatDuration(recordingDuration)}</span>
+                            {isPaused ? (
+                              <Button type="text" shape="circle" icon={<PlayCircleOutlined className="text-green-600 text-lg" />} onClick={resumeRecording} />
+                            ) : (
+                              <Button type="text" shape="circle" icon={<PauseCircleOutlined className="text-orange-500 text-lg" />} onClick={pauseRecording} />
+                            )}
+                            <Button type="text" shape="circle" icon={<StopOutlined className="text-red-500 text-lg" />} onClick={stopRecording} />
+                          </>
+                        )}
+                      </div>
+                      <Button type="text" shape="circle" icon={<DeleteOutlined className="text-gray-500" />} onClick={cancelRecording} />
+                    </div>
+                  ) : (
+                    <Input.TextArea
+                      variant="borderless"
+                      rows={2}
+                      placeholder="Type your message..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      disabled={isSending}
+                      className="resize-none"
+                    />
+                  )}
+
+                  <div className="flex justify-between items-center mt-1">
+                    <div>
+                      {!isRecording && !audioBlob && (
+                        <Button type="text" icon={<AudioOutlined className={message.trim() ? "text-gray-300" : "text-blue-500"} />} onClick={startRecording} disabled={isSending || message.trim().length > 0} title="Record voice message" />
+                      )}
+                    </div>
+                    <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage} loading={isSending} disabled={(!message.trim() && !audioBlob)}>
+                      Send
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
