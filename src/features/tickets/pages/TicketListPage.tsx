@@ -179,9 +179,11 @@ export const TicketListPage: React.FC = () => {
         description="Manage your enterprise tickets and issues here."
         extra={
           <div className="flex gap-2">
-            <Button className="md:hidden" icon={<FilterOutlined />} onClick={() => setIsFilterModalOpen(true)}>
-              Filters
-            </Button>
+            <div className="md:hidden">
+              <Button icon={<FilterOutlined />} onClick={() => setIsFilterModalOpen(true)}>
+                Filters
+              </Button>
+            </div>
             {hasPermission('tickets:create') && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/tickets/new')}>
                 Create Ticket
@@ -198,12 +200,14 @@ export const TicketListPage: React.FC = () => {
             <FilterOutlined className="text-gray-400" />
             <span className="font-medium text-gray-600">Filters</span>
           </div>
-          <Input.Search
-            placeholder="Search title, desc, ID..."
-            onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
-            style={{ width: 220 }}
-            allowClear
-          />
+          <div className="flex-1 min-w-[220px]">
+            <Input.Search
+              placeholder="Search title, desc, ID..."
+              onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+              className="w-full"
+              allowClear
+            />
+          </div>
           <FilterControls />
         </div>
 
