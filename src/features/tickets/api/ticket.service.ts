@@ -40,7 +40,17 @@ export const ticketService = {
     return data;
   },
 
-  createTicket: async (payload: { title: string; description?: string; teamId: string; assignees?: string[] }) => {
+  createTicket: async (payload: { 
+    title: string; 
+    description?: string; 
+    teamId: string; 
+    assignees?: string[];
+    firstMessage?: {
+      content?: string;
+      audioUrl?: string;
+      attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[];
+    }
+  }) => {
     const { data } = await apiClient.post('/tickets', payload);
     return data;
   },

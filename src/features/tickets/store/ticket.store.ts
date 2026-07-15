@@ -11,7 +11,17 @@ interface TicketState {
   currentTicket: Ticket | null;
   fetchTickets: (params?: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
-  createTicket: (payload: { title: string; description?: string; teamId: string; assignees?: string[] }) => Promise<void>;
+  createTicket: (payload: { 
+    title: string; 
+    description?: string; 
+    teamId: string; 
+    assignees?: string[];
+    firstMessage?: {
+      content?: string;
+      audioUrl?: string;
+      attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[];
+    }
+  }) => Promise<void>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
   addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
