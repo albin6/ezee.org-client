@@ -20,7 +20,17 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({ src, isM
     if (!audio) return;
 
     const setAudioData = () => {
-      setDuration(audio.duration);
+      if (audio.duration === Infinity || isNaN(audio.duration)) {
+        audio.currentTime = 1e6;
+        const fixDuration = () => {
+          audio.removeEventListener('timeupdate', fixDuration);
+          setDuration(audio.duration);
+          audio.currentTime = 0;
+        };
+        audio.addEventListener('timeupdate', fixDuration);
+      } else {
+        setDuration(audio.duration);
+      }
     };
 
     const setAudioTime = () => {
