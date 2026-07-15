@@ -57,8 +57,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   markAllAsRead: async () => {
     try {
       await inAppNotificationService.markAllAsRead();
-      set((state) => ({
-        notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+      set((_state) => ({
+        notifications: [],
         unreadCount: 0,
       }));
     } catch (error) {
@@ -72,7 +72,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     try {
       const socket = socketService.connect();
-      
+
       socket.off('NEW_NOTIFICATION');
       socket.on('NEW_NOTIFICATION', (newNotif: InAppNotification) => {
         console.log('Received NEW_NOTIFICATION in store:', newNotif);
