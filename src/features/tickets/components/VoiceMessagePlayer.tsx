@@ -6,10 +6,9 @@ interface VoiceMessagePlayerProps {
   src: string;
   isMe: boolean;
   avatarUrl?: string;
-  userName?: string;
 }
 
-export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({ src, isMe, avatarUrl, userName }) => {
+export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({ src, isMe, avatarUrl }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);

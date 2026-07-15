@@ -398,7 +398,7 @@ export const TicketDetailsPage: React.FC = () => {
                             <span className="whitespace-pre-wrap break-words text-[15px] leading-snug">{msg.content}</span>
                             {msg.audioUrl && (
                               <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
-                                <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} userName={msg.user.name} />
+                                <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />
                               </div>
                             )}
                             {msg.attachments && msg.attachments.length > 0 && (
