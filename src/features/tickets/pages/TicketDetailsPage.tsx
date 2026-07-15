@@ -274,69 +274,7 @@ export const TicketDetailsPage: React.FC = () => {
     });
   };
 
-  if (loading && !ticket) return <PageContainer className="!px-0 sm:!px-4 lg:!px-6 !max-w-full lg:!max-w-7xl">Loading...
-      <Drawer
-        title="Ticket Details"
-        placement="bottom"
-        onClose={() => setMobileDrawerOpen(false)}
-        open={mobileDrawerOpen}
-        height="85vh"
-        styles={{ body: { paddingBottom: 80 } }}
-      >
-        <div className="space-y-6">
-          <div>
-            <Title level={5}>Description</Title>
-            <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
-          </div>
-          <Divider />
-          <div className="space-y-4">
-            <div>
-              <Text type="secondary" className="block mb-1">Status</Text>
-              {canEditStatus ? (
-                <Select
-                  value={ticket.status}
-                  onChange={handleStatusChange}
-                  className="w-full"
-                  disabled={statusOptions.length <= 1}
-                  options={statusOptions}
-                />
-              ) : (
-                <Tag>{ticket.status}</Tag>
-              )}
-            </div>
-
-            <div>
-              <Text type="secondary" className="block mb-1">Priority</Text>
-              <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>
-                {ticket.priority}
-              </Tag>
-            </div>
-
-            <div>
-              <Text type="secondary" className="block mb-1">Team</Text>
-              <Text>{ticket.team?.name || 'N/A'}</Text>
-            </div>
-
-            <div>
-              <Text type="secondary" className="block mb-2">Assignees</Text>
-              {ticket.assignees?.length ? (
-                <div className="flex flex-col gap-2 w-full">
-                  {ticket.assignees.map((a: any) => (
-                    <div key={a.user.id} className="flex items-center gap-2">
-                      <Avatar size="small" icon={<UserOutlined />} />
-                      <Text>{a.user.name}</Text>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Text type="secondary">Unassigned</Text>
-              )}
-            </div>
-          </div>
-        </div>
-      </Drawer>
-
-    </PageContainer>;
+  if (loading && !ticket) return <PageContainer className="!px-0 sm:!px-4 lg:!px-6 !max-w-full lg:!max-w-7xl">Loading...</PageContainer>;
   if (!ticket) return <PageContainer>Ticket not found</PageContainer>;
 
   const authUser: any = user;
@@ -866,6 +804,67 @@ export const TicketDetailsPage: React.FC = () => {
           <iframe src={previewFile?.url} className="w-full h-full border-none" title={previewFile?.name} />
         )}
       </Modal>
+
+      <Drawer
+        title="Ticket Details"
+        placement="bottom"
+        onClose={() => setMobileDrawerOpen(false)}
+        open={mobileDrawerOpen}
+        height="85vh"
+        styles={{ body: { paddingBottom: 80 } }}
+      >
+        <div className="space-y-6">
+          <div>
+            <Title level={5}>Description</Title>
+            <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
+          </div>
+          <Divider />
+          <div className="space-y-4">
+            <div>
+              <Text type="secondary" className="block mb-1">Status</Text>
+              {canEditStatus ? (
+                <Select
+                  value={ticket.status}
+                  onChange={handleStatusChange}
+                  className="w-full"
+                  disabled={statusOptions.length <= 1}
+                  options={statusOptions}
+                />
+              ) : (
+                <Tag>{ticket.status}</Tag>
+              )}
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-1">Priority</Text>
+              <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>
+                {ticket.priority}
+              </Tag>
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-1">Team</Text>
+              <Text>{ticket.team?.name || 'N/A'}</Text>
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-2">Assignees</Text>
+              {ticket.assignees?.length ? (
+                <div className="flex flex-col gap-2 w-full">
+                  {ticket.assignees.map((a: any) => (
+                    <div key={a.user.id} className="flex items-center gap-2">
+                      <Avatar size="small" icon={<UserOutlined />} />
+                      <Text>{a.user.name}</Text>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Text type="secondary">Unassigned</Text>
+              )}
+            </div>
+          </div>
+        </div>
+      </Drawer>
     </PageContainer>
   );
 };

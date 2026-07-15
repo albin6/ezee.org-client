@@ -184,21 +184,70 @@ export const TicketListPage: React.FC = () => {
           />
         </div>
 
-        <Table
-          scroll={{ x: 'max-content' }}
-          dataSource={tickets}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          onChange={handleTableChange}
-          pagination={{
-            current: params.page,
-            pageSize: params.limit,
-            total: total,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} items`,
-          }}
-        />
+        <div className="hidden md:block">
+          <Table
+            scroll={{ x: 'max-content' }}
+            dataSource={tickets}
+            columns={columns}
+            rowKey="id"
+            loading={loading}
+            onChange={handleTableChange}
+            pagination={{
+              current: params.page,
+              pageSize: params.limit,
+              total: total,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} items`,
+            }}
+          />
+        </div>
+
+        <div className="block md:hidden space-y-3">
+          {tickets.length > 0 ? tickets.map((ticket: any) => (
+            <div 
+              key={ticket.id} 
+              className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              onClick={() => navigate(`/tickets/${ticket.id}`)}
+            >
+               <div className="flex justify-between items-start">
+                 <div className="flex gap-3 overflow-hidden">
+                    <Avatar className="bg-blue-100 text-blue-600 font-semibold flex-shrink-0 mt-0.5">{ticket.createdBy?.name?.charAt(0) || 'U'}</Avatar>
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <span className="font-semibold text-gray-800 leading-tight text-sm truncate">{ticket.title}</span>
+                      <span className="text-xs text-gray-500 mt-1 truncate">{ticket.createdBy?.name} • {ticket.team?.name || 'No Team'}</span>
+                    </div>
+                 </div>
+                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                   <span className="text-[10px] text-gray-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                   {ticket.status === 'OPEN' && (
+                     <span className="bg-[#1677ff] text-white text-[10px] px-2 py-0.5 rounded-full font-medium shadow-sm">New</span>
+                   )}
+                 </div>
+               </div>
+            </div>
+          )) : (
+            <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg">
+              No tickets found
+            </div>
+          )}
+          <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-100">
+            <Button 
+              size="small"
+              disabled={params.page === 1} 
+              onClick={() => setParams({ ...params, page: params.page - 1 })}
+            >
+              Previous
+            </Button>
+            <span className="text-xs text-gray-500">Page {params.page}</span>
+            <Button 
+              size="small"
+              disabled={tickets.length < params.limit}
+              onClick={() => setParams({ ...params, page: params.page + 1 })}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
     </PageContainer>
   );
