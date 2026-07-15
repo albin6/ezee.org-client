@@ -361,12 +361,13 @@ export const TicketDetailsPage: React.FC = () => {
                   loading={loading}
                   title="Refresh Conversation"
                 />
-                <Button
-                  className="lg:hidden"
-                  type="text"
-                  icon={<MoreOutlined className="text-lg" />}
-                  onClick={() => setMobileDrawerOpen(true)}
-                />
+                <div className="lg:hidden flex items-center">
+                  <Button
+                    type="text"
+                    icon={<MoreOutlined className="text-lg" />}
+                    onClick={() => setMobileDrawerOpen(true)}
+                  />
+                </div>
               </div>
             </div>
             
@@ -683,7 +684,7 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="col-span-1 space-y-6 hidden lg:block">
+        <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 space-y-6">
           <Card title="Details">
             <div className="space-y-4">
               <div>
