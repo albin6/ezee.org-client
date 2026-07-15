@@ -339,7 +339,7 @@ export const TicketDetailsPage: React.FC = () => {
             <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
           </Card>
 
-          <div className="flex flex-col flex-1 border border-gray-200 rounded-lg bg-white overflow-hidden shadow-sm h-[500px] lg:h-full relative">
+          <div className="flex flex-col flex-1 border border-gray-200 rounded-lg bg-white overflow-hidden shadow-sm min-h-[60vh] sm:min-h-[500px] lg:min-h-0 lg:h-full relative">
             <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0">
               <span className="font-semibold text-base">Conversation</span>
               <Button
