@@ -428,13 +428,20 @@ export const TicketDetailsPage: React.FC = () => {
                   
                   {attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded">
-                      {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1 text-sm max-w-[200px]">
-                          <FileOutlined className="text-gray-400 flex-shrink-0" />
-                          <span className="truncate max-w-[120px] text-gray-700">{file.name}</span>
-                          <Button type="text" size="small" className="p-0 min-w-0 h-auto text-gray-400 hover:text-red-500" icon={<CloseOutlined className="text-[10px]" />} onClick={() => removeAttachment(index)} disabled={isSending || isUploadingAttachments} />
-                        </div>
-                      ))}
+                      {attachments.map((file, index) => {
+                        const isImage = file.type.startsWith('image/');
+                        return (
+                          <div key={index} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1 text-sm max-w-[200px]">
+                            {isImage ? (
+                              <img src={URL.createObjectURL(file)} alt={file.name} className="w-6 h-6 object-cover rounded flex-shrink-0" />
+                            ) : (
+                              <FileOutlined className="text-gray-400 flex-shrink-0" />
+                            )}
+                            <span className="truncate max-w-[120px] text-gray-700">{file.name}</span>
+                            <Button type="text" size="small" className="p-0 min-w-0 h-auto text-gray-400 hover:text-red-500" icon={<CloseOutlined className="text-[10px]" />} onClick={() => removeAttachment(index)} disabled={isSending || isUploadingAttachments} />
+                          </div>
+                        );
+                      })}
                       {isUploadingAttachments && (
                         <div className="flex items-center text-blue-500 text-xs px-2 animate-pulse">
                           Uploading attachments...
