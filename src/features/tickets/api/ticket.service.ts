@@ -15,7 +15,17 @@ export interface Ticket {
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
   assignees?: { user: { id: string; name: string; email: string } }[];
-  messages?: { id: string; content: string; audioUrl?: string; createdAt: string; isSystem: boolean; user: { id: string; name: string }; replyTo?: any; reactions?: any[] }[];
+  messages?: { 
+    id: string; 
+    content: string; 
+    audioUrl?: string; 
+    attachments?: { id: string; fileUrl: string; fileName: string; fileType: string; fileSize: number }[];
+    createdAt: string; 
+    isSystem: boolean; 
+    user: { id: string; name: string }; 
+    replyTo?: any; 
+    reactions?: any[] 
+  }[];
   version: number;
 }
 
@@ -40,11 +50,12 @@ export const ticketService = {
     return data;
   },
 
-  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string) => {
+  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => {
     const payload: any = { content };
     if (statusChange) payload.statusChange = statusChange;
     if (replyToId) payload.replyToId = replyToId;
     if (audioUrl) payload.audioUrl = audioUrl;
+    if (attachments && attachments.length > 0) payload.attachments = attachments;
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages`, payload);
     return data;
   },
@@ -60,6 +71,18 @@ export const ticketService = {
       },
     });
     return data.data; // ApiResponse format: { status: 'success', data: { url: '...' } }
+  },
+
+  uploadAttachment: async (file: File): Promise<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const { data } = await apiClient.post('/upload/attachment', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return data.data; 
   },
 
   toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {

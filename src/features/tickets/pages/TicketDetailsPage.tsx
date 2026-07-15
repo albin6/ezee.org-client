@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover } from 'antd';
-import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService } from '../api/ticket.service';
@@ -28,10 +28,13 @@ export const TicketDetailsPage: React.FC = () => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup object URLs to avoid memory leaks
   useEffect(() => {
@@ -59,7 +62,7 @@ export const TicketDetailsPage: React.FC = () => {
   }, [ticket?.messages]);
 
   const handleSendMessage = async () => {
-    if ((!message.trim() && !audioBlob) || !id || isSending) return;
+    if ((!message.trim() && !audioBlob && attachments.length === 0) || !id || isSending || isUploadingAttachments) return;
     
     const authUser: any = user;
     const authUserId = authUser?.id || authUser?.sub;
@@ -74,17 +77,28 @@ export const TicketDetailsPage: React.FC = () => {
     setIsSending(true);
     try {
       let finalAudioUrl = undefined;
+      let finalAttachments: any[] = [];
+      
+      if (attachments.length > 0) {
+        setIsUploadingAttachments(true);
+        const uploadPromises = attachments.map(file => ticketService.uploadAttachment(file));
+        finalAttachments = await Promise.all(uploadPromises);
+        setIsUploadingAttachments(false);
+      }
+
       if (audioBlob) {
         const { url } = await ticketService.uploadAudio(audioBlob);
         finalAudioUrl = url;
       }
-      const finalMessage = message.trim() || '🎤 Voice Message';
-      await addMessage(id, finalMessage, undefined, replyingTo?.id, finalAudioUrl);
+      const finalMessage = message.trim() || (attachments.length > 0 ? '📁 Sent attachments' : '🎤 Voice Message');
+      await addMessage(id, finalMessage, undefined, replyingTo?.id, finalAudioUrl, finalAttachments);
       setMessage('');
       setReplyingTo(null);
+      setAttachments([]);
       cancelRecording();
     } catch (err) {
       console.error('Failed to send message:', err);
+      setIsUploadingAttachments(false);
     } finally {
       setIsSending(false);
     }
@@ -167,12 +181,25 @@ export const TicketDetailsPage: React.FC = () => {
   };
 
   const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleStatusChange = (status: string) => {
+  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleStatusChange = async (value: string) => {
     if (!id) return;
     Modal.confirm({
       title: 'Confirm Status Change',
@@ -312,6 +339,47 @@ export const TicketDetailsPage: React.FC = () => {
                               <audio controls src={msg.audioUrl} className="w-full h-10 rounded shadow-sm" />
                             </div>
                           )}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-2">
+                              {msg.attachments.map((att: any) => {
+                                const isImage = att.fileType.startsWith('image/');
+                                const isVideo = att.fileType.startsWith('video/');
+                                
+                                if (isImage) {
+                                  return (
+                                    <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px]">
+                                      <img src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
+                                    </div>
+                                  );
+                                }
+                                
+                                if (isVideo) {
+                                  return (
+                                    <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px]">
+                                      <video src={att.fileUrl} controls className="w-full h-auto bg-black" />
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <a 
+                                    key={att.id} 
+                                    href={att.fileUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className={`flex items-center gap-2 p-2 rounded border text-sm max-w-[250px] sm:max-w-[300px] hover:bg-gray-50 transition-colors ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30 hover:text-white' : 'bg-white border-gray-200 text-blue-600 hover:bg-blue-50'}`}
+                                  >
+                                    <FileOutlined className="text-lg flex-shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className="truncate max-w-full font-medium leading-tight">{att.fileName}</span>
+                                      <span className="text-[10px] opacity-80 leading-tight">{(att.fileSize / 1024).toFixed(1)} KB</span>
+                                    </div>
+                                    <DownloadOutlined className="ml-auto flex-shrink-0 opacity-70" />
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                         
                         <div className={`flex gap-1 mt-1 flex-wrap ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -358,6 +426,23 @@ export const TicketDetailsPage: React.FC = () => {
                 )}
                 <div className="flex flex-col gap-2 relative border rounded bg-white p-2">
                   
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded">
+                      {attachments.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1 text-sm max-w-[200px]">
+                          <FileOutlined className="text-gray-400 flex-shrink-0" />
+                          <span className="truncate max-w-[120px] text-gray-700">{file.name}</span>
+                          <Button type="text" size="small" className="p-0 min-w-0 h-auto text-gray-400 hover:text-red-500" icon={<CloseOutlined className="text-[10px]" />} onClick={() => removeAttachment(index)} disabled={isSending || isUploadingAttachments} />
+                        </div>
+                      ))}
+                      {isUploadingAttachments && (
+                        <div className="flex items-center text-blue-500 text-xs px-2 animate-pulse">
+                          Uploading attachments...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {isRecording || audioBlob ? (
                     <div className="flex items-center gap-3 bg-gray-50 p-2 rounded justify-between">
                       <div className="flex items-center gap-3">
@@ -391,12 +476,26 @@ export const TicketDetailsPage: React.FC = () => {
                   )}
 
                   <div className="flex justify-between items-center mt-1">
-                    <div>
+                    <div className="flex items-center gap-1">
+                      <input 
+                        type="file" 
+                        multiple 
+                        ref={fileInputRef} 
+                        onChange={handleAttachmentChange} 
+                        className="hidden" 
+                      />
+                      <Button 
+                        type="text" 
+                        icon={<PaperClipOutlined className="text-gray-400 hover:text-blue-500" />} 
+                        onClick={() => fileInputRef.current?.click()} 
+                        disabled={isSending || isUploadingAttachments} 
+                        title="Attach files" 
+                      />
                       {!isRecording && !audioBlob && (
-                        <Button type="text" icon={<AudioOutlined className={message.trim() ? "text-gray-300" : "text-blue-500"} />} onClick={startRecording} disabled={isSending || message.trim().length > 0} title="Record voice message" />
+                        <Button type="text" icon={<AudioOutlined className={message.trim() ? "text-gray-300" : "text-blue-500"} />} onClick={startRecording} disabled={isSending || isUploadingAttachments || message.trim().length > 0} title="Record voice message" />
                       )}
                     </div>
-                    <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage} loading={isSending} disabled={(!message.trim() && !audioBlob)}>
+                    <Button type="primary" icon={<SendOutlined />} className="h-auto" onClick={handleSendMessage} loading={isSending || isUploadingAttachments} disabled={(!message.trim() && !audioBlob && attachments.length === 0)}>
                       Send
                     </Button>
                   </div>
