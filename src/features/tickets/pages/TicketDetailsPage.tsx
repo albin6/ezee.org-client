@@ -342,8 +342,8 @@ export const TicketDetailsPage: React.FC = () => {
             </Card>
           </div>
 
-          <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm h-[calc(100dvh-64px)] lg:h-full relative">
-            <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0 shadow-sm">
+          <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm fixed inset-0 top-[64px] z-40 lg:static lg:z-auto lg:h-full">
+            <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0 shadow-sm sticky top-0">
               <div className="flex items-center gap-2">
                 <Button 
                   type="text" 
