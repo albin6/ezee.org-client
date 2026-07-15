@@ -90,12 +90,11 @@ export const TicketListPage: React.FC = () => {
   ];
 
   const FilterControls = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-wrap gap-4 items-center'}`}>
+    <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-wrap gap-4 items-center w-full'}`}>
       <Select
         placeholder="Status"
         allowClear
-        className={isMobile ? 'w-full' : ''}
-        style={isMobile ? undefined : { width: 140 }}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
         value={params.status || undefined}
         onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
         options={[
@@ -110,8 +109,7 @@ export const TicketListPage: React.FC = () => {
       <Select
         placeholder="Priority"
         allowClear
-        className={isMobile ? 'w-full' : ''}
-        style={isMobile ? undefined : { width: 120 }}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[120px]'}
         value={params.priority || undefined}
         onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
         options={[
@@ -127,8 +125,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : ''}
-        style={isMobile ? undefined : { width: 160 }}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
         value={params.teamId || undefined}
         onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
         options={teams.map(t => ({ value: t.id, label: t.name }))}
@@ -139,8 +136,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : ''}
-        style={isMobile ? undefined : { width: 160 }}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
         value={params.createdById || undefined}
         onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
@@ -151,15 +147,14 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : ''}
-        style={isMobile ? undefined : { width: 160 }}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
         value={params.assigneeId || undefined}
         onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
       <DatePicker.RangePicker
-        className={isMobile ? 'w-full' : ''}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-[240px]'}
         onChange={(dates) => {
           setParams({
             ...params,
