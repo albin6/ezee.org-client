@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Input, Select, DatePicker } from 'antd';
+import { Table, Button, Tag, Input, Select, DatePicker, Avatar } from 'antd';
 import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { PageContainer } from '@/shared/components/PageContainer';

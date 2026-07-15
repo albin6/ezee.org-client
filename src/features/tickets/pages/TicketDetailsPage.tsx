@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image } from 'antd';
-import { UserOutlined, SendOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer } from 'antd';
+import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService } from '../api/ticket.service';
@@ -38,6 +38,7 @@ export const TicketDetailsPage: React.FC = () => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [openReactionPopoverId, setOpenReactionPopoverId] = useState<string | null>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -273,7 +274,69 @@ export const TicketDetailsPage: React.FC = () => {
     });
   };
 
-  if (loading && !ticket) return <PageContainer>Loading...</PageContainer>;
+  if (loading && !ticket) return <PageContainer className="!px-0 sm:!px-4 lg:!px-6 !max-w-full lg:!max-w-7xl">Loading...
+      <Drawer
+        title="Ticket Details"
+        placement="bottom"
+        onClose={() => setMobileDrawerOpen(false)}
+        open={mobileDrawerOpen}
+        height="85vh"
+        styles={{ body: { paddingBottom: 80 } }}
+      >
+        <div className="space-y-6">
+          <div>
+            <Title level={5}>Description</Title>
+            <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
+          </div>
+          <Divider />
+          <div className="space-y-4">
+            <div>
+              <Text type="secondary" className="block mb-1">Status</Text>
+              {canEditStatus ? (
+                <Select
+                  value={ticket.status}
+                  onChange={handleStatusChange}
+                  className="w-full"
+                  disabled={statusOptions.length <= 1}
+                  options={statusOptions}
+                />
+              ) : (
+                <Tag>{ticket.status}</Tag>
+              )}
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-1">Priority</Text>
+              <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>
+                {ticket.priority}
+              </Tag>
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-1">Team</Text>
+              <Text>{ticket.team?.name || 'N/A'}</Text>
+            </div>
+
+            <div>
+              <Text type="secondary" className="block mb-2">Assignees</Text>
+              {ticket.assignees?.length ? (
+                <div className="flex flex-col gap-2 w-full">
+                  {ticket.assignees.map((a: any) => (
+                    <div key={a.user.id} className="flex items-center gap-2">
+                      <Avatar size="small" icon={<UserOutlined />} />
+                      <Text>{a.user.name}</Text>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Text type="secondary">Unassigned</Text>
+              )}
+            </div>
+          </div>
+        </div>
+      </Drawer>
+
+    </PageContainer>;
   if (!ticket) return <PageContainer>Ticket not found</PageContainer>;
 
   const authUser: any = user;
@@ -307,7 +370,7 @@ export const TicketDetailsPage: React.FC = () => {
 
   return (
     <PageContainer>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="hidden lg:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <Title level={3} className="!mb-1">{ticket.title}</Title>
           <Space>
@@ -332,23 +395,41 @@ export const TicketDetailsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-140px)]">
+      <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 h-auto lg:h-[calc(100vh-140px)] -mx-4 sm:mx-0 lg:mx-0 mt-[-24px] lg:mt-0">
         <div className="flex-1 flex flex-col space-y-6 min-w-0 h-full">
-          <Card>
-            <Title level={5}>Description</Title>
-            <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
-          </Card>
+          <div className="hidden lg:block">
+            <Card>
+              <Title level={5}>Description</Title>
+              <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
+            </Card>
+          </div>
 
-          <div className="flex flex-col flex-1 border border-gray-200 rounded-lg bg-white overflow-hidden shadow-sm min-h-[60vh] sm:min-h-[500px] lg:min-h-0 lg:h-full relative">
-            <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0">
-              <span className="font-semibold text-base">Conversation</span>
-              <Button
-                type="text"
-                icon={<ReloadOutlined />}
-                onClick={() => id && fetchTicket(id)}
-                loading={loading}
-                title="Refresh Conversation"
-              />
+          <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm h-[calc(100dvh-64px)] lg:h-full relative">
+            <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Button 
+                  type="text" 
+                  icon={<span className="text-xl">←</span>} 
+                  className="lg:hidden p-0 w-8 h-8 flex items-center justify-center -ml-2"
+                  onClick={() => navigate('/tickets')}
+                />
+                <span className="font-semibold text-base truncate max-w-[200px]">{ticket.title}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="text"
+                  icon={<ReloadOutlined />}
+                  onClick={() => id && fetchTicket(id)}
+                  loading={loading}
+                  title="Refresh Conversation"
+                />
+                <Button
+                  className="lg:hidden"
+                  type="text"
+                  icon={<MoreOutlined className="text-lg" />}
+                  onClick={() => setMobileDrawerOpen(true)}
+                />
+              </div>
             </div>
             
             <div 
@@ -664,7 +745,7 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="col-span-1 space-y-6">
+        <div className="col-span-1 space-y-6 hidden lg:block">
           <Card title="Details">
             <div className="space-y-4">
               <div>
