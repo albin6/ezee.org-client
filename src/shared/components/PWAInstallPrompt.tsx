@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Typography, Space } from 'antd';
-import { ShareAltOutlined, PlusSquareOutlined } from '@ant-design/icons';
+import { ShareAltOutlined, PlusSquareOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -8,6 +8,7 @@ export const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [_isIOS, setIsIOS] = useState(false);
   const [showIOSPrompt, setShowIOSPrompt] = useState(false);
+  const [showAndroidPrompt, setShowAndroidPrompt] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
@@ -17,15 +18,18 @@ export const PWAInstallPrompt: React.FC = () => {
 
     if (_isStandalone) return; // Don't show prompts if already installed
 
+    // Interval logic: Check if dismissed recently (e.g., within 24 hours)
+    const lastDismissed = localStorage.getItem('pwa_prompt_dismissed_at');
+    // 24 hours interval
+    const isDismissedRecently = lastDismissed && (Date.now() - parseInt(lastDismissed)) < 24 * 60 * 60 * 1000;
+
     // Detect iOS Safari
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
-    // iOS Safari does not support beforeinstallprompt, so we check user agent
+    
     if (isIOSDevice) {
       setIsIOS(true);
-      // Optional: use localStorage to only show once a day or once per session
-      const hasSeenPrompt = localStorage.getItem('pwa_ios_prompt_seen');
-      if (!hasSeenPrompt) {
+      if (!isDismissedRecently) {
         setShowIOSPrompt(true);
       }
     }
@@ -34,10 +38,9 @@ export const PWAInstallPrompt: React.FC = () => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Automatically show the native prompt by triggering it immediately or let Chrome handle its own mini-infobar.
-      // The prompt will just be available if the user clicks a custom install button.
-      // But Chrome usually shows a mini infobar automatically. 
-      // If we want a custom button, we keep deferredPrompt.
+      if (!isDismissedRecently) {
+        setShowAndroidPrompt(true);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -53,27 +56,40 @@ export const PWAInstallPrompt: React.FC = () => {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
+        setShowAndroidPrompt(false);
       }
     }
   };
 
+  const handleCloseAndroidPrompt = () => {
+    setShowAndroidPrompt(false);
+    localStorage.setItem('pwa_prompt_dismissed_at', Date.now().toString());
+  };
+
   const handleCloseIOSPrompt = () => {
     setShowIOSPrompt(false);
-    localStorage.setItem('pwa_ios_prompt_seen', 'true');
+    localStorage.setItem('pwa_prompt_dismissed_at', Date.now().toString());
   };
 
   if (isStandalone) return null;
 
   return (
     <>
-      {/* Custom Install Button for Android/Desktop (optional, as Chrome shows mini-infobar natively, but having this ensures visibility) */}
-      {deferredPrompt && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 z-50 bg-white p-4 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between gap-4 max-w-sm">
+      {/* Custom Install Button for Android/Desktop */}
+      {(deferredPrompt && showAndroidPrompt) && (
+        <div className="fixed top-16 left-4 right-4 md:left-auto md:right-4 md:top-20 z-50 bg-white p-4 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between gap-4 max-w-sm animate-fade-in-down">
+          <Button 
+            type="text" 
+            icon={<CloseOutlined className="text-gray-400 text-xs" />} 
+            size="small"
+            className="absolute top-1 right-1 p-0 w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded-full"
+            onClick={handleCloseAndroidPrompt}
+          />
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-bold text-xs">
               EZEE
             </div>
-            <div>
+            <div className="pr-2">
               <Text strong className="block">Ezee Org</Text>
               <Text type="secondary" className="text-xs">ezee-org-client.vercel.app</Text>
             </div>
