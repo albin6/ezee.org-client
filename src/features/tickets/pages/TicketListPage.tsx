@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Input, Select, DatePicker, Avatar } from 'antd';
+import { Table, Button, Tag, Input, Select, DatePicker, Avatar, Modal } from 'antd';
 import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -16,6 +16,7 @@ export const TicketListPage: React.FC = () => {
   const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTickets(params);
@@ -88,102 +89,136 @@ export const TicketListPage: React.FC = () => {
     },
   ];
 
+  const FilterControls = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-wrap gap-4 items-center'}`}>
+      <Select
+        placeholder="Status"
+        allowClear
+        className={isMobile ? 'w-full' : ''}
+        style={isMobile ? undefined : { width: 140 }}
+        value={params.status}
+        onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
+        options={[
+          { value: 'OPEN', label: 'Open' },
+          { value: 'IN_PROGRESS', label: 'In Progress' },
+          { value: 'RESOLVED', label: 'Resolved' },
+          { value: 'CLOSED', label: 'Closed' },
+          { value: 'REOPENED', label: 'Reopened' },
+        ]}
+      />
+
+      <Select
+        placeholder="Priority"
+        allowClear
+        className={isMobile ? 'w-full' : ''}
+        style={isMobile ? undefined : { width: 120 }}
+        value={params.priority}
+        onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
+        options={[
+          { value: 'LOW', label: 'Low' },
+          { value: 'MEDIUM', label: 'Medium' },
+          { value: 'HIGH', label: 'High' },
+          { value: 'URGENT', label: 'Urgent' },
+        ]}
+      />
+
+      <Select
+        placeholder="Team"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        className={isMobile ? 'w-full' : ''}
+        style={isMobile ? undefined : { width: 160 }}
+        value={params.teamId}
+        onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
+        options={teams.map(t => ({ value: t.id, label: t.name }))}
+      />
+
+      <Select
+        placeholder="Creator"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        className={isMobile ? 'w-full' : ''}
+        style={isMobile ? undefined : { width: 160 }}
+        value={params.createdById}
+        onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
+        options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+      />
+
+      <Select
+        placeholder="Assignee"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        className={isMobile ? 'w-full' : ''}
+        style={isMobile ? undefined : { width: 160 }}
+        value={params.assigneeId}
+        onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
+        options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+      />
+
+      <DatePicker.RangePicker
+        className={isMobile ? 'w-full' : ''}
+        onChange={(dates) => {
+          setParams({
+            ...params,
+            dateFrom: dates?.[0]?.toISOString() || undefined,
+            dateTo: dates?.[1]?.toISOString() || undefined,
+            page: 1
+          });
+        }}
+      />
+    </div>
+  );
+
   return (
     <PageContainer>
       <PageHeader
         title="Tickets & Issues"
         description="Manage your enterprise tickets and issues here."
         extra={
-          hasPermission('tickets:create') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/tickets/new')}>
-              Create Ticket
+          <div className="flex gap-2">
+            <Button className="md:hidden" icon={<FilterOutlined />} onClick={() => setIsFilterModalOpen(true)}>
+              Filters
             </Button>
-          )
+            {hasPermission('tickets:create') && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/tickets/new')}>
+                Create Ticket
+              </Button>
+            )}
+          </div>
         }
       />
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-100">
-        <div className="mb-6 flex flex-col sm:flex-row flex-wrap gap-4 items-start sm:items-center bg-gray-50 p-4 rounded-md border border-gray-200">
+        
+        {/* Desktop Filters Bar */}
+        <div className="hidden md:flex mb-6 flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-md border border-gray-200">
           <div className="flex items-center gap-2 mr-2">
             <FilterOutlined className="text-gray-400" />
             <span className="font-medium text-gray-600">Filters</span>
           </div>
-
           <Input.Search
             placeholder="Search title, desc, ID..."
             onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
             style={{ width: 220 }}
             allowClear
           />
+          <FilterControls />
+        </div>
 
-          <Select
-            placeholder="Status"
+        {/* Mobile Search Bar */}
+        <div className="md:hidden mb-4">
+          <Input.Search
+            placeholder="Search tickets..."
+            onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+            className="w-full"
+            size="large"
             allowClear
-            style={{ width: 140 }}
-            onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
-            options={[
-              { value: 'OPEN', label: 'Open' },
-              { value: 'IN_PROGRESS', label: 'In Progress' },
-              { value: 'RESOLVED', label: 'Resolved' },
-              { value: 'CLOSED', label: 'Closed' },
-              { value: 'REOPENED', label: 'Reopened' },
-            ]}
-          />
-
-          <Select
-            placeholder="Priority"
-            allowClear
-            style={{ width: 120 }}
-            onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
-            options={[
-              { value: 'LOW', label: 'Low' },
-              { value: 'MEDIUM', label: 'Medium' },
-              { value: 'HIGH', label: 'High' },
-              { value: 'URGENT', label: 'Urgent' },
-            ]}
-          />
-
-          <Select
-            placeholder="Team"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            style={{ width: 160 }}
-            onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
-            options={teams.map(t => ({ value: t.id, label: t.name }))}
-          />
-
-          <Select
-            placeholder="Creator"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            style={{ width: 160 }}
-            onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
-            options={users.map((u: any) => ({ value: u.id, label: u.name }))}
-          />
-
-          <Select
-            placeholder="Assignee"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            style={{ width: 160 }}
-            onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
-            options={users.map((u: any) => ({ value: u.id, label: u.name }))}
-          />
-
-          <DatePicker.RangePicker
-            onChange={(dates) => {
-              setParams({
-                ...params,
-                dateFrom: dates?.[0]?.toISOString() || undefined,
-                dateTo: dates?.[1]?.toISOString() || undefined,
-                page: 1
-              });
-            }}
           />
         </div>
 
+        {/* Desktop Table */}
         <div className="hidden md:block">
           <Table
             scroll={{ x: 'max-content' }}
@@ -202,6 +237,7 @@ export const TicketListPage: React.FC = () => {
           />
         </div>
 
+        {/* Mobile List */}
         <div className="block md:hidden space-y-3">
           {tickets.length > 0 ? tickets.map((ticket: any) => (
             <div 
@@ -249,6 +285,22 @@ export const TicketListPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        title="Filter Tickets"
+        open={isFilterModalOpen}
+        onCancel={() => setIsFilterModalOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsFilterModalOpen(false)} className="w-full">
+            Apply Filters
+          </Button>
+        ]}
+      >
+        <div className="py-2">
+          <FilterControls isMobile={true} />
+        </div>
+      </Modal>
     </PageContainer>
   );
 };
+
