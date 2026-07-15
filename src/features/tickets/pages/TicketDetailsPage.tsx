@@ -204,11 +204,15 @@ export const TicketDetailsPage: React.FC = () => {
     if (!id) return;
     Modal.confirm({
       title: 'Confirm Status Change',
-      content: `Are you sure you want to change the ticket status to ${status}?`,
+      content: `Are you sure you want to change the ticket status to ${value}?`,
       okText: 'Yes',
       cancelText: 'No',
       onOk: async () => {
-        await updateStatus(id, status, ticket?.version);
+        try {
+          await updateStatus(id, value, ticket?.version);
+        } catch (err: any) {
+          Modal.error({ title: 'Error', content: err.message || 'Failed to update status' });
+        }
       }
     });
   };
