@@ -307,8 +307,8 @@ export const TicketDetailsPage: React.FC = () => {
   const statusOptions = getStatusOptions();
 
   return (
-    <PageContainer>
-      <div className="hidden lg:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <PageContainer className="lg:h-[calc(100vh-128px)] flex flex-col">
+      <div className="hidden lg:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
         <div>
           <Title level={3} className="!mb-1">{ticket.title}</Title>
           <Space>
@@ -321,7 +321,7 @@ export const TicketDetailsPage: React.FC = () => {
       </div>
 
       {ticket.status === 'RESOLVED' && (isCreator || isAdmin) && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
           <div>
             <Text strong className="text-blue-800 block text-base mb-1">This ticket has been marked as Resolved.</Text>
             <Text className="text-blue-600">Please review the resolution. You can close it permanently or reopen it if you need further clarification.</Text>
@@ -333,16 +333,16 @@ export const TicketDetailsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 h-auto lg:h-[calc(100vh-140px)] -mx-4 sm:mx-0 lg:mx-0 mt-[-24px] lg:mt-0">
+      <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 h-auto lg:flex-1 lg:min-h-0 -mx-4 sm:mx-0 lg:mx-0 mt-[-24px] lg:mt-0">
         <div className="flex-1 flex flex-col space-y-6 min-w-0 h-full">
-          <div className="hidden lg:block">
+          <div className="hidden lg:block shrink-0">
             <Card>
               <Title level={5}>Description</Title>
               <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
             </Card>
           </div>
 
-          <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm fixed inset-0 top-[64px] z-40 lg:static lg:z-auto lg:h-full">
+          <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm fixed inset-0 top-[64px] z-40 lg:static lg:z-auto lg:min-h-0">
             <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0 shadow-sm sticky top-0">
               <div className="flex items-center gap-2">
                 <Button 
