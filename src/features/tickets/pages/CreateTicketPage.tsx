@@ -62,7 +62,7 @@ export const CreateTicketPage: React.FC = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
         setAudioBlob(audioBlob);
         const url = URL.createObjectURL(audioBlob);
         setAudioPreviewUrl(url);
