@@ -13,7 +13,7 @@ export const TaskListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('assigned_to_me');
   
   const anyUser = user as any;
-  const currentUserLevel = anyUser?.role?.level ?? 99;
+  const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
