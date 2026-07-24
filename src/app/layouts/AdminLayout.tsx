@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
-import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -161,6 +161,17 @@ export const AdminLayout: React.FC = () => {
       },
     });
   }
+
+  // Task Management (Visible to everyone in V1 or adapt permissions as needed)
+  menuItems.push({
+    key: '/tasks',
+    icon: <CheckSquareOutlined />,
+    label: 'Tasks',
+    onClick: () => {
+      navigate('/tasks');
+      setMobileMenuOpen(false);
+    },
+  });
 
   const sidebarContent = (
     <>
