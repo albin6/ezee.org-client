@@ -13,14 +13,26 @@ export const TaskListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('assigned_to_me');
   
   const anyUser = user as any;
-  const teamMembers = [
-    { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: anyUser?.role?.level, name: anyUser?.role?.name } }
-  ];
   const currentUserLevel = anyUser?.role?.level ?? 99;
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTasks({ filter: activeTab });
-  }, [activeTab, fetchTasks]);
+    
+    const teamId = anyUser?.teamMembers?.[0]?.teamId;
+    if (teamId) {
+      import('@/features/teams/api/team.service').then(m => {
+        m.teamService.getTeamMembers(teamId, { limit: 1000 }).then(res => {
+          setTeamMembers(res.data || []);
+        }).catch(console.error);
+      });
+    } else {
+      // Fallback if no team (e.g. Super Admin not bound to a team yet, just show themselves for now)
+      setTeamMembers([
+        { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: anyUser?.role?.level, name: anyUser?.role?.name } }
+      ]);
+    }
+  }, [activeTab, fetchTasks, anyUser]);
 
   const handleCreate = async (values: any) => {
     try {
