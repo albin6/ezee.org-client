@@ -91,7 +91,7 @@ export const NotificationBell: React.FC = () => {
       open={open}
       onOpenChange={setOpen}
       placement={screens.sm ? "bottomRight" : "bottom"}
-      overlayInnerStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
       overlayStyle={screens.sm ? { maxWidth: 'calc(100vw - 32px)' } : { maxWidth: '100vw' }}
     >
       <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]}>

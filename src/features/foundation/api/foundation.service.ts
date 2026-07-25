@@ -18,6 +18,40 @@ export interface Student {
   createdAt: string;
 }
 
+export interface StudentCoordinator {
+  id: string;
+  name: string;
+  batchNumber: string;
+  studentNumber: string;
+  createdAt: string;
+}
+
+export interface Thread {
+  id: string;
+  title: string;
+  status: 'OPEN' | 'RESOLVED' | 'CLOSED';
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  author?: {
+    id: string;
+    name: string;
+  };
+  messageCount?: number;
+}
+
+export interface ThreadMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  message: string;
+  createdAt: string;
+  sender?: {
+    id: string;
+    name: string;
+  };
+}
+
 export const foundationService = {
   // Batches
   getBatches: async (params: any) => {
@@ -65,5 +99,63 @@ export const foundationService = {
   bulkImportStudents: async (data: string, batchId: string) => {
     const res = await apiClient.post('/foundation/students/bulk-import', { data, batchId });
     return res.data.data;
+  },
+
+  // Coordinators
+  getCoordinators: async (params: any) => {
+    const res = await apiClient.get('/foundation/coordinators', { params });
+    // This endpoint returns data, total, page, limit directly in json instead of wrapped in { success, data, message } based on our controller structure
+    // Wait, the other endpoints are wrapped with ApiResponse.success(res, data) which wraps it in { success: true, data: ... }. 
+    // Wait, in my StudentCoordinatorController I wrote `res.json({ data: result.data, total: result.total, page, limit })`. 
+    // And for create I wrote `res.status(201).json(coordinator)`. Let's just return res.data.
+    return res.data;
+  },
+  createCoordinator: async (data: any) => {
+    const res = await apiClient.post('/foundation/coordinators', data);
+    return res.data;
+  },
+  createCoordinatorsBulk: async (data: any[]) => {
+    const res = await apiClient.post('/foundation/coordinators/bulk', { coordinators: data });
+    return res.data;
+  },
+  updateCoordinator: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/foundation/coordinators/${id}`, data);
+    return res.data;
+  },
+  deleteCoordinator: async (id: string) => {
+    const res = await apiClient.delete(`/foundation/coordinators/${id}`);
+    return res.data;
+  },
+
+  // Threads
+  getThreads: async (params: any) => {
+    const res = await apiClient.get('/foundation/threads', { params });
+    return res.data;
+  },
+  getThread: async (id: string) => {
+    const res = await apiClient.get(`/foundation/threads/${id}`);
+    return res.data;
+  },
+  createThread: async (data: any) => {
+    const res = await apiClient.post('/foundation/threads', data);
+    return res.data;
+  },
+  updateThreadStatus: async (id: string, status: 'OPEN' | 'RESOLVED' | 'CLOSED') => {
+    const res = await apiClient.patch(`/foundation/threads/${id}/status`, { status });
+    return res.data;
+  },
+  getThreadMessages: async (id: string) => {
+    const res = await apiClient.get(`/foundation/threads/${id}/messages`);
+    return res.data;
+  },
+  createMessage: async (id: string, message: string) => {
+    const res = await apiClient.post(`/foundation/threads/${id}/messages`, { message });
+    return res.data;
+  },
+
+  // Overview
+  getOverviewMetrics: async () => {
+    const res = await apiClient.get('/foundation/overview');
+    return res.data;
   },
 };

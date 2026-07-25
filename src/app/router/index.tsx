@@ -7,6 +7,9 @@ import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
 import { RolesPage } from '@/features/rbac/pages/RolesPage';
 import { BatchesPage } from '@/features/foundation/pages/BatchesPage';
 import { StudentsPage } from '@/features/foundation/pages/StudentsPage';
+import { OverviewPage } from '@/features/foundation/pages/OverviewPage';
+import { CoordinatorPage } from '@/features/foundation/pages/CoordinatorPage';
+import { ThreadsPage } from '@/features/foundation/pages/ThreadsPage';
 import { TeamsPage } from '@/features/teams/pages/TeamsPage';
 import { TeamDetailsPage } from '@/features/teams/pages/TeamDetailsPage';
 import { UsersPage } from '@/features/users/pages/UsersPage';
@@ -41,6 +44,18 @@ export const router = createBrowserRouter([
           {
             path: '/roles',
             element: <RolesPage />,
+          },
+          {
+            path: '/foundation/overview',
+            element: <OverviewPage />,
+          },
+          {
+            path: '/foundation/coordinator',
+            element: <CoordinatorPage />,
+          },
+          {
+            path: '/foundation/threads',
+            element: <ThreadsPage />,
           },
           {
             path: '/batches',

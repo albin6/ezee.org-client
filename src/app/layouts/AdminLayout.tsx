@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
-import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined, MessageOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -91,6 +91,42 @@ export const AdminLayout: React.FC = () => {
 
   if (hasPermission('foundation:read')) {
     const foundationChildren: any[] = [];
+
+    if (hasPermission('foundation_overview:read')) {
+      foundationChildren.push({
+        key: '/foundation/overview',
+        icon: <DashboardOutlined />,
+        label: 'Overview',
+        onClick: () => {
+          navigate('/foundation/overview');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
+
+    if (hasPermission('foundation_coordinator:read')) {
+      foundationChildren.push({
+        key: '/foundation/coordinator',
+        icon: <UserOutlined />,
+        label: 'Student Coordinator',
+        onClick: () => {
+          navigate('/foundation/coordinator');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
+
+    if (hasPermission('foundation_threads:read')) {
+      foundationChildren.push({
+        key: '/foundation/threads',
+        icon: <MessageOutlined />,
+        label: 'Threads',
+        onClick: () => {
+          navigate('/foundation/threads');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
 
     if (hasPermission('batches:read')) {
       foundationChildren.push({
