@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message } from 'antd';
+import { Card, Table, Tag, Button, Tabs, message, Select } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useTaskStore } from '../store/task.store';
 import { TaskFormModal } from '../components/TaskFormModal';
@@ -63,7 +63,65 @@ export const TaskListPage: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag>{status}</Tag>
+      render: (status: string, record: any) => {
+        const isAssignor = record.createdById === anyUser?.id;
+        const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
+        const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
+        
+        let availableOptions: { label: string, value: string }[] = [];
+
+        // Base options based on current status for assignees
+        if (isAssignee && !isAssignor && !isSuperAdmin) {
+          if (status === 'TODO') availableOptions = [{ label: 'IN_PROGRESS', value: 'IN_PROGRESS' }];
+          else if (status === 'IN_PROGRESS') availableOptions = [{ label: 'COMPLETED', value: 'COMPLETED' }];
+        }
+        
+        // Assignor options
+        if (isAssignor || isSuperAdmin) {
+          if (status === 'COMPLETED') {
+            availableOptions = [
+              { label: 'VERIFIED', value: 'VERIFIED' },
+              { label: 'REJECT (IN_PROGRESS)', value: 'IN_PROGRESS' }
+            ];
+          } else {
+            // Assignors can manually adjust statuses as fallback
+            availableOptions = [
+              { label: 'TODO', value: 'TODO' },
+              { label: 'IN_PROGRESS', value: 'IN_PROGRESS' },
+              { label: 'COMPLETED', value: 'COMPLETED' },
+              { label: 'VERIFIED', value: 'VERIFIED' },
+              { label: 'CANCELLED', value: 'CANCELLED' }
+            ].filter(opt => opt.value !== status);
+          }
+        }
+
+        const handleStatusChange = async (newStatus: string) => {
+          try {
+            await useTaskStore.getState().updateTask(record.id, { status: newStatus });
+            message.success('Status updated');
+          } catch (error: any) {
+            message.error(error.message);
+          }
+        };
+
+        if (availableOptions.length === 0) {
+          return <Tag>{status}</Tag>;
+        }
+
+        return (
+          <div className="flex items-center gap-2">
+            <Tag>{status}</Tag>
+            <Select 
+              size="small" 
+              placeholder="Update" 
+              onChange={handleStatusChange}
+              options={availableOptions}
+              value={null}
+              style={{ width: 120 }}
+            />
+          </div>
+        );
+      }
     },
     {
       title: 'Deadline Countdown',
