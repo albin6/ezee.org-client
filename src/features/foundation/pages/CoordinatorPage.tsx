@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Popconfirm, Space, Tabs } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Popconfirm, Space, Tabs, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -133,6 +133,7 @@ export const CoordinatorPage: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      render: (text: string) => <Typography.Text copyable>{text}</Typography.Text>,
     },
     {
       title: 'Batch Number',
@@ -140,9 +141,16 @@ export const CoordinatorPage: React.FC = () => {
       key: 'batchNumber',
     },
     {
-      title: 'Student Number',
+      title: 'Phone (Student No.)',
       dataIndex: 'studentNumber',
       key: 'studentNumber',
+      render: (text: string) => <Typography.Text copyable>{text}</Typography.Text>,
+    },
+    {
+      title: 'Password',
+      dataIndex: 'password',
+      key: 'password',
+      render: (text: string) => text ? <Typography.Text copyable>{text}</Typography.Text> : '-',
     },
     {
       title: 'Actions',

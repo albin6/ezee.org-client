@@ -23,6 +23,7 @@ export interface StudentCoordinator {
   name: string;
   batchNumber: string;
   studentNumber: string;
+  password?: string;
   createdAt: string;
 }
 
