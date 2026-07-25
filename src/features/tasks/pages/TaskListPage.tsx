@@ -70,29 +70,19 @@ export const TaskListPage: React.FC = () => {
         
         let availableOptions: { label: string, value: string }[] = [];
 
-        // Base options based on current status for assignees
-        if (isAssignee && !isAssignor && !isSuperAdmin) {
-          if (status === 'TODO') availableOptions = [{ label: 'IN_PROGRESS', value: 'IN_PROGRESS' }];
-          else if (status === 'IN_PROGRESS') availableOptions = [{ label: 'COMPLETED', value: 'COMPLETED' }];
+        // Assignees move tasks forward
+        if (isAssignee) {
+          if (status === 'TODO') availableOptions.push({ label: 'IN_PROGRESS', value: 'IN_PROGRESS' });
+          if (status === 'IN_PROGRESS') availableOptions.push({ label: 'COMPLETED', value: 'COMPLETED' });
         }
         
-        // Assignor options
-        if (isAssignor || isSuperAdmin) {
-          if (status === 'COMPLETED') {
-            availableOptions = [
-              { label: 'VERIFIED', value: 'VERIFIED' },
-              { label: 'REJECT (IN_PROGRESS)', value: 'IN_PROGRESS' }
-            ];
-          } else {
-            // Assignors can manually adjust statuses as fallback
-            availableOptions = [
-              { label: 'TODO', value: 'TODO' },
-              { label: 'IN_PROGRESS', value: 'IN_PROGRESS' },
-              { label: 'COMPLETED', value: 'COMPLETED' },
-              { label: 'VERIFIED', value: 'VERIFIED' },
-              { label: 'CANCELLED', value: 'CANCELLED' }
-            ].filter(opt => opt.value !== status);
-          }
+        // Assignors verify or reject completed tasks
+        if ((isAssignor || isSuperAdmin) && status === 'COMPLETED') {
+          // If the assignor is also an assignee, they already have options. We can overwrite or merge.
+          availableOptions = [
+            { label: 'VERIFIED', value: 'VERIFIED' },
+            { label: 'REJECT (IN_PROGRESS)', value: 'IN_PROGRESS' }
+          ];
         }
 
         const handleStatusChange = async (newStatus: string) => {
