@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Popconfirm, Space } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Popconfirm, Space, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -23,6 +23,7 @@ export const CoordinatorPage: React.FC = () => {
   const [isImportVisible, setIsImportVisible] = useState(false);
   const [importForm] = Form.useForm();
   const [importLoading, setImportLoading] = useState(false);
+  const [importMode, setImportMode] = useState('json');
 
   const fetchCoordinators = async () => {
     setLoading(true);
@@ -88,15 +89,31 @@ export const CoordinatorPage: React.FC = () => {
       const values = await importForm.validateFields();
       setImportLoading(true);
       
-      let parsedData;
-      try {
-        parsedData = JSON.parse(values.jsonData);
-      } catch (e) {
-        throw new Error('Invalid JSON format');
-      }
+      let parsedData: any[] = [];
+      
+      if (importMode === 'json') {
+        try {
+          parsedData = JSON.parse(values.jsonData);
+        } catch (e) {
+          throw new Error('Invalid JSON format');
+        }
 
-      if (!Array.isArray(parsedData)) {
-        throw new Error('Data must be an array of objects');
+        if (!Array.isArray(parsedData)) {
+          throw new Error('Data must be an array of objects');
+        }
+      } else {
+        const textData = values.textData || '';
+        const lines = textData.split('\n').filter((l: string) => l.trim().length > 0);
+        parsedData = lines.map((line: string) => {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length < 3) {
+            throw new Error(`Invalid format on line: "${line}". Expected: Name BatchNumber StudentNumber`);
+          }
+          const studentNumber = parts.pop();
+          const batchNumber = parts.pop();
+          const name = parts.join(' ');
+          return { name, batchNumber, studentNumber };
+        });
       }
 
       await foundationService.createCoordinatorsBulk(parsedData);
@@ -242,30 +259,53 @@ export const CoordinatorPage: React.FC = () => {
         onOk={handleBulkImport}
         confirmLoading={importLoading}
         width={600}
+        destroyOnClose
       >
-        <div className="mb-4 text-gray-600">
-          Paste a JSON array of coordinators. Example:
-          <pre className="bg-gray-100 p-2 mt-2 rounded text-sm">
-{`[
-  {
-    "name": "John Doe",
-    "batchNumber": "B101",
-    "studentNumber": "S1001"
-  }
-]`}
-          </pre>
-        </div>
         <Form form={importForm} layout="vertical">
-          <Form.Item
-            name="jsonData"
-            rules={[{ required: true, message: 'Please enter JSON data' }]}
-          >
-            <Input.TextArea
-              rows={10}
-              placeholder="Paste JSON array here..."
-              className="font-mono"
-            />
-          </Form.Item>
+          <Tabs activeKey={importMode} onChange={(key) => setImportMode(key)}>
+            <Tabs.TabPane tab="JSON Array" key="json">
+              <div className="mb-4 text-gray-600">
+                Paste a JSON array of coordinators. Example:
+                <pre className="bg-gray-100 p-2 mt-2 rounded text-sm">
+  {`[
+    {
+      "name": "John Doe",
+      "batchNumber": "B101",
+      "studentNumber": "S1001"
+    }
+  ]`}
+                </pre>
+              </div>
+              <Form.Item
+                name="jsonData"
+                rules={[{ required: importMode === 'json', message: 'Please enter JSON data' }]}
+              >
+                <Input.TextArea
+                  rows={10}
+                  placeholder="Paste JSON array here..."
+                  className="font-mono"
+                />
+              </Form.Item>
+            </Tabs.TabPane>
+            
+            <Tabs.TabPane tab="Text Data" key="text">
+              <div className="mb-4 text-gray-600">
+                Paste coordinator data below. Format: <code>name batchNumber studentNumber</code> (one per line).<br/>
+                Example:<br/>
+                <code>John Doe B101 S1001</code><br/>
+                <code>Jane Smith B102 S1002</code>
+              </div>
+              <Form.Item
+                name="textData"
+                rules={[{ required: importMode === 'text', message: 'Please enter text data' }]}
+              >
+                <Input.TextArea
+                  rows={10}
+                  placeholder="John Doe B101 S1001&#10;Jane Smith B102 S1002"
+                />
+              </Form.Item>
+            </Tabs.TabPane>
+          </Tabs>
         </Form>
       </Modal>
     </PageContainer>
