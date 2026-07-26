@@ -159,4 +159,37 @@ export const foundationService = {
     const res = await apiClient.get('/foundation/overview');
     return res.data;
   },
+
+  // Evaluations
+  getEvaluationsByStudent: async (studentId: string) => {
+    const res = await apiClient.get(`/foundation/evaluations/student/${studentId}`);
+    return res.data;
+  },
+  getEvaluationsByBatch: async (batchId: string, dayNumber?: number) => {
+    const params = dayNumber ? { dayNumber } : {};
+    const res = await apiClient.get(`/foundation/evaluations/batch/${batchId}`, { params });
+    return res.data;
+  },
+  submitEvaluation: async (data: any) => {
+    const res = await apiClient.post('/foundation/evaluations', data);
+    return res.data;
+  },
+  updateEvaluation: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/foundation/evaluations/${id}`, data);
+    return res.data;
+  },
+
+  // Exams
+  getExamsByStudent: async (studentId: string) => {
+    const res = await apiClient.get(`/foundation/exams/student/${studentId}`);
+    return res.data;
+  },
+  recordExam: async (data: any) => {
+    const res = await apiClient.post('/foundation/exams', data);
+    return res.data;
+  },
+  updateExam: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/foundation/exams/${id}`, data);
+    return res.data;
+  }
 };

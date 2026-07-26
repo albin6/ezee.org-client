@@ -52,7 +52,7 @@ export const OverviewPage: React.FC = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={6} lg={4}>
           <Card loading={loading} variant="borderless" className="shadow-sm">
             <Statistic
               title="Total Coordinators"
@@ -61,8 +61,8 @@ export const OverviewPage: React.FC = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card loading={loading} bordered={false} className="shadow-sm">
+        <Col xs={24} sm={12} md={6} lg={4}>
+          <Card loading={loading} variant="borderless" className="shadow-sm">
             <Statistic
               title="Open Threads"
               value={metrics?.kpis?.openThreads || 0}
@@ -70,18 +70,23 @@ export const OverviewPage: React.FC = () => {
             />
           </Card>
         </Col>
+        <Col xs={24} sm={12} lg={4}>
+          <Card loading={loading} className="shadow-sm">
+            <Statistic 
+              title="Revenue" 
+              value={metrics?.kpis?.totalRevenue || 0} 
+              prefix="$" 
+              valueStyle={{ color: '#52c41a' }} 
+            />
+          </Card>
+        </Col>
       </Row>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
-          <Card 
-            title="Weekly Activity" 
-            variant="borderless" 
-            className="shadow-sm" 
-            loading={loading}
-            styles={{ body: { padding: '24px 24px 0 24px' } }}
-          >
-            <div className="h-[300px] w-full">
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h3 className="text-lg font-medium mb-4">Exam Performance</h3>
+            <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metrics?.chartData || []}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -99,7 +104,7 @@ export const OverviewPage: React.FC = () => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </Card>
+          </div>
         </Col>
         <Col xs={24} lg={8}>
           <Card title="Quick Actions" variant="borderless" className="shadow-sm" loading={loading}>

@@ -6,6 +6,8 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
 import type { Student, Batch } from '../api/foundation.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { EvaluationsModal } from '../components/EvaluationsModal';
+import { ExamsModal } from '../components/ExamsModal';
 
 export const StudentsPage: React.FC = () => {
   const { hasPermission } = usePermissions();
@@ -25,6 +27,12 @@ export const StudentsPage: React.FC = () => {
   const [isImportVisible, setIsImportVisible] = useState(false);
   const [importForm] = Form.useForm();
   const [importLoading, setImportLoading] = useState(false);
+
+  const [evaluationModalVisible, setEvaluationModalVisible] = useState(false);
+  const [selectedStudentForEval, setSelectedStudentForEval] = useState<any>(null);
+
+  const [examsModalVisible, setExamsModalVisible] = useState(false);
+  const [selectedStudentForExams, setSelectedStudentForExams] = useState<any>(null);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -159,6 +167,24 @@ export const StudentsPage: React.FC = () => {
       key: 'actions',
       render: (_: any, record: Student) => (
         <Space>
+          <Button 
+            type="link" 
+            onClick={() => {
+              setSelectedStudentForEval(record);
+              setEvaluationModalVisible(true);
+            }}
+          >
+            Evaluations
+          </Button>
+          <Button 
+            type="link" 
+            onClick={() => {
+              setSelectedStudentForExams(record);
+              setExamsModalVisible(true);
+            }}
+          >
+            Exams
+          </Button>
           {hasPermission('students:write') && (
             <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} />
           )}
@@ -281,6 +307,18 @@ export const StudentsPage: React.FC = () => {
           </div>
         </Form>
       </Modal>
+
+      <EvaluationsModal 
+        visible={evaluationModalVisible}
+        student={selectedStudentForEval}
+        onClose={() => setEvaluationModalVisible(false)}
+      />
+
+      <ExamsModal 
+        visible={examsModalVisible}
+        student={selectedStudentForExams}
+        onClose={() => setExamsModalVisible(false)}
+      />
     </PageContainer>
   );
 };
