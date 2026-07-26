@@ -25,4 +25,9 @@ export const authService = {
     const response = await apiClient.get<ProfileResponse>('/auth/profile');
     return response.data;
   },
+
+  coordinatorLogin: async (data: LoginPayload): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/coordinator/login', data);
+    return response.data;
+  },
 };

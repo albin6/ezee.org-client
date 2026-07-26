@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Typography } from 'antd';
-import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select } from 'antd';
+import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
-import type { Thread, ThreadMessage } from '../api/foundation.service';
+import type { Thread, ThreadMessage, StudentCoordinator } from '../api/foundation.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 
-const { Text, Paragraph } = Typography;
+
 
 export const ThreadsPage: React.FC = () => {
   const { hasPermission } = usePermissions();
@@ -16,7 +16,7 @@ export const ThreadsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter] = useState<string | undefined>(undefined);
 
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [createForm] = Form.useForm();
@@ -26,6 +26,17 @@ export const ThreadsPage: React.FC = () => {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
+  
+  // New States for Coordinators & Assignments
+  const [, setCoordinators] = useState<StudentCoordinator[]>([]);
+  const [availableCoordinators, setAvailableCoordinators] = useState<StudentCoordinator[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [addCoordinatorLoading, setAddCoordinatorLoading] = useState(false);
+  const [assignEngineLoading, setAssignEngineLoading] = useState(false);
+  const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
+  
+  // New State for Batches for creating threads
+  // const [batches, setBatches] = useState<any[]>([]);
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -40,8 +51,18 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
+  const fetchGlobalData = async () => {
+    try {
+      const coords = await foundationService.getStudentCoordinators();
+      setAvailableCoordinators(Array.isArray(coords) ? coords : []);
+    } catch(e) {
+      console.error('Failed to fetch available coordinators');
+    }
+  };
+
   useEffect(() => {
     fetchThreads();
+    fetchGlobalData();
   }, [page, limit, statusFilter]);
 
   const handleCreateSubmit = async (values: any) => {
@@ -61,10 +82,19 @@ export const ThreadsPage: React.FC = () => {
     setIsDetailModalVisible(true);
     setMessagesLoading(true);
     try {
-      const msgs = await foundationService.getThreadMessages(thread.id);
+      const [msgs, coords, assigns] = await Promise.all([
+        foundationService.getThreadMessages(thread.id),
+        foundationService.getThreadCoordinators(thread.id),
+        foundationService.getThreadAssignments(thread.id)
+      ]);
       setMessages(msgs);
+      setCoordinators(coords);
+      setAssignments(assigns);
+      
+      // We should also fetch students in the batch
+      // For now we'll just show the assignment data
     } catch (error: any) {
-      message.error('Failed to load messages');
+      message.error('Failed to load thread details');
     } finally {
       setMessagesLoading(false);
     }
@@ -95,11 +125,50 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
+  const handleAddCoordinator = async () => {
+    if (!selectedThread || !selectedCoordinator) return;
+    setAddCoordinatorLoading(true);
+    try {
+      await foundationService.addThreadCoordinator(selectedThread.id, selectedCoordinator);
+      message.success('Coordinator added successfully');
+      setSelectedCoordinator(null);
+      // refresh coordinators
+      const coords = await foundationService.getThreadCoordinators(selectedThread.id);
+      setCoordinators(coords);
+    } catch (error: any) {
+      message.error('Failed to add coordinator');
+    } finally {
+      setAddCoordinatorLoading(false);
+    }
+  };
+
+  const handleRunAutoAssign = async () => {
+    if (!selectedThread) return;
+    setAssignEngineLoading(true);
+    try {
+      await foundationService.runThreadAutoAssign(selectedThread.id);
+      message.success('Auto-assignment completed');
+      // refresh assignments
+      const assigns = await foundationService.getThreadAssignments(selectedThread.id);
+      setAssignments(assigns);
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Auto-assign failed');
+    } finally {
+      setAssignEngineLoading(false);
+    }
+  };
+
   const columns = [
     {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+    },
+    {
+      title: 'Exam Type',
+      dataIndex: 'examType',
+      key: 'examType',
+      render: (type: string) => <Tag color="purple">{type}</Tag>
     },
     {
       title: 'Status',
@@ -205,60 +274,125 @@ export const ThreadsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <div className="flex flex-col h-[60vh]">
-          <div className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
-            <List
-              loading={messagesLoading}
-              itemLayout="horizontal"
-              dataSource={messages}
-              renderItem={(msg) => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={<Avatar icon={<UserOutlined />} />}
-                    title={
-                      <div className="flex justify-between">
-                        <span>{msg.sender?.name || 'Unknown'}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(msg.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    }
-                    description={<div className="text-gray-800 whitespace-pre-wrap">{msg.message}</div>}
-                  />
-                </List.Item>
-              )}
-            />
-            {messages.length === 0 && !messagesLoading && (
-              <div className="text-center text-gray-400 py-10">No messages yet. Start the discussion!</div>
-            )}
-          </div>
-          
-          <div className="mt-auto">
-            {selectedThread?.status === 'OPEN' ? (
-              <div className="flex items-start gap-2">
-                <Input.TextArea
-                  rows={3}
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder="Type your message here..."
-                  onPressEnter={(e) => {
-                    if (!e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
+        <Tabs defaultActiveKey="1">
+          <Tabs.TabPane tab={<span><MessageOutlined /> Overview</span>} key="1">
+            <div className="flex flex-col h-[60vh]">
+              <div className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
+                <List
+                  loading={messagesLoading}
+                  itemLayout="horizontal"
+                  dataSource={messages}
+                  renderItem={(msg) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        avatar={<Avatar icon={<UserOutlined />} />}
+                        title={
+                          <div className="flex justify-between">
+                            <span>{msg.sender?.name || 'Unknown'}</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(msg.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                        }
+                        description={<div className="text-gray-800 whitespace-pre-wrap">{msg.message}</div>}
+                      />
+                    </List.Item>
+                  )}
                 />
-                <Button type="primary" onClick={handleSendMessage}>
-                  Send
-                </Button>
+                {messages.length === 0 && !messagesLoading && (
+                  <div className="text-center text-gray-400 py-10">No messages yet. Start the discussion!</div>
+                )}
               </div>
-            ) : (
-              <div className="text-center text-gray-500 bg-gray-100 p-3 rounded">
-                This thread is closed/resolved. No more messages can be sent.
+              
+              <div className="mt-auto">
+                {selectedThread?.status === 'OPEN' ? (
+                  <div className="flex items-start gap-2">
+                    <Input.TextArea
+                      rows={3}
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      placeholder="Type your message here..."
+                      onPressEnter={(e) => {
+                        if (!e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    />
+                    <Button type="primary" onClick={handleSendMessage}>
+                      Send
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 bg-gray-100 p-3 rounded">
+                    This thread is closed/resolved. No more messages can be sent.
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators & Assignments</span>} key="2">
+            <div className="h-[60vh] overflow-y-auto">
+              {hasPermission('foundation_threads:write') && (
+                <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
+                  <h3 className="font-semibold mb-2">Manage Assignments</h3>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        className="w-64"
+                        placeholder="Select Coordinator"
+                        value={selectedCoordinator}
+                        onChange={setSelectedCoordinator}
+                        options={availableCoordinators.map(c => ({ label: c.name, value: c.id }))}
+                      />
+                      <Button
+                        type="default"
+                        icon={<UserAddOutlined />}
+                        onClick={handleAddCoordinator}
+                        loading={addCoordinatorLoading}
+                        disabled={!selectedCoordinator}
+                      >
+                        Add to Thread
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        type="primary" 
+                        onClick={handleRunAutoAssign} 
+                        loading={assignEngineLoading}
+                      >
+                        Run Auto-Assign Engine
+                      </Button>
+                      <span className="text-gray-500 text-sm">Distributes students to assigned coordinators evenly.</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h3 className="font-semibold mb-4 text-lg">Assignments List (Copyable)</h3>
+                <div 
+                  className="bg-gray-50 p-4 rounded border border-gray-200 font-mono text-sm select-all whitespace-pre-wrap"
+                  style={{ minHeight: '100px' }}
+                >
+                  {assignments.length > 0 ? (
+                    assignments.map((group, idx) => (
+                      <div key={idx} className="mb-4">
+                        <div className="font-bold">{group.coordinator.name}</div>
+                        {group.students.map((st: any, i: number) => (
+                          <div key={i}>- {st.name}</div>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-400 italic">No assignments generated yet. Run Auto-Assign Engine.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Tabs.TabPane>
+        </Tabs>
       </Modal>
     </PageContainer>
   );

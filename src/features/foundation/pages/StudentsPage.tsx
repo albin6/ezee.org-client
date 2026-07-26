@@ -29,7 +29,7 @@ export const StudentsPage: React.FC = () => {
   const [importLoading, setImportLoading] = useState(false);
 
   const [evaluationModalVisible, setEvaluationModalVisible] = useState(false);
-  const [selectedStudentForEval, setSelectedStudentForEval] = useState<any>(null);
+  const [selectedStudentForEval] = useState<any>(null);
 
   const [examsModalVisible, setExamsModalVisible] = useState(false);
   const [selectedStudentForExams, setSelectedStudentForExams] = useState<any>(null);
@@ -167,15 +167,6 @@ export const StudentsPage: React.FC = () => {
       key: 'actions',
       render: (_: any, record: Student) => (
         <Space>
-          <Button 
-            type="link" 
-            onClick={() => {
-              setSelectedStudentForEval(record);
-              setEvaluationModalVisible(true);
-            }}
-          >
-            Evaluations
-          </Button>
           <Button 
             type="link" 
             onClick={() => {

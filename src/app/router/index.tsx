@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { CoordinatorLoginPage } from '@/features/auth/pages/CoordinatorLoginPage';
 import { ProfilePage } from '@/features/auth/pages/ProfilePage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { AdminLayout } from '../layouts/AdminLayout';
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/coordinator/login',
+    element: <CoordinatorLoginPage />,
   },
   {
     element: <ProtectedRoute />,

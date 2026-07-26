@@ -128,6 +128,12 @@ export const foundationService = {
     return res.data;
   },
 
+  // Student Coordinators
+  getStudentCoordinators: async () => {
+    const res = await apiClient.get('/foundation/coordinators');
+    return res.data.data || res.data;
+  },
+
   // Threads
   getThreads: async (params: any) => {
     const res = await apiClient.get('/foundation/threads', { params });
@@ -151,6 +157,23 @@ export const foundationService = {
   },
   createMessage: async (id: string, message: string) => {
     const res = await apiClient.post(`/foundation/threads/${id}/messages`, { message });
+    return res.data;
+  },
+  
+  getThreadCoordinators: async (id: string) => {
+    const res = await apiClient.get(`/foundation/threads/${id}/coordinators`);
+    return res.data;
+  },
+  addThreadCoordinator: async (id: string, coordinatorId: string) => {
+    const res = await apiClient.post(`/foundation/threads/${id}/coordinators`, { coordinatorId });
+    return res.data;
+  },
+  getThreadAssignments: async (id: string) => {
+    const res = await apiClient.get(`/foundation/threads/${id}/assignments`);
+    return res.data;
+  },
+  runThreadAutoAssign: async (id: string) => {
+    const res = await apiClient.post(`/foundation/threads/${id}/auto-assign`);
     return res.data;
   },
 
