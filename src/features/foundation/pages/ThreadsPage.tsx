@@ -134,7 +134,7 @@ export const ThreadsPage: React.FC = () => {
           >
             View Thread
           </Button>
-          {hasPermission('foundation_thread:write') && record.status === 'OPEN' && (
+          {hasPermission('foundation_threads:write') && record.status === 'OPEN' && (
             <Button
               type="text"
               icon={<CheckCircleOutlined />}
@@ -154,7 +154,7 @@ export const ThreadsPage: React.FC = () => {
         title="Foundation Threads"
         description="Thread-based communication interface for exam coordination and discussions."
         extra={
-          hasPermission('foundation_thread:write') && (
+          hasPermission('foundation_threads:write') && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalVisible(true)}>
               New Thread
             </Button>
