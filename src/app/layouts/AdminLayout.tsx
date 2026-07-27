@@ -312,7 +312,9 @@ export const AdminLayout: React.FC = () => {
               <Button type="text" className="flex items-center gap-2 h-auto py-1">
                 <Avatar icon={<UserOutlined />} className="bg-purple-600" />
                 <span className="hidden sm:inline text-gray-600 font-medium">
-                  {user?.type === 'user' || (user as any)?.email ? (user as any)?.name || 'User' : user?.identifier || 'Admin'}
+                  {isCoordinator 
+                    ? (user as any)?.name || 'Coordinator' 
+                    : (user?.type === 'user' || (user as any)?.email ? (user as any)?.name || 'User' : user?.identifier || 'Admin')}
                 </span>
               </Button>
             </Dropdown>

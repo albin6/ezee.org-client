@@ -19,9 +19,9 @@ export const CoordinatorLoginPage: React.FC = () => {
         password: values.password,
       });
 
-      const role = (response.data as any).role || 'STUDENT_COORDINATOR';
       login(response.data.accessToken);
-      setUser({ role, type: role } as any);
+      const profile = await authService.getUserProfile();
+      setUser(profile.data as any);
       message.success('Login successful');
       navigate('/foundation/threads');
     } catch (error: any) {
