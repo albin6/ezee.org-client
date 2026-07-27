@@ -23,7 +23,7 @@ export const CoordinatorLoginPage: React.FC = () => {
       login(response.data.accessToken);
       setUser({ role, type: role } as any);
       message.success('Login successful');
-      navigate('/dashboard'); // Or wherever appropriate
+      navigate('/foundation/threads');
     } catch (error: any) {
       console.error("LOGIN ERROR:", error);
       message.error(error.message || error.response?.data?.message || 'Invalid credentials');

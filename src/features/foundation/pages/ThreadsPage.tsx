@@ -6,11 +6,15 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
 import type { Thread, ThreadMessage, StudentCoordinator } from '../api/foundation.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 
 
 
 export const ThreadsPage: React.FC = () => {
   const { hasPermission } = usePermissions();
+  const user = useAuthStore(state => state.user);
+  const isCoordinator = (user as any)?.type === 'STUDENT_COORDINATOR' || (user as any)?.role === 'STUDENT_COORDINATOR';
+
   const [threads, setThreads] = useState<Thread[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -35,6 +39,7 @@ export const ThreadsPage: React.FC = () => {
   const [addCoordinatorLoading, setAddCoordinatorLoading] = useState(false);
   const [assignEngineLoading, setAssignEngineLoading] = useState(false);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
+  const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
   
   // New State for Batches for creating threads
   // const [batches, setBatches] = useState<any[]>([]);
@@ -152,15 +157,20 @@ export const ThreadsPage: React.FC = () => {
     try {
       await foundationService.removeThreadCoordinator(selectedThread.id, coordinatorId);
       message.success('Coordinator removed successfully');
-      // Refresh coordinators & assignments
-      const [coords, assigns] = await Promise.all([
-        foundationService.getThreadCoordinators(selectedThread.id),
-        foundationService.getThreadAssignments(selectedThread.id)
-      ]);
-      setCoordinators(coords);
-      setAssignments(assigns);
+      openThreadDetails(selectedThread);
     } catch (error: any) {
       message.error('Failed to remove coordinator');
+    }
+  };
+
+  const handleUpdateLink = async (coordinatorId: string, link: string) => {
+    if (!selectedThread) return;
+    try {
+      await foundationService.updateThreadCoordinatorLink(selectedThread.id, coordinatorId, link);
+      message.success('Meeting link updated successfully');
+      openThreadDetails(selectedThread);
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to update meeting link');
     }
   };
 
@@ -406,9 +416,25 @@ export const ThreadsPage: React.FC = () => {
                   dataSource={coordinators}
                   renderItem={(coord) => (
                     <List.Item
-                      actions={
-                        hasPermission('foundation_threads:write') ? [
+                      actions={[
+                        ...(isCoordinator && coord.id === user?.sub ? [
+                          <div key="edit-link" className="flex items-center gap-2">
+                            <Input 
+                              placeholder="Google Meet Link" 
+                              defaultValue={coord.meetingLink}
+                              onChange={(e) => setMeetingLinkMap({ ...meetingLinkMap, [coord.id]: e.target.value })}
+                            />
+                            <Button 
+                              type="primary" 
+                              onClick={() => handleUpdateLink(coord.id, meetingLinkMap[coord.id] !== undefined ? meetingLinkMap[coord.id] : (coord.meetingLink || ''))}
+                            >
+                              Save Link
+                            </Button>
+                          </div>
+                        ] : []),
+                        ...(hasPermission('foundation_threads:write') ? [
                           <Popconfirm
+                            key="remove"
                             title="Remove Coordinator"
                             description="Removing this coordinator will also remove all their student assignments for this thread. Are you sure?"
                             onConfirm={() => handleRemoveCoordinator(coord.id)}
@@ -417,13 +443,22 @@ export const ThreadsPage: React.FC = () => {
                           >
                             <Button danger type="text" icon={<DeleteOutlined />}>Remove</Button>
                           </Popconfirm>
-                        ] : []
-                      }
+                        ] : [])
+                      ]}
                     >
                       <List.Item.Meta
                         avatar={<Avatar icon={<UserOutlined />} />}
                         title={coord.name}
-                        description={`Student No: ${coord.studentNumber}`}
+                        description={
+                          <div>
+                            <div>Student No: {coord.studentNumber}</div>
+                            {coord.meetingLink && (
+                              <div className="mt-1">
+                                Link: <a href={coord.meetingLink.startsWith('http') ? coord.meetingLink : `https://${coord.meetingLink}`} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">{coord.meetingLink}</a>
+                              </div>
+                            )}
+                          </div>
+                        }
                       />
                     </List.Item>
                   )}
@@ -457,7 +492,9 @@ export const ThreadsPage: React.FC = () => {
                   style={{ minHeight: '100px' }}
                 >
                   {assignments.length > 0 ? (
-                    assignments.map((group, idx) => (
+                    assignments
+                      .filter(group => isCoordinator ? group.coordinator.id === user?.sub : true)
+                      .map((group, idx) => (
                       <div key={idx} className="mb-4">
                         <div className="font-bold">{group.coordinator.name}</div>
                         {group.students.map((st: any, i: number) => (

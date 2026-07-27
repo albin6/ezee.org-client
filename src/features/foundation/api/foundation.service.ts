@@ -24,6 +24,7 @@ export interface StudentCoordinator {
   batchNumber: string;
   studentNumber: string;
   password?: string;
+  meetingLink?: string;
   createdAt: string;
 }
 
@@ -166,6 +167,10 @@ export const foundationService = {
   },
   addThreadCoordinator: async (threadId: string, coordinatorId: string) => {
     const response = await apiClient.post(`/foundation/threads/${threadId}/coordinators`, { coordinatorId });
+    return response.data;
+  },
+  updateThreadCoordinatorLink: async (threadId: string, coordinatorId: string, meetingLink: string) => {
+    const response = await apiClient.patch(`/foundation/threads/${threadId}/coordinators/${coordinatorId}/link`, { meetingLink });
     return response.data;
   },
 

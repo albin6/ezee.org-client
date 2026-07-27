@@ -56,29 +56,55 @@ export const AdminLayout: React.FC = () => {
     />
   );
 
-  const menuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: 'Dashboard',
-      onClick: () => {
-        navigate('/dashboard');
-        setMobileMenuOpen(false);
-      },
-    },
-    {
-      key: '/profile',
-      icon: <ProfileOutlined />,
-      label: 'Profile',
-      onClick: () => {
-        navigate('/profile');
-        setMobileMenuOpen(false);
-      },
-    },
-  ] as any[];
+  let menuItems: any[] = [];
 
-  if (hasPermission('roles:read')) {
-    menuItems.push({
+  const isCoordinator = (user as any)?.type === 'STUDENT_COORDINATOR' || (user as any)?.role === 'STUDENT_COORDINATOR';
+
+  if (isCoordinator) {
+    menuItems = [
+      {
+        key: '/foundation/threads',
+        icon: <FolderOutlined />,
+        label: 'My Threads',
+        onClick: () => {
+          navigate('/foundation/threads');
+          setMobileMenuOpen(false);
+        },
+      },
+      {
+        key: '/profile',
+        icon: <ProfileOutlined />,
+        label: 'Profile',
+        onClick: () => {
+          navigate('/profile');
+          setMobileMenuOpen(false);
+        },
+      },
+    ];
+  } else {
+    menuItems = [
+      {
+        key: '/dashboard',
+        icon: <DashboardOutlined />,
+        label: 'Dashboard',
+        onClick: () => {
+          navigate('/dashboard');
+          setMobileMenuOpen(false);
+        },
+      },
+      {
+        key: '/profile',
+        icon: <ProfileOutlined />,
+        label: 'Profile',
+        onClick: () => {
+          navigate('/profile');
+          setMobileMenuOpen(false);
+        },
+      },
+    ];
+
+    if (hasPermission('roles:read')) {
+      menuItems.push({
       key: '/roles',
       icon: <SafetyCertificateOutlined />,
       label: 'Roles & Permissions',
@@ -87,10 +113,10 @@ export const AdminLayout: React.FC = () => {
         setMobileMenuOpen(false);
       },
     });
-  }
+    }
 
-  if (hasPermission('foundation:read')) {
-    const foundationChildren: any[] = [];
+    if (hasPermission('foundation:read')) {
+      const foundationChildren: any[] = [];
 
     if (hasPermission('foundation_overview:read')) {
       foundationChildren.push({
@@ -160,10 +186,10 @@ export const AdminLayout: React.FC = () => {
         children: foundationChildren,
       });
     }
-  }
+      }
 
-  if (hasPermission('teams:read')) {
-    menuItems.push({
+    if (hasPermission('teams:read')) {
+      menuItems.push({
       key: '/teams',
       icon: <TeamOutlined />,
       label: 'Team Management',
@@ -172,10 +198,10 @@ export const AdminLayout: React.FC = () => {
         setMobileMenuOpen(false);
       },
     });
-  }
+    }
 
-  if (hasPermission('users:read')) {
-    menuItems.push({
+    if (hasPermission('users:read')) {
+      menuItems.push({
       key: '/users',
       icon: <UserOutlined />,
       label: 'User Management',
@@ -184,10 +210,10 @@ export const AdminLayout: React.FC = () => {
         setMobileMenuOpen(false);
       },
     });
-  }
+    }
 
-  if (hasPermission('tickets:read')) {
-    menuItems.push({
+    if (hasPermission('tickets:read')) {
+      menuItems.push({
       key: '/tickets',
       icon: <BugOutlined />,
       label: 'Tickets & Issues',
@@ -198,21 +224,22 @@ export const AdminLayout: React.FC = () => {
     });
   }
 
-  // Task Management (Visible to everyone in V1 or adapt permissions as needed)
-  menuItems.push({
-    key: '/tasks',
-    icon: <CheckSquareOutlined />,
-    label: 'Tasks',
-    onClick: () => {
-      navigate('/tasks');
-      setMobileMenuOpen(false);
-    },
-  });
+    // Task Management (Visible to everyone in V1 or adapt permissions as needed)
+    menuItems.push({
+      key: '/tasks',
+      icon: <CheckSquareOutlined />,
+      label: 'Tasks',
+      onClick: () => {
+        navigate('/tasks');
+        setMobileMenuOpen(false);
+      },
+    });
+  }
 
   const sidebarContent = (
     <>
       <div className="h-16 flex items-center justify-center text-white text-xl font-bold border-b border-gray-800 bg-gray-900">
-        {user?.type === 'user' || (user as any)?.email ? 'User Portal' : 'Admin Panel'}
+        {isCoordinator ? 'Coordinator Portal' : (user?.type === 'user' || (user as any)?.email ? 'User Portal' : 'Admin Panel')}
       </div>
       <Menu
         theme="dark"
