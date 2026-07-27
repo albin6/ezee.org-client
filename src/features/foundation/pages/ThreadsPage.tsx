@@ -236,13 +236,20 @@ export const ThreadsPage: React.FC = () => {
             View Thread
           </Button>
           {hasPermission('foundation_threads:write') && record.status === 'OPEN' && (
-            <Button
-              type="text"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleUpdateStatus(record.id, 'RESOLVED')}
+            <Popconfirm
+              title="Resolve Thread"
+              description="Are you sure you want to resolve this thread? It cannot be reopened easily."
+              onConfirm={() => handleUpdateStatus(record.id, 'RESOLVED')}
+              okText="Yes, Resolve"
+              cancelText="Cancel"
             >
-              Resolve
-            </Button>
+              <Button
+                type="text"
+                icon={<CheckCircleOutlined />}
+              >
+                Resolve
+              </Button>
+            </Popconfirm>
           )}
         </Space>
       ),
@@ -496,13 +503,20 @@ export const ThreadsPage: React.FC = () => {
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
                   <h3 className="font-semibold mb-2">Auto-Assign Engine</h3>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      type="primary" 
-                      onClick={handleRunAutoAssign} 
-                      loading={assignEngineLoading}
+                    <Popconfirm
+                      title="Run Auto-Assign Engine"
+                      description="This will distribute students evenly to assigned coordinators. Existing assignments may be modified. Proceed?"
+                      onConfirm={handleRunAutoAssign}
+                      okText="Run Engine"
+                      cancelText="Cancel"
                     >
-                      Run Auto-Assign Engine
-                    </Button>
+                      <Button 
+                        type="primary" 
+                        loading={assignEngineLoading}
+                      >
+                        Run Auto-Assign Engine
+                      </Button>
+                    </Popconfirm>
                     <span className="text-gray-500 text-sm">Distributes students evenly to assigned coordinators.</span>
                   </div>
                 </div>

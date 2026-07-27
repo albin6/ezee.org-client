@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer } from 'antd';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Popconfirm } from 'antd';
 import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -328,7 +328,15 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
           <Space>
             <Button onClick={() => handleStatusChange('REOPENED')}>Reopen Ticket</Button>
-            <Button type="primary" onClick={() => handleStatusChange('CLOSED')}>Close Permanently</Button>
+            <Popconfirm
+              title="Close Permanently"
+              description="Are you sure you want to close this ticket permanently? It cannot be reopened."
+              onConfirm={() => handleStatusChange('CLOSED')}
+              okText="Yes, Close"
+              cancelText="Cancel"
+            >
+              <Button type="primary">Close Permanently</Button>
+            </Popconfirm>
           </Space>
         </div>
       )}
