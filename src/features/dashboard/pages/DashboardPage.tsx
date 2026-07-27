@@ -5,9 +5,16 @@ import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { CoordinatorDashboard } from './CoordinatorDashboard';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
+  
+  const isCoordinator = (user as any)?.type === 'STUDENT_COORDINATOR' || (user as any)?.role === 'STUDENT_COORDINATOR';
+
+  if (isCoordinator) {
+    return <CoordinatorDashboard />;
+  }
 
   return (
     <PageContainer>

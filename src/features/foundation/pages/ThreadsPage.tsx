@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm } from 'antd';
-import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic } from 'antd';
+import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
@@ -327,8 +327,43 @@ export const ThreadsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <Tabs defaultActiveKey="1">
-          <Tabs.TabPane tab={<span><MessageOutlined /> Overview</span>} key="1">
+        <Tabs defaultActiveKey="overview">
+          <Tabs.TabPane tab={<span><DashboardOutlined /> Overview</span>} key="overview">
+            {isCoordinator ? (
+              <div className="p-4 h-[60vh]">
+                <h3 className="text-lg font-semibold mb-4">My Analytics</h3>
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <Card variant="borderless">
+                      <Statistic title="Assigned Students" value={assignments.find(a => a.coordinator.id === ((user as any)?.sub || (user as any)?.id))?.students.length || 0} />
+                    </Card>
+                  </Col>
+                  <Col span={12}>
+                    <Card variant="borderless">
+                      <Statistic title="Thread Status" value={selectedThread?.status || 'UNKNOWN'} />
+                    </Card>
+                  </Col>
+                </Row>
+              </div>
+            ) : (
+              <div className="p-4 h-[60vh]">
+                <h3 className="text-lg font-semibold mb-4">Thread Analytics</h3>
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <Card variant="borderless">
+                      <Statistic title="Total Coordinators" value={coordinators.length} />
+                    </Card>
+                  </Col>
+                  <Col span={12}>
+                    <Card variant="borderless">
+                      <Statistic title="Total Assigned Students" value={assignments.reduce((acc, curr) => acc + curr.students.length, 0)} />
+                    </Card>
+                  </Col>
+                </Row>
+              </div>
+            )}
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={<span><MessageOutlined /> Discussion</span>} key="discussion">
             <div className="flex flex-col h-[60vh]">
               <div className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
                 <List
@@ -384,7 +419,8 @@ export const ThreadsPage: React.FC = () => {
               </div>
             </div>
           </Tabs.TabPane>
-          <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators</span>} key="2">
+          {!isCoordinator && (
+            <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators</span>} key="coordinators">
             <div className="h-[60vh] overflow-y-auto">
               {hasPermission('foundation_threads:write') && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
@@ -417,21 +453,6 @@ export const ThreadsPage: React.FC = () => {
                   renderItem={(coord) => (
                     <List.Item
                       actions={[
-                        ...(isCoordinator && coord.id === user?.sub ? [
-                          <div key="edit-link" className="flex items-center gap-2">
-                            <Input 
-                              placeholder="Google Meet Link" 
-                              defaultValue={coord.meetingLink}
-                              onChange={(e) => setMeetingLinkMap({ ...meetingLinkMap, [coord.id]: e.target.value })}
-                            />
-                            <Button 
-                              type="primary" 
-                              onClick={() => handleUpdateLink(coord.id, meetingLinkMap[coord.id] !== undefined ? meetingLinkMap[coord.id] : (coord.meetingLink || ''))}
-                            >
-                              Save Link
-                            </Button>
-                          </div>
-                        ] : []),
                         ...(hasPermission('foundation_threads:write') ? [
                           <Popconfirm
                             key="remove"
@@ -467,7 +488,9 @@ export const ThreadsPage: React.FC = () => {
               </div>
             </div>
           </Tabs.TabPane>
-          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assignments</span>} key="3">
+          )}
+          {!isCoordinator && (
+          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assignments</span>} key="assignments">
             <div className="h-[60vh] overflow-y-auto">
               {hasPermission('foundation_threads:write') && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
@@ -493,7 +516,6 @@ export const ThreadsPage: React.FC = () => {
                 >
                   {assignments.length > 0 ? (
                     assignments
-                      .filter(group => isCoordinator ? group.coordinator.id === user?.sub : true)
                       .map((group, idx) => (
                       <div key={idx} className="mb-4">
                         <div className="font-bold">{group.coordinator.name}</div>
@@ -509,6 +531,36 @@ export const ThreadsPage: React.FC = () => {
               </div>
             </div>
           </Tabs.TabPane>
+          )}
+          {isCoordinator && (
+          <Tabs.TabPane tab={<span><VideoCameraOutlined /> Meetings</span>} key="meetings">
+            <div className="p-4 h-[60vh]">
+              <h3 className="font-semibold mb-4 text-lg">My Google Meet Link</h3>
+              <p className="text-gray-500 mb-6">Update the link where your mock exam session will be held.</p>
+              {coordinators.filter(c => c.id === ((user as any)?.sub || (user as any)?.id)).map(coord => (
+                <div key={coord.id} className="flex items-center gap-4 mb-4 bg-gray-50 p-4 rounded border border-gray-200">
+                  <Input 
+                    className="flex-1"
+                    size="large"
+                    placeholder="https://meet.google.com/abc-defg-hij" 
+                    defaultValue={coord.meetingLink}
+                    onChange={(e) => setMeetingLinkMap({ ...meetingLinkMap, [coord.id]: e.target.value })}
+                  />
+                  <Button 
+                    type="primary" 
+                    size="large"
+                    onClick={() => handleUpdateLink(coord.id, meetingLinkMap[coord.id] !== undefined ? meetingLinkMap[coord.id] : (coord.meetingLink || ''))}
+                  >
+                    Save Link
+                  </Button>
+                </div>
+              ))}
+              {coordinators.filter(c => c.id === ((user as any)?.sub || (user as any)?.id)).length === 0 && (
+                <div className="text-gray-500">You are not assigned to this thread.</div>
+              )}
+            </div>
+          </Tabs.TabPane>
+          )}
         </Tabs>
       </Modal>
     </PageContainer>

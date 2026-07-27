@@ -63,6 +63,15 @@ export const AdminLayout: React.FC = () => {
   if (isCoordinator) {
     menuItems = [
       {
+        key: '/dashboard',
+        icon: <DashboardOutlined />,
+        label: 'Dashboard',
+        onClick: () => {
+          navigate('/dashboard');
+          setMobileMenuOpen(false);
+        },
+      },
+      {
         key: '/foundation/threads',
         icon: <FolderOutlined />,
         label: 'My Threads',
