@@ -33,9 +33,15 @@ export interface Thread {
   title: string;
   status: 'OPEN' | 'RESOLVED' | 'CLOSED';
   authorId: string;
+  batchId: string;
+  examType: string;
   createdAt: string;
   updatedAt: string;
   author?: {
+    id: string;
+    name: string;
+  };
+  batch?: {
     id: string;
     name: string;
   };

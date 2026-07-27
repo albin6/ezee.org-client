@@ -3,11 +3,9 @@ import { Card, Row, Col, Statistic, List, Avatar } from 'antd';
 import { BookOutlined, TeamOutlined, CalendarOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
-import { useAuthStore } from '@/features/auth/store/auth.store';
-import { foundationService, Thread } from '@/features/foundation/api/foundation.service';
+import { foundationService, type Thread } from '@/features/foundation/api/foundation.service';
 
 export const CoordinatorDashboard: React.FC = () => {
-  const { user } = useAuthStore();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -15,7 +13,7 @@ export const CoordinatorDashboard: React.FC = () => {
     const fetchThreads = async () => {
       setLoading(true);
       try {
-        const response = await foundationService.getThreads();
+        const response = await foundationService.getThreads({});
         setThreads(response.data);
       } catch (error) {
         console.error('Failed to fetch threads', error);
