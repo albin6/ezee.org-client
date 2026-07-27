@@ -423,7 +423,7 @@ export const ThreadsPage: React.FC = () => {
                       <List.Item.Meta
                         avatar={<Avatar icon={<UserOutlined />} />}
                         title={coord.name}
-                        description={coord.email}
+                        description={`Student No: ${coord.studentNumber}`}
                       />
                     </List.Item>
                   )}
