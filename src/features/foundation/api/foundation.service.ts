@@ -164,9 +164,14 @@ export const foundationService = {
     const res = await apiClient.get(`/foundation/threads/${id}/coordinators`);
     return res.data;
   },
-  addThreadCoordinator: async (id: string, coordinatorId: string) => {
-    const res = await apiClient.post(`/foundation/threads/${id}/coordinators`, { coordinatorId });
-    return res.data;
+  addThreadCoordinator: async (threadId: string, coordinatorId: string) => {
+    const response = await apiClient.post(`/foundation/threads/${threadId}/coordinators`, { coordinatorId });
+    return response.data;
+  },
+
+  removeThreadCoordinator: async (threadId: string, coordinatorId: string) => {
+    const response = await apiClient.delete(`/foundation/threads/${threadId}/coordinators/${coordinatorId}`);
+    return response.data;
   },
   getThreadAssignments: async (id: string) => {
     const res = await apiClient.get(`/foundation/threads/${id}/assignments`);

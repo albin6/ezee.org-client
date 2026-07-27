@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select } from 'antd';
-import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm } from 'antd';
+import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
@@ -29,7 +29,7 @@ export const ThreadsPage: React.FC = () => {
   const [batches, setBatches] = useState<any[]>([]);
   
   // New States for Coordinators & Assignments
-  const [, setCoordinators] = useState<StudentCoordinator[]>([]);
+  const [coordinators, setCoordinators] = useState<StudentCoordinator[]>([]);
   const [availableCoordinators, setAvailableCoordinators] = useState<StudentCoordinator[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [addCoordinatorLoading, setAddCoordinatorLoading] = useState(false);
@@ -144,6 +144,23 @@ export const ThreadsPage: React.FC = () => {
       message.error('Failed to add coordinator');
     } finally {
       setAddCoordinatorLoading(false);
+    }
+  };
+
+  const handleRemoveCoordinator = async (coordinatorId: string) => {
+    if (!selectedThread) return;
+    try {
+      await foundationService.removeThreadCoordinator(selectedThread.id, coordinatorId);
+      message.success('Coordinator removed successfully');
+      // Refresh coordinators & assignments
+      const [coords, assigns] = await Promise.all([
+        foundationService.getThreadCoordinators(selectedThread.id),
+        foundationService.getThreadAssignments(selectedThread.id)
+      ]);
+      setCoordinators(coords);
+      setAssignments(assigns);
+    } catch (error: any) {
+      message.error('Failed to remove coordinator');
     }
   };
 
@@ -357,41 +374,78 @@ export const ThreadsPage: React.FC = () => {
               </div>
             </div>
           </Tabs.TabPane>
-          <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators & Assignments</span>} key="2">
+          <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators</span>} key="2">
             <div className="h-[60vh] overflow-y-auto">
               {hasPermission('foundation_threads:write') && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-                  <h3 className="font-semibold mb-2">Manage Assignments</h3>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2">
-                      <Select
-                        className="w-64"
-                        placeholder="Select Coordinator"
-                        value={selectedCoordinator}
-                        onChange={setSelectedCoordinator}
-                        options={availableCoordinators.map(c => ({ label: c.name, value: c.id }))}
+                  <h3 className="font-semibold mb-2">Add Coordinator</h3>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      className="w-64"
+                      placeholder="Select Coordinator"
+                      value={selectedCoordinator}
+                      onChange={setSelectedCoordinator}
+                      options={availableCoordinators.map(c => ({ label: c.name, value: c.id }))}
+                    />
+                    <Button
+                      type="default"
+                      icon={<UserAddOutlined />}
+                      onClick={handleAddCoordinator}
+                      loading={addCoordinatorLoading}
+                      disabled={!selectedCoordinator}
+                    >
+                      Add to Thread
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h3 className="font-semibold mb-4 text-lg">Assigned Coordinators</h3>
+                <List
+                  dataSource={coordinators}
+                  renderItem={(coord) => (
+                    <List.Item
+                      actions={
+                        hasPermission('foundation_threads:write') ? [
+                          <Popconfirm
+                            title="Remove Coordinator"
+                            description="Removing this coordinator will also remove all their student assignments for this thread. Are you sure?"
+                            onConfirm={() => handleRemoveCoordinator(coord.id)}
+                            okText="Yes, Remove"
+                            cancelText="Cancel"
+                          >
+                            <Button danger type="text" icon={<DeleteOutlined />}>Remove</Button>
+                          </Popconfirm>
+                        ] : []
+                      }
+                    >
+                      <List.Item.Meta
+                        avatar={<Avatar icon={<UserOutlined />} />}
+                        title={coord.name}
+                        description={coord.email}
                       />
-                      <Button
-                        type="default"
-                        icon={<UserAddOutlined />}
-                        onClick={handleAddCoordinator}
-                        loading={addCoordinatorLoading}
-                        disabled={!selectedCoordinator}
-                      >
-                        Add to Thread
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        type="primary" 
-                        onClick={handleRunAutoAssign} 
-                        loading={assignEngineLoading}
-                      >
-                        Run Auto-Assign Engine
-                      </Button>
-                      <span className="text-gray-500 text-sm">Distributes students to assigned coordinators evenly.</span>
-                    </div>
+                    </List.Item>
+                  )}
+                  locale={{ emptyText: 'No coordinators assigned.' }}
+                />
+              </div>
+            </div>
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assignments</span>} key="3">
+            <div className="h-[60vh] overflow-y-auto">
+              {hasPermission('foundation_threads:write') && (
+                <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
+                  <h3 className="font-semibold mb-2">Auto-Assign Engine</h3>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      type="primary" 
+                      onClick={handleRunAutoAssign} 
+                      loading={assignEngineLoading}
+                    >
+                      Run Auto-Assign Engine
+                    </Button>
+                    <span className="text-gray-500 text-sm">Distributes students evenly to assigned coordinators.</span>
                   </div>
                 </div>
               )}
