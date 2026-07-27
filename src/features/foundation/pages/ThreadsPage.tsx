@@ -26,6 +26,7 @@ export const ThreadsPage: React.FC = () => {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [batches, setBatches] = useState<any[]>([]);
   
   // New States for Coordinators & Assignments
   const [, setCoordinators] = useState<StudentCoordinator[]>([]);
@@ -53,8 +54,12 @@ export const ThreadsPage: React.FC = () => {
 
   const fetchGlobalData = async () => {
     try {
-      const coords = await foundationService.getStudentCoordinators();
+      const [coords, batchesRes] = await Promise.all([
+        foundationService.getStudentCoordinators(),
+        foundationService.getBatches({ page: 1, limit: 100 })
+      ]);
       setAvailableCoordinators(Array.isArray(coords) ? coords : []);
+      setBatches(batchesRes.data || []);
     } catch(e) {
       console.error('Failed to fetch available coordinators');
     }
@@ -263,6 +268,27 @@ export const ThreadsPage: React.FC = () => {
             rules={[{ required: true, message: 'Please enter thread title' }]}
           >
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="batchId"
+            label="Batch"
+            rules={[{ required: true, message: 'Please select a batch' }]}
+          >
+            <Select placeholder="Select Batch">
+              {batches.map(b => (
+                <Select.Option key={b.id} value={b.id}>{b.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="examType"
+            label="Exam Type"
+            rules={[{ required: true, message: 'Please select an exam type' }]}
+          >
+            <Select placeholder="Select Exam Type">
+              <Select.Option value="MOCK">Mock Exam</Select.Option>
+              <Select.Option value="FINAL">Final Exam</Select.Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>
