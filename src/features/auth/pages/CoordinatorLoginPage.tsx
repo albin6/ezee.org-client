@@ -8,7 +8,8 @@ import { PhoneOutlined, LockOutlined } from '@ant-design/icons';
 export const CoordinatorLoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const setAuthFn = useAuthStore((state: any) => state.setAuth);
+  const login = useAuthStore((state: any) => state.login);
+  const setUser = useAuthStore((state: any) => state.setUser);
 
   const onFinish = async (values: any) => {
     setLoading(true);
@@ -18,12 +19,14 @@ export const CoordinatorLoginPage: React.FC = () => {
         password: values.password,
       });
 
-      const role = (response as any).role || 'STUDENT_COORDINATOR';
-      setAuthFn(response.data.accessToken, role);
+      const role = (response.data as any).role || 'STUDENT_COORDINATOR';
+      login(response.data.accessToken);
+      setUser({ role, type: role } as any);
       message.success('Login successful');
       navigate('/dashboard'); // Or wherever appropriate
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Invalid credentials');
+      console.error("LOGIN ERROR:", error);
+      message.error(error.message || error.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
