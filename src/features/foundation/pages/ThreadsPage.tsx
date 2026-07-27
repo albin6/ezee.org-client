@@ -518,7 +518,15 @@ export const ThreadsPage: React.FC = () => {
                     assignments
                       .map((group, idx) => (
                       <div key={idx} className="mb-4">
-                        <div className="font-bold">{group.coordinator.name}</div>
+                        <div className="font-bold">
+                          {group.coordinator.name} - {
+                            (() => {
+                              const coord = coordinators.find(c => c.id === group.coordinator.id);
+                              const link = coord?.meetingLink || group.coordinator.meetingLink;
+                              return link ? (link.startsWith('http') ? link : `https://${link}`) : 'meeting link Not available';
+                            })()
+                          }
+                        </div>
                         {group.students.map((st: any, i: number) => (
                           <div key={i}>- {st.name}</div>
                         ))}
