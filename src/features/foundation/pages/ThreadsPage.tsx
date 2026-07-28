@@ -41,6 +41,7 @@ export const ThreadsPage: React.FC = () => {
   const [assignEngineLoading, setAssignEngineLoading] = useState(false);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
   const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState('overview');
   
   // New State for Batches for creating threads
   // const [batches, setBatches] = useState<any[]>([]);
@@ -52,8 +53,12 @@ export const ThreadsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (activeTab === 'discussion') {
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
+  }, [messages, activeTab]);
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -140,6 +145,7 @@ export const ThreadsPage: React.FC = () => {
   const openThreadDetails = async (thread: Thread) => {
     setSelectedThread(thread);
     setIsDetailModalVisible(true);
+    setActiveTab('overview');
     setMessagesLoading(true);
     try {
       const [msgs, coords, assigns] = await Promise.all([
@@ -388,7 +394,7 @@ export const ThreadsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <Tabs defaultActiveKey="overview">
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
           <Tabs.TabPane tab={<span><DashboardOutlined /> Overview</span>} key="overview">
             {isCoordinator ? (
               <div className="p-4 h-[60vh]">
