@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic } from 'antd';
 import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -44,6 +44,16 @@ export const ThreadsPage: React.FC = () => {
   
   // New State for Batches for creating threads
   // const [batches, setBatches] = useState<any[]>([]);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -441,6 +451,7 @@ export const ThreadsPage: React.FC = () => {
                 {messages.length === 0 && !messagesLoading && (
                   <div className="text-center text-gray-400 py-10">No messages yet. Start the discussion!</div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
               
               <div className="mt-auto">
