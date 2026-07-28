@@ -204,9 +204,13 @@ export const ThreadsPage: React.FC = () => {
   };
 
   const handleUpdateLink = async (coordinatorId: string, link: string) => {
+    if (!link.trim()) {
+      message.error('Please enter a valid meeting link before saving');
+      return;
+    }
     if (!selectedThread) return;
     try {
-      await foundationService.updateThreadCoordinatorLink(selectedThread.id, coordinatorId, link);
+      await foundationService.updateThreadCoordinatorLink(selectedThread.id, coordinatorId, link.trim());
       message.success('Meeting link updated successfully');
       openThreadDetails(selectedThread);
     } catch (error: any) {
