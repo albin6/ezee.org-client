@@ -7,6 +7,7 @@ import { foundationService } from '../api/foundation.service';
 import type { Thread, ThreadMessage, StudentCoordinator } from '../api/foundation.service';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { socketService } from '@/shared/services/socket.service';
 
 
 
@@ -74,6 +75,45 @@ export const ThreadsPage: React.FC = () => {
     fetchThreads();
     fetchGlobalData();
   }, [page, limit, statusFilter]);
+
+  // Real-time socket logic for messages
+  useEffect(() => {
+    if (!isDetailModalVisible || !selectedThread) return;
+
+    const socket = socketService.connect();
+
+    // Use current messages state's latest message to get lastTimestamp
+    // We pass it to a ref or just use it initially
+    const lastTimestamp = messages.length > 0 ? messages[messages.length - 1].createdAt : undefined;
+
+    socket.emit('joinThread', { threadId: selectedThread.id, lastTimestamp }, (response: any) => {
+      if (response.status === 'success' && response.missedMessages?.length > 0) {
+        setMessages(prev => {
+          const newMessages = response.missedMessages.filter(
+            (msg: any) => !prev.some(p => p.id === msg.id)
+          );
+          return [...prev, ...newMessages];
+        });
+      }
+    });
+
+    const handleNewMessage = (newMsg: ThreadMessage) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    };
+
+    socket.on('NEW_THREAD_MESSAGE', handleNewMessage);
+
+    return () => {
+      const s = socketService.getSocket();
+      if (s) {
+        s.emit('leaveThread', { threadId: selectedThread.id });
+        s.off('NEW_THREAD_MESSAGE', handleNewMessage);
+      }
+    };
+  }, [isDetailModalVisible, selectedThread?.id]);
 
   const handleCreateSubmit = async (values: any) => {
     try {
