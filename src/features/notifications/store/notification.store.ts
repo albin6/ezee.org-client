@@ -108,6 +108,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         }
       });
 
+      socket.off('NEW_COORDINATOR_NOTIFICATION');
+      socket.on('NEW_COORDINATOR_NOTIFICATION', (newNotif: InAppNotification) => {
+        console.log('Received NEW_COORDINATOR_NOTIFICATION in store:', newNotif);
+        notification.info({
+          message: newNotif.title,
+          description: newNotif.body,
+          placement: 'topRight',
+          duration: 5,
+        });
+      });
+
       set({ isSocketConnected: true });
     } catch (err) {
       console.error('Failed to connect socket for notifications', err);
@@ -118,6 +129,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const socket = socketService.getSocket();
     if (socket) {
       socket.off('NEW_NOTIFICATION');
+      socket.off('NEW_COORDINATOR_NOTIFICATION');
       // We don't necessarily want to disconnect the entire socket here 
       // because other features (tickets) might use it.
       // The auth store logout will handle socketService.disconnect()

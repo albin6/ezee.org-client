@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic, Mentions } from 'antd';
 import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -463,17 +463,22 @@ export const ThreadsPage: React.FC = () => {
               <div className="mt-auto">
                 {selectedThread?.status === 'OPEN' ? (
                   <div className="flex items-start gap-2">
-                    <Input.TextArea
+                    <Mentions
                       rows={3}
                       value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Type your message here..."
-                      onPressEnter={(e) => {
-                        if (!e.shiftKey) {
+                      onChange={(val) => setMessageInput(val)}
+                      placeholder="Type your message here... Use @ to tag coordinators"
+                      options={availableCoordinators.map(c => ({
+                        value: c.name.replace(/\s+/g, ''),
+                        label: c.name
+                      }))}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage();
                         }
                       }}
+                      className="flex-1"
                     />
                     <Button type="primary" onClick={handleSendMessage}>
                       Send
