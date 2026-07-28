@@ -91,6 +91,22 @@ export const ThreadsPage: React.FC = () => {
     fetchGlobalData();
   }, [page, limit, statusFilter]);
 
+  // Handle URL parameters for opening a specific thread
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const threadId = params.get('threadId');
+    const tab = params.get('tab');
+    
+    if (threadId && threads.length > 0 && !isDetailModalVisible) {
+      const found = threads.find(t => t.id === threadId);
+      if (found) {
+        openThreadDetails(found, tab || 'overview');
+        // Clear params to avoid re-triggering on future renders
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+  }, [threads, isDetailModalVisible]);
+
   // Real-time socket logic for messages
   useEffect(() => {
     if (!isDetailModalVisible || !selectedThread) return;
@@ -142,10 +158,10 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
-  const openThreadDetails = async (thread: Thread) => {
+  const openThreadDetails = async (thread: Thread, defaultTab = 'overview') => {
     setSelectedThread(thread);
     setIsDetailModalVisible(true);
-    setActiveTab('overview');
+    setActiveTab(defaultTab);
     setMessagesLoading(true);
     try {
       const [msgs, coords, assigns] = await Promise.all([
