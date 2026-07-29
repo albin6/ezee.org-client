@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -45,7 +46,10 @@ export const BatchesPage: React.FC = () => {
   const handleOpenModal = (batch?: Batch) => {
     if (batch) {
       setEditingBatch(batch);
-      form.setFieldsValue(batch);
+      form.setFieldsValue({
+        ...batch,
+        startDate: batch.startDate ? dayjs(batch.startDate) : undefined
+      });
     } else {
       setEditingBatch(null);
       form.resetFields();
@@ -55,11 +59,15 @@ export const BatchesPage: React.FC = () => {
 
   const handleSubmit = async (values: any) => {
     try {
+      const payload = {
+        ...values,
+        startDate: values.startDate ? values.startDate.toISOString() : undefined
+      };
       if (editingBatch) {
-        await foundationService.updateBatch(editingBatch.id, values);
+        await foundationService.updateBatch(editingBatch.id, payload);
         message.success('Batch updated');
       } else {
-        await foundationService.createBatch(values);
+        await foundationService.createBatch(payload);
         message.success('Batch created');
       }
       setIsModalVisible(false);
@@ -177,6 +185,9 @@ export const BatchesPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="description" label="Description">
             <Input.TextArea />
+          </Form.Item>
+          <Form.Item name="startDate" label="Start Date">
+            <DatePicker className="w-full" />
           </Form.Item>
           <div className="flex justify-end gap-2">
             <Button onClick={() => setIsModalVisible(false)}>Cancel</Button>

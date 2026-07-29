@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic, Mentions } from 'antd';
-import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic, Mentions, TimePicker, InputNumber, DatePicker } from 'antd';
+import dayjs from 'dayjs';
+import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined, CalendarOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
@@ -41,6 +42,9 @@ export const ThreadsPage: React.FC = () => {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [addCoordinatorLoading, setAddCoordinatorLoading] = useState(false);
   const [assignEngineLoading, setAssignEngineLoading] = useState(false);
+  const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleForm] = Form.useForm();
   const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
   const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -296,13 +300,35 @@ export const ThreadsPage: React.FC = () => {
     try {
       await foundationService.runThreadAutoAssign(selectedThread.id);
       message.success('Auto-assignment completed');
-      // refresh assignments
       const assigns = await foundationService.getThreadAssignments(selectedThread.id);
       setAssignments(assigns);
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Auto-assign failed');
     } finally {
       setAssignEngineLoading(false);
+    }
+  };
+
+  const handleScheduleExams = async (values: any) => {
+    if (!selectedThread) return;
+    setScheduleLoading(true);
+    try {
+      const selectedDate = values.date.format('YYYY-MM-DD');
+      const selectedTime = values.startTime.format('HH:mm:ssZ');
+      // combine them
+      const combinedDateTimeStr = `${selectedDate}T${selectedTime}`;
+      const formattedTime = dayjs(combinedDateTimeStr).format('YYYY-MM-DDTHH:mm:ssZ');
+      
+      await foundationService.scheduleExams(selectedThread.id, formattedTime, values.intervalMinutes);
+      message.success('Exams scheduled successfully');
+      setIsScheduleModalVisible(false);
+      scheduleForm.resetFields();
+      const assigns = await foundationService.getThreadAssignments(selectedThread.id);
+      setAssignments(assigns);
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to schedule exams');
+    } finally {
+      setScheduleLoading(false);
     }
   };
 
@@ -336,6 +362,8 @@ export const ThreadsPage: React.FC = () => {
       }
     }
   };
+
+  const hasScheduledExams = assignments.some(a => a.students.some((s: any) => s.scheduledTime));
 
   const columns = [
     {
@@ -470,6 +498,41 @@ export const ThreadsPage: React.FC = () => {
               <Select.Option value="MOCK">Mock Exam</Select.Option>
               <Select.Option value="FINAL">Final Exam</Select.Option>
             </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={hasScheduledExams ? "Update Exam Schedule" : "Schedule Exams"}
+        open={isScheduleModalVisible}
+        onCancel={() => setIsScheduleModalVisible(false)}
+        onOk={() => scheduleForm.submit()}
+        confirmLoading={scheduleLoading}
+      >
+        <Form form={scheduleForm} layout="vertical" onFinish={handleScheduleExams} initialValues={{ intervalMinutes: 35 }}>
+          <div className="mb-4 text-gray-500">
+            This will schedule the first student for each coordinator at the start time, and subsequent students at the specified interval.
+          </div>
+          <Form.Item
+            name="date"
+            label="Date"
+            rules={[{ required: true, message: 'Please select a date' }]}
+          >
+            <DatePicker className="w-full" />
+          </Form.Item>
+          <Form.Item
+            name="startTime"
+            label="Start Time"
+            rules={[{ required: true, message: 'Please select a start time' }]}
+          >
+            <TimePicker format="HH:mm" className="w-full" />
+          </Form.Item>
+          <Form.Item
+            name="intervalMinutes"
+            label="Interval (minutes)"
+            rules={[{ required: true, message: 'Please set the interval' }]}
+          >
+            <InputNumber min={5} max={120} className="w-full" />
           </Form.Item>
         </Form>
       </Modal>
@@ -674,7 +737,35 @@ export const ThreadsPage: React.FC = () => {
                         Run Auto-Assign Engine
                       </Button>
                     </Popconfirm>
-                    <span className="text-gray-500 text-sm">Distributes students evenly to assigned coordinators.</span>
+                    <span className="text-gray-500 text-sm border-r border-gray-300 pr-4 mr-2">Distributes students evenly.</span>
+                    
+                    <Button
+                      type="default"
+                      icon={<CalendarOutlined />}
+                      onClick={() => {
+                        let defaultDate = dayjs();
+                        if (selectedThread?.batch?.id || selectedThread?.batchId) {
+                          const bId = selectedThread.batch?.id || selectedThread.batchId;
+                          const batch = batches.find((b: any) => b.id === bId);
+                          if (batch && batch.startDate) {
+                            if (selectedThread.examType === 'MOCK') {
+                              defaultDate = dayjs(batch.startDate).add(5, 'day');
+                            } else if (selectedThread.examType === 'FINAL') {
+                              defaultDate = dayjs(batch.startDate).add(9, 'day');
+                            }
+                          }
+                        }
+                        
+                        scheduleForm.setFieldsValue({
+                          date: defaultDate,
+                          intervalMinutes: 35
+                        });
+                        setIsScheduleModalVisible(true);
+                      }}
+                    >
+                      {hasScheduledExams ? "Update Schedule" : "Schedule Exams"}
+                    </Button>
+                    <span className="text-gray-500 text-sm">Assign a start time & intervals for all exams.</span>
                   </div>
                 </div>
               )}
@@ -699,7 +790,14 @@ export const ThreadsPage: React.FC = () => {
                           }
                         </div>
                         {group.students.map((st: any, i: number) => (
-                          <div key={i}>- {st.name}</div>
+                          <div key={i} className="flex gap-4">
+                            <span>- {st.name}</span>
+                            {st.scheduledTime && (
+                              <span className="text-blue-600">
+                                ({new Date(st.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     ))
@@ -786,7 +884,16 @@ export const ThreadsPage: React.FC = () => {
                             <List.Item.Meta
                               avatar={<Avatar icon={<UserOutlined />} />}
                               title={st.name}
-                              description={st.email}
+                              description={
+                                <div>
+                                  <div>{st.email}</div>
+                                  {st.scheduledTime && (
+                                    <div className="text-blue-600 font-medium mt-1">
+                                      Scheduled for: {new Date(st.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  )}
+                                </div>
+                              }
                             />
                           </List.Item>
                         )}

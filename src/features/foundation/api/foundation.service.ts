@@ -5,6 +5,7 @@ export interface Batch {
   name: string;
   description: string | null;
   status: 'ACTIVE' | 'BLOCKED';
+  startDate: string;
   createdAt: string;
 }
 
@@ -197,6 +198,13 @@ export const foundationService = {
   completeStudentExam: async (threadId: string, studentId: string, data: any) => {
     const res = await apiClient.post(`/foundation/threads/${threadId}/students/${studentId}/complete`, data);
     return res.data;
+  },
+  scheduleExams: async (threadId: string, startTime: string, intervalMinutes: number) => {
+    const response = await apiClient.post(`/foundation/threads/${threadId}/schedule`, {
+      startTime,
+      intervalMinutes
+    });
+    return response.data;
   },
 
   // Overview
