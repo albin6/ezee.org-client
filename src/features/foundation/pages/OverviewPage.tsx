@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Row, Col, Card, Statistic, message } from 'antd';
 import { TeamOutlined, UserOutlined, BookOutlined, MessageOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -7,6 +8,7 @@ import { foundationService } from '../api/foundation.service';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export const OverviewPage: React.FC = () => {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -109,15 +111,24 @@ export const OverviewPage: React.FC = () => {
         <Col xs={24} lg={8}>
           <Card title="Quick Actions" variant="borderless" className="shadow-sm" loading={loading}>
             <div className="flex flex-col gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors cursor-pointer">
+              <div 
+                className="p-4 bg-blue-50 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors cursor-pointer"
+                onClick={() => navigate('/batches')}
+              >
                 <h4 className="text-blue-800 font-semibold mb-1">Schedule Mock Test</h4>
                 <p className="text-blue-600 text-sm m-0">Set up the mid-term evaluation for an active batch.</p>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 hover:bg-purple-100 transition-colors cursor-pointer">
+              <div 
+                className="p-4 bg-purple-50 rounded-lg border border-purple-100 hover:bg-purple-100 transition-colors cursor-pointer"
+                onClick={() => navigate('/foundation/coordinator')}
+              >
                 <h4 className="text-purple-800 font-semibold mb-1">Review Coordinator Reports</h4>
                 <p className="text-purple-600 text-sm m-0">Check the latest feedback from student coordinators.</p>
               </div>
-              <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 hover:bg-orange-100 transition-colors cursor-pointer">
+              <div 
+                className="p-4 bg-orange-50 rounded-lg border border-orange-100 hover:bg-orange-100 transition-colors cursor-pointer"
+                onClick={() => navigate('/foundation/threads')}
+              >
                 <h4 className="text-orange-800 font-semibold mb-1">Check Open Threads</h4>
                 <p className="text-orange-600 text-sm m-0">Respond to student and coordinator inquiries.</p>
               </div>
