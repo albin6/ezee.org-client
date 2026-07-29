@@ -559,7 +559,7 @@ export const ThreadsPage: React.FC = () => {
                       value={messageInput}
                       onChange={(val) => setMessageInput(val)}
                       placeholder="Type your message here... Use @ to tag coordinators"
-                      options={availableCoordinators.map(c => ({
+                      options={coordinators.map(c => ({
                         value: c.name.replace(/\s+/g, ''),
                         label: c.name
                       }))}
