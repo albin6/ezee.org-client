@@ -77,7 +77,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       socket.on('NEW_NOTIFICATION', (newNotif: InAppNotification) => {
         console.log('Received NEW_NOTIFICATION in store:', newNotif);
 
-        const isCurrentPage = newNotif.linkUrl && window.location.pathname === newNotif.linkUrl;
+        let isCurrentPage = newNotif.linkUrl && window.location.pathname === newNotif.linkUrl;
+        
+        const activeThreadId = (window as any).activeDiscussionThreadId;
+        if (activeThreadId && newNotif.linkUrl && newNotif.linkUrl.includes(`threadId=${activeThreadId}`) && newNotif.linkUrl.includes('tab=discussion')) {
+          isCurrentPage = true;
+        }
 
         if (isCurrentPage) {
           // User is currently looking at this exact page (e.g., ticket chat)

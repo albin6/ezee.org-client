@@ -66,6 +66,17 @@ export const ThreadsPage: React.FC = () => {
     }
   }, [messages, activeTab]);
 
+  useEffect(() => {
+    if (isDetailModalVisible && selectedThread && activeTab === 'discussion') {
+      (window as any).activeDiscussionThreadId = selectedThread.id;
+    } else {
+      (window as any).activeDiscussionThreadId = null;
+    }
+    return () => {
+      (window as any).activeDiscussionThreadId = null;
+    };
+  }, [isDetailModalVisible, selectedThread?.id, activeTab]);
+
   const fetchThreads = async () => {
     setLoading(true);
     try {
