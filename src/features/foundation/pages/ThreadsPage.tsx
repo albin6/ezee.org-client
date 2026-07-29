@@ -8,7 +8,7 @@ import type { Thread, ThreadMessage, StudentCoordinator } from '../api/foundatio
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { socketService } from '@/shared/services/socket.service';
-
+import { CompleteExamModal } from '../components/CompleteExamModal';
 
 
 export const ThreadsPage: React.FC = () => {
@@ -44,6 +44,10 @@ export const ThreadsPage: React.FC = () => {
   const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
   const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Complete Exam Modal State
+  const [completeExamVisible, setCompleteExamVisible] = useState(false);
+  const [selectedStudentForExam, setSelectedStudentForExam] = useState<any>(null);
   
   // New State for Batches for creating threads
   // const [batches, setBatches] = useState<any[]>([]);
@@ -754,7 +758,20 @@ export const ThreadsPage: React.FC = () => {
                       <List
                         dataSource={myAssignment.students}
                         renderItem={(st: any) => (
-                          <List.Item>
+                          <List.Item
+                            actions={[
+                              <Button
+                                type="primary"
+                                disabled={st.isCompleted}
+                                onClick={() => {
+                                  setSelectedStudentForExam(st);
+                                  setCompleteExamVisible(true);
+                                }}
+                              >
+                                {st.isCompleted ? 'Completed' : 'Complete Exam'}
+                              </Button>
+                            ]}
+                          >
                             <List.Item.Meta
                               avatar={<Avatar icon={<UserOutlined />} />}
                               title={st.name}
@@ -774,6 +791,23 @@ export const ThreadsPage: React.FC = () => {
           )}
         </Tabs>
       </Modal>
+
+      {selectedThread && selectedStudentForExam && (
+        <CompleteExamModal
+          open={completeExamVisible}
+          threadId={selectedThread.id}
+          student={selectedStudentForExam}
+          onClose={() => {
+            setCompleteExamVisible(false);
+            setSelectedStudentForExam(null);
+          }}
+          onSuccess={() => {
+            setCompleteExamVisible(false);
+            setSelectedStudentForExam(null);
+            handleTabChange('assigned-students'); // Refresh the list
+          }}
+        />
+      )}
     </PageContainer>
   );
 };

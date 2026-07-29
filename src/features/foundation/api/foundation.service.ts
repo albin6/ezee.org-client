@@ -194,6 +194,10 @@ export const foundationService = {
     const res = await apiClient.post(`/foundation/threads/${id}/auto-assign`);
     return res.data;
   },
+  completeStudentExam: async (threadId: string, studentId: string, data: any) => {
+    const res = await apiClient.post(`/foundation/threads/${threadId}/students/${studentId}/complete`, data);
+    return res.data;
+  },
 
   // Overview
   getOverviewMetrics: async () => {
