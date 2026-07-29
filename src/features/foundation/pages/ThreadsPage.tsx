@@ -253,6 +253,28 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
+  const handleTabChange = async (key: string) => {
+    setActiveTab(key);
+    if (!selectedThread) return;
+    
+    try {
+      if (key === 'discussion') {
+        const msgs = await foundationService.getThreadMessages(selectedThread.id, undefined, 50);
+        setMessages(msgs);
+        setHasMoreMessages(msgs.length === 50);
+        requestAnimationFrame(() => scrollToBottom());
+      } else if (key === 'coordinators') {
+        const coords = await foundationService.getThreadCoordinators(selectedThread.id);
+        setCoordinators(coords);
+      } else if (key === 'assignments' || key === 'overview' || key === 'assigned-students') {
+        const assigns = await foundationService.getThreadAssignments(selectedThread.id);
+        setAssignments(assigns);
+      }
+    } catch (error) {
+      console.error('Failed to refresh tab data');
+    }
+  };
+
   const handleRunAutoAssign = async () => {
     if (!selectedThread) return;
     setAssignEngineLoading(true);
@@ -444,7 +466,7 @@ export const ThreadsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <Tabs activeKey={activeTab} onChange={handleTabChange}>
           <Tabs.TabPane tab={<span><DashboardOutlined /> Overview</span>} key="overview">
             {isCoordinator ? (
               <div className="p-4 h-[60vh]">
