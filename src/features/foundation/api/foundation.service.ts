@@ -158,8 +158,10 @@ export const foundationService = {
     const res = await apiClient.patch(`/foundation/threads/${id}/status`, { status });
     return res.data;
   },
-  getThreadMessages: async (id: string) => {
-    const res = await apiClient.get(`/foundation/threads/${id}/messages`);
+  getThreadMessages: async (id: string, cursor?: string, limit?: number) => {
+    const res = await apiClient.get(`/foundation/threads/${id}/messages`, {
+      params: { cursor, limit }
+    });
     return res.data;
   },
   createMessage: async (id: string, message: string) => {

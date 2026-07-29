@@ -31,6 +31,8 @@ export const ThreadsPage: React.FC = () => {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [batches, setBatches] = useState<any[]>([]);
   
   // New States for Coordinators & Assignments
@@ -165,11 +167,12 @@ export const ThreadsPage: React.FC = () => {
     setMessagesLoading(true);
     try {
       const [msgs, coords, assigns] = await Promise.all([
-        foundationService.getThreadMessages(thread.id),
+        foundationService.getThreadMessages(thread.id, undefined, 50),
         foundationService.getThreadCoordinators(thread.id),
         foundationService.getThreadAssignments(thread.id)
       ]);
       setMessages(msgs);
+      setHasMoreMessages(msgs.length === 50);
       setCoordinators(coords);
       setAssignments(assigns);
       
@@ -263,6 +266,37 @@ export const ThreadsPage: React.FC = () => {
       message.error(error.response?.data?.message || 'Auto-assign failed');
     } finally {
       setAssignEngineLoading(false);
+    }
+  };
+
+  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    if (target.scrollTop === 0 && !messagesLoading && hasMoreMessages && messages.length > 0 && selectedThread) {
+      const oldScrollHeight = target.scrollHeight;
+      setMessagesLoading(true);
+      try {
+        const oldestMessage = messages[0];
+        const olderMessages = await foundationService.getThreadMessages(selectedThread.id, oldestMessage.createdAt, 50);
+        
+        if (olderMessages.length < 50) {
+          setHasMoreMessages(false);
+        }
+        
+        if (olderMessages.length > 0) {
+          setMessages(prev => [...olderMessages, ...prev]);
+          // Maintain scroll position
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current) {
+              const newScrollHeight = messagesContainerRef.current.scrollHeight;
+              messagesContainerRef.current.scrollTop = newScrollHeight - oldScrollHeight;
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load older messages', error);
+      } finally {
+        setMessagesLoading(false);
+      }
     }
   };
 
@@ -448,7 +482,11 @@ export const ThreadsPage: React.FC = () => {
           </Tabs.TabPane>
           <Tabs.TabPane tab={<span><MessageOutlined /> Discussion</span>} key="discussion">
             <div className="flex flex-col h-[60vh]">
-              <div className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded">
+              <div 
+                className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded"
+                ref={messagesContainerRef}
+                onScroll={handleScroll}
+              >
                 <List
                   loading={messagesLoading}
                   itemLayout="horizontal"
@@ -662,6 +700,53 @@ export const ThreadsPage: React.FC = () => {
               {coordinators.filter(c => c.id === ((user as any)?.sub || (user as any)?.id)).length === 0 && (
                 <div className="text-gray-500">You are not assigned to this thread.</div>
               )}
+            </div>
+          </Tabs.TabPane>
+          )}
+          {isCoordinator && (
+          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assigned Students</span>} key="assigned-students">
+            <div className="p-4 h-[60vh] overflow-y-auto">
+              {(() => {
+                const userId = (user as any)?.sub || (user as any)?.id;
+                const myAssignment = assignments.find(a => a.coordinator.id === userId);
+                const myCoordInfo = coordinators.find(c => c.id === userId);
+                const link = myCoordInfo?.meetingLink || myAssignment?.coordinator.meetingLink;
+                
+                return (
+                  <>
+                    <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold mb-1">Quick Join Link</h3>
+                        {link ? (
+                          <a href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+                            {link}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic">No meeting link added yet. (Add one in the Meetings tab)</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <h3 className="font-semibold mb-4 text-lg">My Assigned Students ({myAssignment?.students.length || 0})</h3>
+                    {myAssignment && myAssignment.students.length > 0 ? (
+                      <List
+                        dataSource={myAssignment.students}
+                        renderItem={(st: any) => (
+                          <List.Item>
+                            <List.Item.Meta
+                              avatar={<Avatar icon={<UserOutlined />} />}
+                              title={st.name}
+                              description={st.email}
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <div className="text-gray-400 italic text-center py-10">No students have been assigned to you yet.</div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </Tabs.TabPane>
           )}
