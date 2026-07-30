@@ -37,7 +37,7 @@ export const ResultsPage: React.FC = () => {
   const fetchBatches = async () => {
     try {
       const res = await foundationService.getBatches({ limit: 100 });
-      setBatches(res);
+      setBatches(res.data || []);
     } catch (error) {
       console.error('Failed to fetch batches', error);
     }
