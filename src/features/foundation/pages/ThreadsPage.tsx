@@ -40,6 +40,7 @@ export const ThreadsPage: React.FC = () => {
   const [coordinators, setCoordinators] = useState<StudentCoordinator[]>([]);
   const [availableCoordinators, setAvailableCoordinators] = useState<StudentCoordinator[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [isAssignmentsSynced, setIsAssignmentsSynced] = useState(true);
   const [addCoordinatorLoading, setAddCoordinatorLoading] = useState(false);
   const [assignEngineLoading, setAssignEngineLoading] = useState(false);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
@@ -193,7 +194,8 @@ export const ThreadsPage: React.FC = () => {
       setMessages(msgs);
       setHasMoreMessages(msgs.length === 50);
       setCoordinators(coords);
-      setAssignments(assigns);
+      setAssignments(assigns.assignments);
+      setIsAssignmentsSynced(assigns.isSynced);
       
       // We should also fetch students in the batch
       // For now we'll just show the assignment data
@@ -287,7 +289,8 @@ export const ThreadsPage: React.FC = () => {
         setCoordinators(coords);
       } else if (key === 'assignments' || key === 'overview' || key === 'assigned-students') {
         const assigns = await foundationService.getThreadAssignments(selectedThread.id);
-        setAssignments(assigns);
+        setAssignments(assigns.assignments);
+        setIsAssignmentsSynced(assigns.isSynced);
       }
     } catch (error) {
       console.error('Failed to refresh tab data');
@@ -299,9 +302,10 @@ export const ThreadsPage: React.FC = () => {
     setAssignEngineLoading(true);
     try {
       await foundationService.runThreadAutoAssign(selectedThread.id);
-      message.success('Auto-assignment completed');
+      message.success('Auto-assign completed');
       const assigns = await foundationService.getThreadAssignments(selectedThread.id);
-      setAssignments(assigns);
+      setAssignments(assigns.assignments);
+      setIsAssignmentsSynced(assigns.isSynced);
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Auto-assign failed');
     } finally {
@@ -320,11 +324,13 @@ export const ThreadsPage: React.FC = () => {
       const formattedTime = dayjs(combinedDateTimeStr).format('YYYY-MM-DDTHH:mm:ssZ');
       
       await foundationService.scheduleExams(selectedThread.id, formattedTime, values.intervalMinutes);
-      message.success('Exams scheduled successfully');
+      message.success('Exam schedule updated successfully!');
       setIsScheduleModalVisible(false);
       scheduleForm.resetFields();
+      
       const assigns = await foundationService.getThreadAssignments(selectedThread.id);
-      setAssignments(assigns);
+      setAssignments(assigns.assignments);
+      setIsAssignmentsSynced(assigns.isSynced);
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to schedule exams');
     } finally {
@@ -774,6 +780,16 @@ export const ThreadsPage: React.FC = () => {
 
               <div>
                 <h3 className="font-semibold mb-4 text-lg">Assignments List (Copyable)</h3>
+                {!isAssignmentsSynced && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded flex justify-between items-center">
+                    <span>
+                      <strong>Warning:</strong> The coordinator list has changed. The current assignments are incomplete or unbalanced.
+                    </span>
+                    <Button size="small" type="primary" onClick={handleRunAutoAssign} loading={assignEngineLoading}>
+                      Re-run Engine
+                    </Button>
+                  </div>
+                )}
                 <div 
                   className="bg-gray-50 p-4 rounded border border-gray-200 font-mono text-sm select-all whitespace-pre-wrap"
                   style={{ minHeight: '100px' }}

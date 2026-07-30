@@ -187,9 +187,9 @@ export const foundationService = {
     const response = await apiClient.delete(`/foundation/threads/${threadId}/coordinators/${coordinatorId}`);
     return response.data;
   },
-  getThreadAssignments: async (id: string) => {
-    const res = await apiClient.get(`/foundation/threads/${id}/assignments`);
-    return res.data;
+  getThreadAssignments: async (threadId: string): Promise<{ assignments: any[], isSynced: boolean, totalStudents?: number, assignedStudentsCount?: number }> => {
+    const response = await apiClient.get(`/foundation/threads/${threadId}/assignments`);
+    return response.data;
   },
   runThreadAutoAssign: async (id: string) => {
     const res = await apiClient.post(`/foundation/threads/${id}/auto-assign`);
