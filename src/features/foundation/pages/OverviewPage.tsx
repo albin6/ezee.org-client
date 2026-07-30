@@ -78,7 +78,7 @@ export const OverviewPage: React.FC = () => {
               title="Revenue" 
               value={metrics?.kpis?.totalRevenue || 0} 
               prefix="$" 
-              valueStyle={{ color: '#52c41a' }} 
+              styles={{ content: { color: '#52c41a' } }} 
             />
           </Card>
         </Col>

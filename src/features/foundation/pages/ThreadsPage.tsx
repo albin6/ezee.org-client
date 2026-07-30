@@ -550,9 +550,11 @@ export const ThreadsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <Tabs activeKey={activeTab} onChange={handleTabChange}>
-          <Tabs.TabPane tab={<span><DashboardOutlined /> Overview</span>} key="overview">
-            {isCoordinator ? (
+        <Tabs activeKey={activeTab} onChange={handleTabChange} items={[
+          {
+            key: 'overview',
+            label: <span><DashboardOutlined /> Overview</span>,
+            children: isCoordinator ? (
               <div className="p-4 h-[60vh]">
                 <h3 className="text-lg font-semibold mb-4">My Analytics</h3>
                 <Row gutter={[16, 16]}>
@@ -584,9 +586,12 @@ export const ThreadsPage: React.FC = () => {
                   </Col>
                 </Row>
               </div>
-            )}
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={<span><MessageOutlined /> Discussion</span>} key="discussion">
+            )
+          },
+          {
+            key: 'discussion',
+            label: <span><MessageOutlined /> Discussion</span>,
+            children: (
             <div className="flex flex-col h-[60vh]">
               <div 
                 className="flex-1 overflow-y-auto mb-4 p-2 bg-gray-50 rounded"
@@ -651,9 +656,13 @@ export const ThreadsPage: React.FC = () => {
                 )}
               </div>
             </div>
-          </Tabs.TabPane>
-          {!isCoordinator && (
-            <Tabs.TabPane tab={<span><TeamOutlined /> Coordinators</span>} key="coordinators">
+            )
+          },
+          ...(!isCoordinator ? [
+          {
+            key: 'coordinators',
+            label: <span><TeamOutlined /> Coordinators</span>,
+            children: (
             <div className="h-[60vh] overflow-y-auto">
               {hasPermission('foundation_threads:write') && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
@@ -722,10 +731,14 @@ export const ThreadsPage: React.FC = () => {
                 />
               </div>
             </div>
-          </Tabs.TabPane>
-          )}
-          {!isCoordinator && (
-          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assignments</span>} key="assignments">
+            )
+          }
+          ] : []),
+          ...(!isCoordinator ? [
+          {
+            key: 'assignments',
+            label: <span><UsergroupAddOutlined /> Assignments</span>,
+            children: (
             <div className="h-[60vh] overflow-y-auto">
               {hasPermission('foundation_threads:write') && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
@@ -825,10 +838,14 @@ export const ThreadsPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </Tabs.TabPane>
-          )}
-          {isCoordinator && (
-          <Tabs.TabPane tab={<span><VideoCameraOutlined /> Meetings</span>} key="meetings">
+            )
+          }
+          ] : []),
+          ...(isCoordinator ? [
+          {
+            key: 'meetings',
+            label: <span><VideoCameraOutlined /> Meetings</span>,
+            children: (
             <div className="p-4 h-[60vh]">
               <h3 className="font-semibold mb-4 text-lg">My Google Meet Link</h3>
               <p className="text-gray-500 mb-6">Update the link where your mock exam session will be held.</p>
@@ -854,10 +871,14 @@ export const ThreadsPage: React.FC = () => {
                 <div className="text-gray-500">You are not assigned to this thread.</div>
               )}
             </div>
-          </Tabs.TabPane>
-          )}
-          {isCoordinator && (
-          <Tabs.TabPane tab={<span><UsergroupAddOutlined /> Assigned Students</span>} key="assigned-students">
+            )
+          }
+          ] : []),
+          ...(isCoordinator ? [
+          {
+            key: 'assigned-students',
+            label: <span><UsergroupAddOutlined /> Assigned Students</span>,
+            children: (
             <div className="p-4 h-[60vh] overflow-y-auto">
               {(() => {
                 const userId = (user as any)?.sub || (user as any)?.id;
@@ -923,9 +944,10 @@ export const ThreadsPage: React.FC = () => {
                 );
               })()}
             </div>
-          </Tabs.TabPane>
-          )}
-        </Tabs>
+            )
+          }
+          ] : [])
+        ]} />
       </Modal>
 
       {selectedThread && selectedStudentForExam && (

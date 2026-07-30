@@ -167,7 +167,7 @@ export const ResultsPage: React.FC = () => {
             showSearch
             style={{ width: 180 }}
             onChange={setBatchId}
-            options={batches.map((b) => ({ label: b.name, value: b.id }))}
+            options={Array.isArray(batches) ? batches.map((b) => ({ label: b.name, value: b.id })) : []}
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
