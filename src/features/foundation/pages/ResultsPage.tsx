@@ -18,15 +18,30 @@ export const ResultsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string | undefined>();
   const [examType, setExamType] = useState<string | undefined>();
+  const [batchId, setBatchId] = useState<string | undefined>();
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const [batches, setBatches] = useState<any[]>([]);
 
   useEffect(() => {
     fetchResults();
-  }, [page, limit, search, status, examType, dateRange, sortBy, sortOrder]);
+  }, [page, limit, search, status, examType, batchId, dateRange, sortBy, sortOrder]);
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  const fetchBatches = async () => {
+    try {
+      const res = await foundationService.getBatches({ limit: 100 });
+      setBatches(res);
+    } catch (error) {
+      console.error('Failed to fetch batches', error);
+    }
+  };
 
   const fetchResults = async () => {
     setLoading(true);
@@ -37,6 +52,7 @@ export const ResultsPage: React.FC = () => {
         search: search || undefined,
         status: status || undefined,
         examType: examType || undefined,
+        batchId: batchId || undefined,
         sortBy,
         sortOrder,
       };
@@ -54,7 +70,7 @@ export const ResultsPage: React.FC = () => {
     }
   };
 
-  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+  const handleTableChange = (pagination: any, _filters: any, sorter: any) => {
     setPage(pagination.current);
     setLimit(pagination.pageSize);
     if (sorter.field) {
@@ -144,6 +160,17 @@ export const ResultsPage: React.FC = () => {
               { label: 'Mock Exam', value: 'MOCK' },
               { label: 'Final Exam', value: 'FINAL' },
             ]}
+          />
+          <Select
+            placeholder="Batch"
+            allowClear
+            showSearch
+            style={{ width: 180 }}
+            onChange={setBatchId}
+            options={batches.map((b) => ({ label: b.name, value: b.id }))}
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
           />
           <RangePicker onChange={setDateRange as any} />
           <Button icon={<ReloadOutlined />} onClick={fetchResults}>
