@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
-import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined, MessageOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined, MessageOutlined, FileDoneOutlined, CloseOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -158,6 +158,18 @@ export const AdminLayout: React.FC = () => {
         label: 'Threads',
         onClick: () => {
           navigate('/foundation/threads');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
+
+    if (hasPermission('foundation_results:read')) {
+      foundationChildren.push({
+        key: '/foundation/results',
+        icon: <FileDoneOutlined />,
+        label: 'Results',
+        onClick: () => {
+          navigate('/foundation/results');
           setMobileMenuOpen(false);
         },
       });

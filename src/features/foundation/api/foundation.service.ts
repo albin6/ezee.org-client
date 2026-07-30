@@ -244,5 +244,15 @@ export const foundationService = {
   updateExam: async (id: string, data: any) => {
     const res = await apiClient.patch(`/foundation/exams/${id}`, data);
     return res.data;
+  },
+
+  // Results
+  getResults: async (params?: Record<string, any>) => {
+    const res = await apiClient.get('/foundation/results', { params });
+    return res.data;
+  },
+  getResultDetails: async (id: string) => {
+    const res = await apiClient.get(`/foundation/results/${id}`);
+    return res.data;
   }
 };
