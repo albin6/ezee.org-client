@@ -658,7 +658,9 @@ export const ThreadsPage: React.FC = () => {
                       placeholder="Select Coordinator"
                       value={selectedCoordinator}
                       onChange={setSelectedCoordinator}
-                      options={availableCoordinators.map(c => ({ label: c.name, value: c.id }))}
+                      options={availableCoordinators
+                        .filter(c => !coordinators.some(existing => existing.id === c.id))
+                        .map(c => ({ label: c.name, value: c.id }))}
                     />
                     <Button
                       type="default"
