@@ -46,7 +46,7 @@ export const ThreadsPage: React.FC = () => {
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleForm] = Form.useForm();
-  const [selectedCoordinator, setSelectedCoordinator] = useState<string | null>(null);
+  const [selectedCoordinators, setSelectedCoordinators] = useState<string[]>([]);
   const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('overview');
   
@@ -232,17 +232,19 @@ export const ThreadsPage: React.FC = () => {
   };
 
   const handleAddCoordinator = async () => {
-    if (!selectedThread || !selectedCoordinator) return;
+    if (!selectedThread || selectedCoordinators.length === 0) return;
     setAddCoordinatorLoading(true);
     try {
-      await foundationService.addThreadCoordinator(selectedThread.id, selectedCoordinator);
-      message.success('Coordinator added successfully');
-      setSelectedCoordinator(null);
+      await Promise.all(selectedCoordinators.map(coordId => 
+        foundationService.addThreadCoordinator(selectedThread.id, coordId)
+      ));
+      message.success('Coordinators added successfully');
+      setSelectedCoordinators([]);
       // refresh coordinators
       const coords = await foundationService.getThreadCoordinators(selectedThread.id);
       setCoordinators(coords);
     } catch (error: any) {
-      message.error('Failed to add coordinator');
+      message.error('Failed to add coordinators');
     } finally {
       setAddCoordinatorLoading(false);
     }
@@ -669,10 +671,11 @@ export const ThreadsPage: React.FC = () => {
                   <h3 className="font-semibold mb-2">Add Coordinator</h3>
                   <div className="flex items-center gap-2">
                     <Select
+                      mode="multiple"
                       className="w-64"
-                      placeholder="Select Coordinator"
-                      value={selectedCoordinator}
-                      onChange={setSelectedCoordinator}
+                      placeholder="Select Coordinators"
+                      value={selectedCoordinators}
+                      onChange={setSelectedCoordinators}
                       options={availableCoordinators
                         .filter(c => !coordinators.some(existing => existing.id === c.id))
                         .map(c => ({ label: c.name, value: c.id }))}
@@ -682,7 +685,7 @@ export const ThreadsPage: React.FC = () => {
                       icon={<UserAddOutlined />}
                       onClick={handleAddCoordinator}
                       loading={addCoordinatorLoading}
-                      disabled={!selectedCoordinator}
+                      disabled={selectedCoordinators.length === 0}
                     >
                       Add to Thread
                     </Button>
