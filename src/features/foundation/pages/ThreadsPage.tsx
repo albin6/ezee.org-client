@@ -261,6 +261,19 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
+  const handleRemoveAllCoordinators = async () => {
+    if (!selectedThread || coordinators.length === 0) return;
+    try {
+      await Promise.all(coordinators.map(c => 
+        foundationService.removeThreadCoordinator(selectedThread.id, c.id)
+      ));
+      message.success('All coordinators removed successfully');
+      openThreadDetails(selectedThread);
+    } catch (error: any) {
+      message.error('Failed to remove all coordinators');
+    }
+  };
+
   const handleUpdateLink = async (coordinatorId: string, link: string) => {
     if (!link.trim()) {
       message.error('Please enter a valid meeting link before saving');
@@ -694,7 +707,20 @@ export const ThreadsPage: React.FC = () => {
               )}
 
               <div>
-                <h3 className="font-semibold mb-4 text-lg">Assigned Coordinators</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold text-lg m-0">Assigned Coordinators</h3>
+                  {hasPermission('foundation_threads:write') && selectedThread?.status === 'OPEN' && coordinators.length > 0 && (
+                    <Popconfirm
+                      title="Remove All Coordinators"
+                      description="This will remove all assigned coordinators and their student assignments. Are you sure?"
+                      onConfirm={handleRemoveAllCoordinators}
+                      okText="Yes, Remove All"
+                      cancelText="Cancel"
+                    >
+                      <Button danger type="default" icon={<DeleteOutlined />}>Remove All</Button>
+                    </Popconfirm>
+                  )}
+                </div>
                 <List
                   dataSource={coordinators}
                   renderItem={(coord) => (
