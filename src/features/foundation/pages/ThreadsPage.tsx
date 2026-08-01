@@ -664,7 +664,7 @@ export const ThreadsPage: React.FC = () => {
             label: <span><TeamOutlined /> Coordinators</span>,
             children: (
             <div className="h-[60vh] overflow-y-auto">
-              {hasPermission('foundation_threads:write') && (
+              {hasPermission('foundation_threads:write') && selectedThread?.status === 'OPEN' && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
                   <h3 className="font-semibold mb-2">Add Coordinator</h3>
                   <div className="flex items-center gap-2">
@@ -697,7 +697,7 @@ export const ThreadsPage: React.FC = () => {
                   renderItem={(coord) => (
                     <List.Item
                       actions={[
-                        ...(hasPermission('foundation_threads:write') ? [
+                        ...(hasPermission('foundation_threads:write') && selectedThread?.status === 'OPEN' ? [
                           <Popconfirm
                             key="remove"
                             title="Remove Coordinator"
@@ -740,7 +740,7 @@ export const ThreadsPage: React.FC = () => {
             label: <span><UsergroupAddOutlined /> Assignments</span>,
             children: (
             <div className="h-[60vh] overflow-y-auto">
-              {hasPermission('foundation_threads:write') && (
+              {hasPermission('foundation_threads:write') && selectedThread?.status === 'OPEN' && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
                   <h3 className="font-semibold mb-2">Auto-Assign Engine</h3>
                   <div className="flex items-center gap-2">
@@ -798,7 +798,7 @@ export const ThreadsPage: React.FC = () => {
                     <span>
                       <strong>Warning:</strong> The coordinator list has changed. The current assignments are incomplete or unbalanced.
                     </span>
-                    <Button size="small" type="primary" onClick={handleRunAutoAssign} loading={assignEngineLoading}>
+                    <Button size="small" type="primary" onClick={handleRunAutoAssign} loading={assignEngineLoading} disabled={selectedThread?.status !== 'OPEN'}>
                       Re-run Engine
                     </Button>
                   </div>
@@ -857,11 +857,13 @@ export const ThreadsPage: React.FC = () => {
                     placeholder="https://meet.google.com/abc-defg-hij" 
                     defaultValue={coord.meetingLink}
                     onChange={(e) => setMeetingLinkMap({ ...meetingLinkMap, [coord.id]: e.target.value })}
+                    disabled={selectedThread?.status !== 'OPEN'}
                   />
                   <Button 
                     type="primary" 
                     size="large"
                     onClick={() => handleUpdateLink(coord.id, meetingLinkMap[coord.id] !== undefined ? meetingLinkMap[coord.id] : (coord.meetingLink || ''))}
+                    disabled={selectedThread?.status !== 'OPEN'}
                   >
                     Save Link
                   </Button>
@@ -910,7 +912,7 @@ export const ThreadsPage: React.FC = () => {
                             actions={[
                               <Button
                                 type="primary"
-                                disabled={st.isCompleted}
+                                disabled={st.isCompleted || selectedThread?.status !== 'OPEN'}
                                 onClick={() => {
                                   setSelectedStudentForExam(st);
                                   setCompleteExamVisible(true);
