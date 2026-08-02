@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Modal, Form, InputNumber, Input, Radio, Button, message } from 'antd';
+import { Modal, Form, InputNumber, Input, Radio, Button, message, Grid } from 'antd';
 import { foundationService } from '../api/foundation.service';
 
 const { TextArea } = Input;
+const { useBreakpoint } = Grid;
 
 interface CompleteExamModalProps {
   open: boolean;
@@ -22,6 +23,8 @@ export const CompleteExamModal: React.FC<CompleteExamModalProps> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const hasRecording = Form.useWatch('hasRecording', form);
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -44,6 +47,8 @@ export const CompleteExamModal: React.FC<CompleteExamModalProps> = ({
       onCancel={onClose}
       footer={null}
       destroyOnHidden
+      width={isMobile ? '100%' : 600}
+      style={isMobile ? { top: 10, padding: 0, margin: '0 auto', maxWidth: '95%' } : undefined}
     >
       <Form
         form={form}
