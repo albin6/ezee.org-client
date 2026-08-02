@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Descriptions, Tag, Spin, Alert, Typography, Divider, Timeline, Button } from 'antd';
+import { Modal, Descriptions, Tag, Spin, Alert, Typography, Divider, Timeline, Button, Grid } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { foundationService } from '../api/foundation.service';
 import dayjs from 'dayjs';
@@ -7,6 +7,7 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 import { EditResultModal } from './EditResultModal';
 
 const { Text, Link } = Typography;
+const { useBreakpoint } = Grid;
 
 interface ResultDetailsModalProps {
   open: boolean;
@@ -24,6 +25,8 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const { hasPermission } = usePermissions();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
 
   useEffect(() => {
     if (open && resultId) {
@@ -51,10 +54,10 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
     <>
       <Modal
         title={
-          <div className="flex justify-between items-center pr-8">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center pr-8 gap-2">
             <span>Exam Result Details</span>
             {hasPermission('foundation_results:write') && data && (
-              <Button icon={<EditOutlined />} onClick={() => setIsEditModalVisible(true)}>
+              <Button icon={<EditOutlined />} onClick={() => setIsEditModalVisible(true)} size={isMobile ? "small" : "middle"}>
                 Edit Marks
               </Button>
             )}
@@ -63,7 +66,8 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
         open={open}
         onCancel={onClose}
         footer={null}
-        width={800}
+        width={isMobile ? '100%' : 800}
+        style={isMobile ? { top: 10, padding: 0, margin: '0 auto', maxWidth: '95%' } : undefined}
         destroyOnHidden
       >
       {loading ? (
@@ -74,8 +78,8 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
         <Alert type="error" message={error} />
       ) : data ? (
         <>
-          <Descriptions bordered column={2}>
-          <Descriptions.Item label="Student" span={2}>
+          <Descriptions bordered column={isMobile ? 1 : 2} size={isMobile ? 'small' : 'default'} layout={isMobile ? 'vertical' : 'horizontal'}>
+          <Descriptions.Item label="Student" span={isMobile ? 1 : 2}>
             {data.student.name} <br/>
             <Text type="secondary">{data.student.email}</Text>
           </Descriptions.Item>
@@ -95,19 +99,19 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
             </Tag>
           </Descriptions.Item>
 
-          <Descriptions.Item label="Pending Topics & Feedback" span={2}>
+          <Descriptions.Item label="Pending Topics & Feedback" span={isMobile ? 1 : 2}>
             <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>
               {data.feedback}
             </pre>
           </Descriptions.Item>
 
-          <Descriptions.Item label="Practical Questions Asked" span={2}>
+          <Descriptions.Item label="Practical Questions Asked" span={isMobile ? 1 : 2}>
             <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>
               {data.practicalQuestions}
             </pre>
           </Descriptions.Item>
 
-          <Descriptions.Item label="Recording" span={2}>
+          <Descriptions.Item label="Recording" span={isMobile ? 1 : 2}>
             {data.hasRecording ? (
               <Link href={data.recordingUrl} target="_blank" rel="noopener noreferrer">
                 View Recording
