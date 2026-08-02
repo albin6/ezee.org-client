@@ -11,6 +11,7 @@ import { StudentsPage } from '@/features/foundation/pages/StudentsPage';
 import { OverviewPage } from '@/features/foundation/pages/OverviewPage';
 import { CoordinatorPage } from '@/features/foundation/pages/CoordinatorPage';
 import { ThreadsPage } from '@/features/foundation/pages/ThreadsPage';
+import { ThreadDetailsPage } from '@/features/foundation/pages/ThreadDetailsPage';
 import { ResultsPage } from '@/features/foundation/pages/ResultsPage';
 import { TeamsPage } from '@/features/teams/pages/TeamsPage';
 import { TeamDetailsPage } from '@/features/teams/pages/TeamDetailsPage';
@@ -62,6 +63,10 @@ export const router = createBrowserRouter([
           {
             path: '/foundation/threads',
             element: <ThreadsPage />,
+          },
+          {
+            path: '/foundation/threads/:threadId',
+            element: <ThreadDetailsPage />,
           },
           {
             path: '/foundation/results',
