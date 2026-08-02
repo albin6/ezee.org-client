@@ -25,6 +25,8 @@ export const StudentsPage: React.FC = () => {
   const [form] = Form.useForm();
 
   const [isImportVisible, setIsImportVisible] = useState(false);
+  const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [importForm] = Form.useForm();
   const [importLoading, setImportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
@@ -107,7 +109,20 @@ export const StudentsPage: React.FC = () => {
       message.success('Student deleted');
       fetchStudents();
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Delete failed');
+      message.error(error.response?.data?.message || 'Failed to delete');
+    }
+  };
+
+  const handleAssignBatch = async (values: { targetBatchId: string }) => {
+    if (selectedStudentIds.length === 0) return;
+    try {
+      await foundationService.bulkAssignBatch(selectedStudentIds, values.targetBatchId);
+      message.success('Buffered students assigned to batch successfully');
+      setIsAssignModalVisible(false);
+      setSelectedStudentIds([]);
+      fetchStudents();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to assign students');
     }
   };
 
@@ -242,10 +257,23 @@ export const StudentsPage: React.FC = () => {
             className="w-full sm:w-48"
             options={batches.map(b => ({ label: b.name, value: b.id }))}
           />
+          {activeTab === 'buffered' && (
+            <Button 
+              type="primary" 
+              disabled={selectedStudentIds.length === 0}
+              onClick={() => setIsAssignModalVisible(true)}
+            >
+              Assign to Batch ({selectedStudentIds.length})
+            </Button>
+          )}
         </div>
 
         <Table 
           scroll={{ x: 'max-content' }}
+          rowSelection={activeTab === 'buffered' ? {
+            selectedRowKeys: selectedStudentIds,
+            onChange: (keys) => setSelectedStudentIds(keys as string[])
+          } : undefined}
           columns={columns} 
           dataSource={students} 
           rowKey="id" 
@@ -314,6 +342,27 @@ export const StudentsPage: React.FC = () => {
           <div className="flex justify-end gap-2">
             <Button onClick={() => setIsImportVisible(false)}>Cancel</Button>
             <Button type="primary" htmlType="submit" loading={importLoading}>Import</Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Assign Buffered Students to Batch"
+        open={isAssignModalVisible}
+        onCancel={() => setIsAssignModalVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form layout="vertical" onFinish={handleAssignBatch}>
+          <div className="mb-4 text-gray-600">
+            Select the upcoming batch to assign these {selectedStudentIds.length} buffered students to.
+          </div>
+          <Form.Item name="targetBatchId" label="Target Batch" rules={[{ required: true, message: 'Please select a batch' }]}>
+            <Select options={batches.map(b => ({ label: b.name, value: b.id }))} />
+          </Form.Item>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setIsAssignModalVisible(false)}>Cancel</Button>
+            <Button type="primary" htmlType="submit">Assign</Button>
           </div>
         </Form>
       </Modal>

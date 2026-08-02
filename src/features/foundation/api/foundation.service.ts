@@ -113,6 +113,10 @@ export const foundationService = {
     const res = await apiClient.post('/foundation/students/bulk-import', { data, batchId });
     return res.data.data;
   },
+  bulkAssignBatch: async (studentIds: string[], batchId: string) => {
+    const res = await apiClient.post('/foundation/buffered-students/bulk-assign', { studentIds, batchId });
+    return res.data;
+  },
   updateStudentStatus: async (id: string, status: string) => {
     const res = await apiClient.patch(`/foundation/students/${id}/status`, { status });
     return res.data.data;
