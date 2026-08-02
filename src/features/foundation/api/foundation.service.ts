@@ -77,7 +77,7 @@ export const foundationService = {
   },
   deleteBatch: async (id: string) => {
     const res = await apiClient.delete(`/foundation/batches/${id}`);
-    return res.data;
+    return res.data.data;
   },
   blockBatch: async (id: string, block: boolean) => {
     const res = await apiClient.patch(`/foundation/batches/${id}/block`, { block });
@@ -85,8 +85,12 @@ export const foundationService = {
   },
 
   // Students
-  getStudents: async (params: any) => {
+  getStudents: async (params?: any) => {
     const res = await apiClient.get('/foundation/students', { params });
+    return res.data.data;
+  },
+  getBufferedStudents: async (params?: any) => {
+    const res = await apiClient.get('/foundation/buffered-students', { params });
     return res.data.data;
   },
   createStudent: async (data: any) => {
@@ -99,7 +103,7 @@ export const foundationService = {
   },
   deleteStudent: async (id: string) => {
     const res = await apiClient.delete(`/foundation/students/${id}`);
-    return res.data;
+    return res.data.data;
   },
   blockStudent: async (id: string, block: boolean) => {
     const res = await apiClient.patch(`/foundation/students/${id}/block`, { block });
@@ -107,6 +111,10 @@ export const foundationService = {
   },
   bulkImportStudents: async (data: string, batchId: string) => {
     const res = await apiClient.post('/foundation/students/bulk-import', { data, batchId });
+    return res.data.data;
+  },
+  updateStudentStatus: async (id: string, status: string) => {
+    const res = await apiClient.patch(`/foundation/students/${id}/status`, { status });
     return res.data.data;
   },
 
@@ -195,8 +203,13 @@ export const foundationService = {
     const res = await apiClient.post(`/foundation/threads/${id}/auto-assign`);
     return res.data;
   },
-  completeStudentExam: async (threadId: string, studentId: string, data: any) => {
+  completeExam: async (threadId: string, studentId: string, data: any) => {
     const res = await apiClient.post(`/foundation/threads/${threadId}/students/${studentId}/complete`, data);
+    return res.data;
+  },
+  
+  updateMarks: async (threadId: string, studentId: string, data: any) => {
+    const res = await apiClient.patch(`/foundation/threads/${threadId}/students/${studentId}/marks`, data);
     return res.data;
   },
   scheduleExams: async (threadId: string, startTime: string, intervalMinutes: number) => {
@@ -205,6 +218,16 @@ export const foundationService = {
       intervalMinutes
     });
     return response.data;
+  },
+
+  assignBufferedStudents: async (threadId: string, studentIds: string[]) => {
+    const res = await apiClient.post(`/foundation/threads/${threadId}/assign-buffered`, { studentIds });
+    return res.data;
+  },
+
+  markStudentAbsent: async (threadId: string, studentId: string) => {
+    const res = await apiClient.post(`/foundation/threads/${threadId}/students/${studentId}/absent`);
+    return res.data;
   },
 
   // Overview

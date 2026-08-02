@@ -267,7 +267,7 @@ export const CoordinatorPage: React.FC = () => {
         onOk={handleBulkImport}
         confirmLoading={importLoading}
         width={600}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={importForm} layout="vertical">
           <Tabs activeKey={importMode} onChange={(key) => setImportMode(key)}>

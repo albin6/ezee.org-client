@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, Select } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, Select, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -27,6 +27,7 @@ export const StudentsPage: React.FC = () => {
   const [isImportVisible, setIsImportVisible] = useState(false);
   const [importForm] = Form.useForm();
   const [importLoading, setImportLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
 
   const [evaluationModalVisible, setEvaluationModalVisible] = useState(false);
   const [selectedStudentForEval] = useState<any>(null);
@@ -37,7 +38,9 @@ export const StudentsPage: React.FC = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const data = await foundationService.getStudents({ page, limit, search, batchId: batchFilter });
+      const data = activeTab === 'buffered' 
+        ? await foundationService.getBufferedStudents({ page, limit, search, batchId: batchFilter })
+        : await foundationService.getStudents({ page, limit, search, batchId: batchFilter });
       setStudents(data.data);
       setTotal(data.total);
     } catch (error: any) {
@@ -46,6 +49,10 @@ export const StudentsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchStudents();
+  }, [page, limit, search, batchFilter, activeTab]);
 
   const fetchBatches = async () => {
     try {
@@ -56,9 +63,7 @@ export const StudentsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchStudents();
-  }, [page, limit, search, batchFilter]);
+
 
   useEffect(() => {
     fetchBatches();
@@ -159,7 +164,7 @@ export const StudentsPage: React.FC = () => {
       dataIndex: 'status', 
       key: 'status',
       render: (status: string) => (
-        <Tag color={status === 'ACTIVE' ? 'green' : 'red'}>{status}</Tag>
+        <Tag color={status === 'ACTIVE' ? 'green' : (status === 'BUFFERED' ? 'orange' : (status === 'QUIT' ? 'purple' : 'red'))}>{status}</Tag>
       )
     },
     {
@@ -181,10 +186,10 @@ export const StudentsPage: React.FC = () => {
           )}
           {hasPermission('students:block') && (
             <Popconfirm
-              title={`Are you sure you want to ${record.status === 'ACTIVE' ? 'block' : 'unblock'} this student?`}
-              onConfirm={() => handleBlock(record.id, record.status === 'ACTIVE')}
+              title={`Are you sure you want to ${record.status === 'BLOCKED' ? 'unblock' : 'block'} this student?`}
+              onConfirm={() => handleBlock(record.id, record.status !== 'BLOCKED')}
             >
-              <Button icon={record.status === 'ACTIVE' ? <StopOutlined /> : <CheckCircleOutlined />} />
+              <Button icon={record.status === 'BLOCKED' ? <CheckCircleOutlined /> : <StopOutlined />} />
             </Popconfirm>
           )}
           {hasPermission('students:delete') && (
@@ -224,7 +229,11 @@ export const StudentsPage: React.FC = () => {
       />
       
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-        <div className="mb-4 flex flex-col sm:flex-row gap-4">
+        <Tabs activeKey={activeTab} onChange={(k: string) => { setActiveTab(k); setPage(1); }} items={[
+          { key: 'all', label: 'All Students' },
+          { key: 'buffered', label: 'Buffered Students' }
+        ]} />
+        <div className="mb-4 flex flex-col sm:flex-row gap-4 mt-2">
           <Input.Search placeholder="Search students..." onSearch={handleSearch} allowClear className="w-full sm:w-64" />
           <Select
             placeholder="Filter by Batch"
@@ -269,6 +278,16 @@ export const StudentsPage: React.FC = () => {
           <Form.Item name="batchId" label="Batch" rules={[{ required: true }]}>
             <Select options={batches.map(b => ({ label: b.name, value: b.id }))} />
           </Form.Item>
+          {editingStudent && (
+            <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+              <Select options={[
+                { label: 'Active', value: 'ACTIVE' },
+                { label: 'Transferred (Buffered)', value: 'BUFFERED' },
+                { label: 'Quit', value: 'QUIT' },
+                { label: 'Blocked', value: 'BLOCKED' }
+              ]} />
+            </Form.Item>
+          )}
           <div className="flex justify-end gap-2">
             <Button onClick={() => setIsModalVisible(false)}>Cancel</Button>
             <Button type="primary" htmlType="submit">Save</Button>

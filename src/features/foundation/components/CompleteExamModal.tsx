@@ -26,7 +26,7 @@ export const CompleteExamModal: React.FC<CompleteExamModalProps> = ({
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      await foundationService.completeStudentExam(threadId, student.id, values);
+      await foundationService.completeExam(threadId, student.id, values);
       message.success('Exam completed successfully');
       form.resetFields();
       onSuccess();
@@ -43,7 +43,7 @@ export const CompleteExamModal: React.FC<CompleteExamModalProps> = ({
       title={`Complete Exam for ${student?.name || 'Student'}`}
       onCancel={onClose}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}

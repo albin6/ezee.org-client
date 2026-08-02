@@ -72,6 +72,7 @@ export const ExamsModal: React.FC<ExamsModalProps> = ({ visible, student, onClos
       maxScore: record?.maxScore || 100,
       status: record?.status || 'PENDING',
       id: record?.id,
+      isFromThread: record?.isFromThread,
     };
   });
 
@@ -136,6 +137,9 @@ export const ExamsModal: React.FC<ExamsModalProps> = ({ visible, student, onClos
       key: 'action',
       render: (_: any, record: any) => {
         if (!canWrite) return null;
+        if (record.isFromThread) {
+          return <span className="text-gray-400 text-xs italic">Managed via Threads</span>;
+        }
         if (editingExamType === record.examType) {
           return (
             <div>

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Descriptions, Tag, Spin, Alert, Typography } from 'antd';
+import { Modal, Descriptions, Tag, Spin, Alert, Typography, Divider, Timeline, Button } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 import { foundationService } from '../api/foundation.service';
 import dayjs from 'dayjs';
+import { usePermissions } from '@/shared/hooks/usePermissions';
+import { EditResultModal } from './EditResultModal';
 
 const { Text, Link } = Typography;
 
@@ -19,6 +22,8 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const { hasPermission } = usePermissions();
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
   useEffect(() => {
     if (open && resultId) {
@@ -43,14 +48,24 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
   };
 
   return (
-    <Modal
-      title="Exam Result Details"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={800}
-      destroyOnHidden
-    >
+    <>
+      <Modal
+        title={
+          <div className="flex justify-between items-center pr-8">
+            <span>Exam Result Details</span>
+            {hasPermission('foundation_results:write') && data && (
+              <Button icon={<EditOutlined />} onClick={() => setIsEditModalVisible(true)}>
+                Edit Marks
+              </Button>
+            )}
+          </div>
+        }
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        width={800}
+        destroyOnHidden
+      >
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <Spin size="large" />
@@ -58,7 +73,8 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
       ) : error ? (
         <Alert type="error" message={error} />
       ) : data ? (
-        <Descriptions bordered column={2}>
+        <>
+          <Descriptions bordered column={2}>
           <Descriptions.Item label="Student" span={2}>
             {data.student.name} <br/>
             <Text type="secondary">{data.student.email}</Text>
@@ -108,7 +124,44 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
             {dayjs(data.createdAt).format('DD MMM YYYY, HH:mm')}
           </Descriptions.Item>
         </Descriptions>
+
+        {data.audits && data.audits.length > 0 && (
+          <div className="mt-8">
+            <Divider>Audit Trail</Divider>
+            <Timeline
+              items={data.audits.map((audit: any) => ({
+                color: 'blue',
+                children: (
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Modified by {audit.modifiedBy?.name || 'Unknown User'} on {dayjs(audit.createdAt).format('DD MMM YYYY, HH:mm')}
+                    </div>
+                    <div className="text-gray-600 mt-1">
+                      <div>Theory: {audit.oldTheoryMarks} → {audit.newTheoryMarks}</div>
+                      <div>Practical: {audit.oldPracticalMarks} → {audit.newPracticalMarks}</div>
+                      <div className="mt-1 italic">Reason: {audit.reason}</div>
+                    </div>
+                  </div>
+                )
+              }))}
+            />
+          </div>
+        )}
+        </>
       ) : null}
-    </Modal>
+      </Modal>
+
+      {data && (
+        <EditResultModal
+          open={isEditModalVisible}
+          result={data}
+          onClose={() => setIsEditModalVisible(false)}
+          onSuccess={() => {
+            setIsEditModalVisible(false);
+            fetchDetails();
+          }}
+        />
+      )}
+    </>
   );
 };

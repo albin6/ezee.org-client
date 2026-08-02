@@ -48,6 +48,11 @@ export const ThreadsPage: React.FC = () => {
   const [scheduleForm] = Form.useForm();
   const [selectedCoordinators, setSelectedCoordinators] = useState<string[]>([]);
   const [meetingLinkMap, setMeetingLinkMap] = useState<Record<string, string>>({});
+  
+  const [isBufferedModalVisible, setIsBufferedModalVisible] = useState(false);
+  const [bufferedStudents, setBufferedStudents] = useState<any[]>([]);
+  const [selectedBufferedStudents, setSelectedBufferedStudents] = useState<string[]>([]);
+  const [bufferedLoading, setBufferedLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   
   // Complete Exam Modal State
@@ -274,6 +279,17 @@ export const ThreadsPage: React.FC = () => {
     }
   };
 
+  const handleMarkAbsent = async (studentId: string) => {
+    if (!selectedThread) return;
+    try {
+      await foundationService.markStudentAbsent(selectedThread.id, studentId);
+      message.success('Student marked as absent');
+      openThreadDetails(selectedThread, 'assigned-students'); // Refresh the list
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to mark student as absent');
+    }
+  };
+
   const handleUpdateLink = async (coordinatorId: string, link: string) => {
     if (!link.trim()) {
       message.error('Please enter a valid meeting link before saving');
@@ -332,24 +348,45 @@ export const ThreadsPage: React.FC = () => {
     if (!selectedThread) return;
     setScheduleLoading(true);
     try {
-      const selectedDate = values.date.format('YYYY-MM-DD');
-      const selectedTime = values.startTime.format('HH:mm:ssZ');
-      // combine them
-      const combinedDateTimeStr = `${selectedDate}T${selectedTime}`;
-      const formattedTime = dayjs(combinedDateTimeStr).format('YYYY-MM-DDTHH:mm:ssZ');
-      
-      await foundationService.scheduleExams(selectedThread.id, formattedTime, values.intervalMinutes);
-      message.success('Exam schedule updated successfully!');
+      await foundationService.scheduleExams(
+        selectedThread.id,
+        values.date.toISOString(),
+        values.intervalMinutes
+      );
+      message.success('Exams scheduled successfully');
       setIsScheduleModalVisible(false);
-      scheduleForm.resetFields();
-      
-      const assigns = await foundationService.getThreadAssignments(selectedThread.id);
-      setAssignments(assigns.assignments);
-      setIsAssignmentsSynced(assigns.isSynced);
+      openThreadDetails(selectedThread, 'assignments');
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to schedule exams');
     } finally {
       setScheduleLoading(false);
+    }
+  };
+
+  const handleOpenBufferedModal = async () => {
+    setIsBufferedModalVisible(true);
+    setBufferedLoading(true);
+    try {
+      const bId = selectedThread?.batch?.id || selectedThread?.batchId;
+      const res = await foundationService.getBufferedStudents({ limit: 1000, batchId: bId });
+      setBufferedStudents(res.data);
+    } catch (error) {
+      message.error('Failed to load buffered students');
+    } finally {
+      setBufferedLoading(false);
+    }
+  };
+
+  const handleAssignBuffered = async () => {
+    if (!selectedThread || selectedBufferedStudents.length === 0) return;
+    try {
+      await foundationService.assignBufferedStudents(selectedThread.id, selectedBufferedStudents);
+      message.success('Buffered students assigned successfully');
+      setIsBufferedModalVisible(false);
+      setSelectedBufferedStudents([]);
+      openThreadDetails(selectedThread, 'assignments');
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to assign buffered students');
     }
   };
 
@@ -613,27 +650,24 @@ export const ThreadsPage: React.FC = () => {
                 ref={messagesContainerRef}
                 onScroll={handleScroll}
               >
-                <List
-                  loading={messagesLoading}
-                  itemLayout="horizontal"
-                  dataSource={messages}
-                  renderItem={(msg) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        avatar={<Avatar icon={<UserOutlined />} />}
-                        title={
-                          <div className="flex justify-between">
-                            <span>{msg.sender?.name || 'Unknown'}</span>
-                            <span className="text-xs text-gray-400">
-                              {new Date(msg.createdAt).toLocaleString()}
-                            </span>
+                {messagesLoading ? (
+                  <div className="text-center py-4 text-gray-500">Loading messages...</div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {messages.map((msg) => (
+                      <div key={msg.id} className="flex gap-3 px-2 py-1">
+                        <Avatar icon={<UserOutlined />} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-800">{msg.sender?.name || 'System'}</span>
+                            <span className="text-gray-400 text-xs">{dayjs(msg.createdAt).format('MMM D, YYYY h:mm A')}</span>
                           </div>
-                        }
-                        description={<div className="text-gray-800 whitespace-pre-wrap">{msg.message}</div>}
-                      />
-                    </List.Item>
-                  )}
-                />
+                          <div className="text-gray-600 whitespace-pre-wrap">{msg.message}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {messages.length === 0 && !messagesLoading && (
                   <div className="text-center text-gray-400 py-10">No messages yet. Start the discussion!</div>
                 )}
@@ -772,50 +806,61 @@ export const ThreadsPage: React.FC = () => {
               {hasPermission('foundation_threads:write') && selectedThread?.status === 'OPEN' && (
                 <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
                   <h3 className="font-semibold mb-2">Auto-Assign Engine</h3>
-                  <div className="flex items-center gap-2">
-                    <Popconfirm
-                      title="Run Auto-Assign Engine"
-                      description="This will distribute students evenly to assigned coordinators. Existing assignments may be modified. Proceed?"
-                      onConfirm={handleRunAutoAssign}
-                      okText="Run Engine"
-                      cancelText="Cancel"
-                    >
-                      <Button 
-                        type="primary" 
-                        loading={assignEngineLoading}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <Popconfirm
+                        title="Run Auto-Assign Engine"
+                        description="This will distribute students evenly to assigned coordinators. Existing assignments may be modified. Proceed?"
+                        onConfirm={handleRunAutoAssign}
+                        okText="Run Engine"
+                        cancelText="Cancel"
                       >
-                        Run Auto-Assign Engine
-                      </Button>
-                    </Popconfirm>
-                    <span className="text-gray-500 text-sm border-r border-gray-300 pr-4 mr-2">Distributes students evenly.</span>
+                        <Button 
+                          type="primary" 
+                          loading={assignEngineLoading}
+                        >
+                          Run Auto-Assign Engine
+                        </Button>
+                      </Popconfirm>
+                      <span className="text-gray-500 text-sm">Distributes students evenly.</span>
+                    </div>
                     
-                    <Button
-                      type="default"
-                      icon={<CalendarOutlined />}
-                      onClick={() => {
-                        let defaultDate = dayjs();
-                        if (selectedThread?.batch?.id || selectedThread?.batchId) {
-                          const bId = selectedThread.batch?.id || selectedThread.batchId;
-                          const batch = batches.find((b: any) => b.id === bId);
-                          if (batch && batch.startDate) {
-                            if (selectedThread.examType === 'MOCK') {
-                              defaultDate = dayjs(batch.startDate).add(5, 'day');
-                            } else if (selectedThread.examType === 'FINAL') {
-                              defaultDate = dayjs(batch.startDate).add(9, 'day');
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <Button
+                        type="default"
+                        icon={<CalendarOutlined />}
+                        onClick={() => {
+                          let defaultDate = dayjs();
+                          if (selectedThread?.batch?.id || selectedThread?.batchId) {
+                            const bId = selectedThread.batch?.id || selectedThread.batchId;
+                            const batch = batches.find((b: any) => b.id === bId);
+                            if (batch && batch.startDate) {
+                              if (selectedThread.examType === 'MOCK') {
+                                defaultDate = dayjs(batch.startDate).add(5, 'day');
+                              } else if (selectedThread.examType === 'FINAL') {
+                                defaultDate = dayjs(batch.startDate).add(9, 'day');
+                              }
                             }
                           }
-                        }
-                        
-                        scheduleForm.setFieldsValue({
-                          date: defaultDate,
-                          intervalMinutes: 35
-                        });
-                        setIsScheduleModalVisible(true);
-                      }}
-                    >
-                      {hasScheduledExams ? "Update Schedule" : "Schedule Exams"}
-                    </Button>
-                    <span className="text-gray-500 text-sm">Assign a start time & intervals for all exams.</span>
+                          
+                          scheduleForm.setFieldsValue({
+                            date: defaultDate,
+                            intervalMinutes: 35
+                          });
+                          setIsScheduleModalVisible(true);
+                        }}
+                      >
+                        {hasScheduledExams ? "Update Schedule" : "Schedule Exams"}
+                      </Button>
+                      <span className="text-gray-500 text-sm">Assign a start time & intervals for all exams.</span>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                      <Button type="dashed" onClick={handleOpenBufferedModal}>
+                        Assign Buffered Students
+                      </Button>
+                      <span className="text-gray-500 text-sm">Add students from the buffer list to this thread.</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -948,7 +993,22 @@ export const ThreadsPage: React.FC = () => {
                                 }}
                               >
                                 {st.isCompleted ? 'Completed' : 'Complete Exam'}
-                              </Button>
+                              </Button>,
+                              <Popconfirm
+                                title="Mark student as absent?"
+                                description="This will set their result to CANCELLED_FAIL and move them to the buffer list."
+                                onConfirm={() => handleMarkAbsent(st.id)}
+                                okText="Yes, mark absent"
+                                cancelText="Cancel"
+                              >
+                                <Button
+                                  type="default"
+                                  danger
+                                  disabled={st.isCompleted || selectedThread?.status !== 'OPEN'}
+                                >
+                                  Mark Absent
+                                </Button>
+                              </Popconfirm>
                             ]}
                           >
                             <List.Item.Meta
@@ -997,6 +1057,30 @@ export const ThreadsPage: React.FC = () => {
           }}
         />
       )}
+
+      <Modal
+        title="Assign Buffered Students"
+        open={isBufferedModalVisible}
+        onCancel={() => setIsBufferedModalVisible(false)}
+        onOk={handleAssignBuffered}
+        okText="Assign Selected"
+        okButtonProps={{ disabled: selectedBufferedStudents.length === 0 }}
+      >
+        <Table
+          rowSelection={{
+            type: 'checkbox',
+            onChange: (selectedRowKeys) => setSelectedBufferedStudents(selectedRowKeys as string[])
+          }}
+          columns={[
+            { title: 'Name', dataIndex: 'name', key: 'name' },
+            { title: 'Email', dataIndex: 'email', key: 'email' },
+          ]}
+          dataSource={bufferedStudents}
+          rowKey="id"
+          loading={bufferedLoading}
+          pagination={{ pageSize: 10 }}
+        />
+      </Modal>
     </PageContainer>
   );
 };
