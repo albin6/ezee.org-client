@@ -483,7 +483,7 @@ export const StudentsPage: React.FC = () => {
         open={isAssignModalVisible}
         onCancel={() => setIsAssignModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" onFinish={handleAssignBatch}>
           <div className="mb-4 text-gray-600">
