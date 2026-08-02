@@ -15,7 +15,7 @@ export interface Student {
   email: string;
   phone: string;
   batchId: string;
-  status: 'ACTIVE' | 'BLOCKED';
+  status: 'ACTIVE' | 'BLOCKED' | 'BUFFERED' | 'QUIT';
   createdAt: string;
 }
 

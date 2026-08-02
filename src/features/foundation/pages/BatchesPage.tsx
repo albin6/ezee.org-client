@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, DatePicker } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, DatePicker, Grid, List, Card } from 'antd';
 import dayjs from 'dayjs';
 import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -10,6 +10,8 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 
 export const BatchesPage: React.FC = () => {
   const { hasPermission } = usePermissions();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const [batches, setBatches] = useState<Batch[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -158,19 +160,65 @@ export const BatchesPage: React.FC = () => {
           <Input.Search placeholder="Search batches..." onSearch={handleSearch} allowClear />
         </div>
 
-        <Table 
-          scroll={{ x: 'max-content' }}
-          columns={columns} 
-          dataSource={batches} 
-          rowKey="id" 
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize: limit,
-            total,
-            onChange: (p, s) => { setPage(p); setLimit(s); }
-          }}
-        />
+        {isMobile ? (
+          <List
+            grid={{ gutter: 16, column: 1 }}
+            dataSource={batches}
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => { setPage(p); setLimit(s); }
+            }}
+            renderItem={record => (
+              <List.Item>
+                <Card 
+                  title={record.name}
+                  extra={<Tag color={record.status === 'ACTIVE' ? 'green' : 'red'}>{record.status}</Tag>}
+                  actions={[
+                    hasPermission('batches:write') ? <EditOutlined key="edit" onClick={() => handleOpenModal(record)} /> : null,
+                    hasPermission('batches:block') ? (
+                      <Popconfirm
+                        key="block"
+                        title={record.status === 'ACTIVE' ? 'Block Batch' : 'Unblock Batch'}
+                        onConfirm={() => handleBlock(record.id, record.status === 'ACTIVE')}
+                      >
+                        {record.status === 'ACTIVE' ? <StopOutlined className="text-red-500" /> : <CheckCircleOutlined className="text-green-500" />}
+                      </Popconfirm>
+                    ) : null,
+                    hasPermission('batches:delete') ? (
+                      <Popconfirm
+                        key="delete"
+                        title="Delete batch?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okButtonProps={{ danger: true }}
+                      >
+                        <DeleteOutlined className="text-red-500" />
+                      </Popconfirm>
+                    ) : null,
+                  ].filter(Boolean) as React.ReactNode[]}
+                >
+                  {record.description && <p className="text-gray-500 text-sm mb-2">{record.description}</p>}
+                </Card>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Table 
+            scroll={{ x: 'max-content' }}
+            columns={columns} 
+            dataSource={batches} 
+            rowKey="id" 
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => { setPage(p); setLimit(s); }
+            }}
+          />
+        )}
       </div>
 
       <Modal

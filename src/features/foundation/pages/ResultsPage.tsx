@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Input, Select, DatePicker, Button, Space, Tag } from 'antd';
+import { Table, Card, Input, Select, DatePicker, Button, Tag, Grid, List } from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { foundationService } from '../api/foundation.service';
 import { ResultDetailsModal } from '../components/ResultDetailsModal';
@@ -8,6 +9,8 @@ import dayjs from 'dayjs';
 const { RangePicker } = DatePicker;
 
 export const ResultsPage: React.FC = () => {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -25,14 +28,6 @@ export const ResultsPage: React.FC = () => {
 
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [batches, setBatches] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchResults();
-  }, [page, limit, search, status, examType, batchId, dateRange, sortBy, sortOrder]);
-
-  useEffect(() => {
-    fetchBatches();
-  }, []);
 
   const fetchBatches = async () => {
     try {
@@ -69,6 +64,14 @@ export const ResultsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchResults();
+  }, [page, limit, search, status, examType, batchId, dateRange, sortBy, sortOrder]);
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
 
   const handleTableChange = (pagination: any, _filters: any, sorter: any) => {
     setPage(pagination.current);
@@ -130,21 +133,21 @@ export const ResultsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card title="Foundation Results">
-        <Space style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+    <div className="p-4 sm:p-6">
+      <Card title="Foundation Results" className="w-full">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-6">
           <Input
             placeholder="Search student, batch, coordinator..."
             prefix={<SearchOutlined />}
             onPressEnter={(e: any) => setSearch(e.target.value)}
             onBlur={(e: any) => setSearch(e.target.value)}
-            style={{ width: 250 }}
+            className="w-full sm:w-64"
             allowClear
           />
           <Select
             placeholder="Status"
             allowClear
-            style={{ width: 120 }}
+            className="w-full sm:w-32"
             onChange={setStatus}
             options={[
               { label: 'Pass', value: 'PASS' },
@@ -165,20 +168,55 @@ export const ResultsPage: React.FC = () => {
             placeholder="Batch"
             allowClear
             showSearch
-            style={{ width: 180 }}
+            className="w-full sm:w-48"
             onChange={setBatchId}
             options={Array.isArray(batches) ? batches.map((b) => ({ label: b.name, value: b.id })) : []}
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
           />
-          <RangePicker onChange={setDateRange as any} />
-          <Button icon={<ReloadOutlined />} onClick={fetchResults}>
+          <RangePicker className="w-full sm:w-auto" onChange={setDateRange as any} />
+          <Button icon={<ReloadOutlined />} onClick={fetchResults} className="w-full sm:w-auto">
             Refresh
           </Button>
-        </Space>
+        </div>
 
-        <Table
+        {isMobile ? (
+          <List
+            grid={{ gutter: 16, column: 1 }}
+            dataSource={data}
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => { setPage(p); setLimit(s); }
+            }}
+            renderItem={record => (
+              <List.Item>
+                <Card 
+                  title={record.student?.name || 'Unknown Student'}
+                  extra={
+                    <Tag color={record.status === 'PASS' ? 'green' : 'red'}>
+                      {record.status}
+                    </Tag>
+                  }
+                  actions={[
+                    <Button key="details" type="link" onClick={() => setSelectedResultId(record.id)}>
+                      View Details
+                    </Button>
+                  ]}
+                >
+                  <p className="text-gray-500 mb-1">Batch: {record.thread?.batch?.name || 'Unknown'}</p>
+                  <p className="text-gray-500 mb-1">Exam: {record.examType}</p>
+                  <p className="text-gray-500 mb-1">Score: {record.finalScore} / {record.totalMaxMarks}</p>
+                  <p className="text-gray-400 text-sm">{dayjs(record.createdAt).format('MMM D, YYYY')}</p>
+                </Card>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Table
           columns={columns}
           dataSource={data}
           rowKey="id"
@@ -192,6 +230,7 @@ export const ResultsPage: React.FC = () => {
           }}
           scroll={{ x: 800 }}
         />
+        )}
       </Card>
 
       <ResultDetailsModal

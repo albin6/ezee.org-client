@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic, Mentions, TimePicker, InputNumber, DatePicker } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Space, Tag, List, Avatar, Tabs, Select, Popconfirm, Row, Col, Card, Statistic, Mentions, TimePicker, InputNumber, DatePicker, Grid, Checkbox } from 'antd';
 import dayjs from 'dayjs';
 import { PlusOutlined, MessageOutlined, CheckCircleOutlined, UserOutlined, TeamOutlined, UserAddOutlined, UsergroupAddOutlined, DeleteOutlined, DashboardOutlined, VideoCameraOutlined, CalendarOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -15,6 +15,8 @@ import { CompleteExamModal } from '../components/CompleteExamModal';
 export const ThreadsPage: React.FC = () => {
   const { hasPermission } = usePermissions();
   const user = useAuthStore(state => state.user);
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const isCoordinator = (user as any)?.type === 'STUDENT_COORDINATOR' || (user as any)?.role === 'STUDENT_COORDINATOR';
 
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -504,22 +506,69 @@ export const ThreadsPage: React.FC = () => {
       />
       
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <Table
-          columns={columns}
-          dataSource={threads}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize: limit,
-            total,
-            onChange: (p, s) => {
-              setPage(p);
-              setLimit(s);
-            },
-            showSizeChanger: true,
-          }}
-        />
+        {isMobile ? (
+          <List
+            grid={{ gutter: 16, column: 1 }}
+            dataSource={threads}
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => { setPage(p); setLimit(s); }
+            }}
+            renderItem={record => (
+              <List.Item>
+                <Card 
+                  title={record.title}
+                  extra={<Tag color={record.status === 'OPEN' ? 'green' : record.status === 'RESOLVED' ? 'blue' : 'default'}>{record.status}</Tag>}
+                  actions={[
+                    <Button
+                      key="view"
+                      type="link"
+                      icon={<MessageOutlined />}
+                      onClick={() => openThreadDetails(record)}
+                    >
+                      View
+                    </Button>,
+                    hasPermission('foundation_threads:write') && record.status === 'OPEN' ? (
+                      <Popconfirm
+                        key="resolve"
+                        title="Resolve Thread"
+                        onConfirm={() => handleUpdateStatus(record.id, 'RESOLVED')}
+                        okText="Yes"
+                        cancelText="Cancel"
+                      >
+                        <Button type="link" icon={<CheckCircleOutlined />}>Resolve</Button>
+                      </Popconfirm>
+                    ) : null
+                  ].filter(Boolean) as React.ReactNode[]}
+                >
+                  <p className="text-gray-500 mb-1">Author: {record.author?.name || 'Unknown'}</p>
+                  <p className="text-gray-500 mb-1">Type: <Tag color="purple">{record.examType}</Tag></p>
+                  <p className="text-gray-500">Messages: {record.messageCount || 0}</p>
+                </Card>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={threads}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => {
+                setPage(p);
+                setLimit(s);
+              },
+              showSizeChanger: true,
+            }}
+          />
+        )}
       </div>
 
       <Modal
@@ -1066,20 +1115,46 @@ export const ThreadsPage: React.FC = () => {
         okText="Assign Selected"
         okButtonProps={{ disabled: selectedBufferedStudents.length === 0 }}
       >
-        <Table
-          rowSelection={{
-            type: 'checkbox',
-            onChange: (selectedRowKeys) => setSelectedBufferedStudents(selectedRowKeys as string[])
-          }}
-          columns={[
-            { title: 'Name', dataIndex: 'name', key: 'name' },
-            { title: 'Email', dataIndex: 'email', key: 'email' },
-          ]}
-          dataSource={bufferedStudents}
-          rowKey="id"
-          loading={bufferedLoading}
-          pagination={{ pageSize: 10 }}
-        />
+        {isMobile ? (
+          <List
+            dataSource={bufferedStudents}
+            loading={bufferedLoading}
+            pagination={{ pageSize: 10 }}
+            renderItem={student => (
+              <List.Item
+                onClick={() => {
+                  if (selectedBufferedStudents.includes(student.id)) {
+                    setSelectedBufferedStudents(selectedBufferedStudents.filter(id => id !== student.id));
+                  } else {
+                    setSelectedBufferedStudents([...selectedBufferedStudents, student.id]);
+                  }
+                }}
+                className="cursor-pointer border rounded mb-2 p-3 hover:bg-gray-50"
+              >
+                <List.Item.Meta
+                  avatar={<Checkbox checked={selectedBufferedStudents.includes(student.id)} />}
+                  title={student.name}
+                  description={student.email}
+                />
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Table
+            rowSelection={{
+              type: 'checkbox',
+              onChange: (selectedRowKeys) => setSelectedBufferedStudents(selectedRowKeys as string[])
+            }}
+            columns={[
+              { title: 'Name', dataIndex: 'name', key: 'name' },
+              { title: 'Email', dataIndex: 'email', key: 'email' },
+            ]}
+            dataSource={bufferedStudents}
+            rowKey="id"
+            loading={bufferedLoading}
+            pagination={{ pageSize: 10 }}
+          />
+        )}
       </Modal>
     </PageContainer>
   );

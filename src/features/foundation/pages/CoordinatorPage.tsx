@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Popconfirm, Space, Tabs, Typography } from 'antd';
+import { Table, Button, Input, Modal, Form, message, Popconfirm, Space, Tabs, Typography, Grid, List, Card } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -9,6 +9,8 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 
 export const CoordinatorPage: React.FC = () => {
   const { hasPermission } = usePermissions();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const [coordinators, setCoordinators] = useState<StudentCoordinator[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -211,22 +213,60 @@ export const CoordinatorPage: React.FC = () => {
           />
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={coordinators}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize: limit,
-            total,
-            onChange: (p, s) => {
-              setPage(p);
-              setLimit(s);
-            },
-            showSizeChanger: true,
-          }}
-        />
+        {isMobile ? (
+          <List
+            grid={{ gutter: 16, column: 1 }}
+            dataSource={coordinators}
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => { setPage(p); setLimit(s); }
+            }}
+            renderItem={record => (
+              <List.Item>
+                <Card 
+                  title={record.name}
+                  actions={[
+                    hasPermission('foundation_coordinator:write') ? <EditOutlined key="edit" onClick={() => handleOpenModal(record)} /> : null,
+                    hasPermission('foundation_coordinator:write') ? (
+                      <Popconfirm
+                        key="delete"
+                        title="Delete coordinator?"
+                        onConfirm={() => handleDelete(record.id)}
+                        okButtonProps={{ danger: true }}
+                      >
+                        <DeleteOutlined className="text-red-500" />
+                      </Popconfirm>
+                    ) : null,
+                  ].filter(Boolean) as React.ReactNode[]}
+                >
+                  <p className="text-gray-500 mb-1">Batch: {record.batchNumber}</p>
+                  <p className="text-gray-500 mb-1">Phone/Student No: {record.studentNumber}</p>
+                  {record.password && <p className="text-gray-500 mb-1">Password: {record.password}</p>}
+                </Card>
+              </List.Item>
+            )}
+          />
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={coordinators}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize: limit,
+              total,
+              onChange: (p, s) => {
+                setPage(p);
+                setLimit(s);
+              },
+              showSizeChanger: true,
+            }}
+          />
+        )}
       </div>
 
       <Modal
