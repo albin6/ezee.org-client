@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Modal, Form, message, Tag, Space, Popconfirm, Select, Tabs } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined, UploadOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Modal, Form, message, Tag, Space, Dropdown, Select, Tabs } from 'antd';
+import type { MenuProps } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined, UploadOutlined, MoreOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService } from '../api/foundation.service';
@@ -18,7 +19,8 @@ export const StudentsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
-  const [batchFilter, setBatchFilter] = useState<string | undefined>();
+  const [batchFilter, setBatchFilter] = useState<string | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<string | undefined>('ACTIVE');
   
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -42,7 +44,7 @@ export const StudentsPage: React.FC = () => {
     try {
       const data = activeTab === 'buffered' 
         ? await foundationService.getBufferedStudents({ page, limit, search, batchId: batchFilter })
-        : await foundationService.getStudents({ page, limit, search, batchId: batchFilter });
+        : await foundationService.getStudents({ page, limit, search, batchId: batchFilter, status: statusFilter });
       setStudents(data.data);
       setTotal(data.total);
     } catch (error: any) {
@@ -54,7 +56,7 @@ export const StudentsPage: React.FC = () => {
 
   useEffect(() => {
     fetchStudents();
-  }, [page, limit, search, batchFilter, activeTab]);
+  }, [page, limit, search, batchFilter, statusFilter, activeTab]);
 
   const fetchBatches = async () => {
     try {
@@ -102,6 +104,25 @@ export const StudentsPage: React.FC = () => {
       message.error(error.response?.data?.message || 'Action failed');
     }
   };
+  const handleBlock = async (id: string, block: boolean) => {
+    try {
+      await foundationService.blockStudent(id, block);
+      message.success(`Student ${block ? 'blocked' : 'unblocked'}`);
+      fetchStudents();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: string) => {
+    try {
+      await foundationService.updateStudentStatus(id, status);
+      message.success(`Student status updated to ${status}`);
+      fetchStudents();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to update status');
+    }
+  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -123,16 +144,6 @@ export const StudentsPage: React.FC = () => {
       fetchStudents();
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to assign students');
-    }
-  };
-
-  const handleBlock = async (id: string, block: boolean) => {
-    try {
-      await foundationService.blockStudent(id, block);
-      message.success(`Student ${block ? 'blocked' : 'unblocked'}`);
-      fetchStudents();
-    } catch (error: any) {
-      message.error(error.response?.data?.message || 'Action failed');
     }
   };
 
@@ -185,41 +196,81 @@ export const StudentsPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Student) => (
-        <Space>
-          <Button 
-            type="link" 
-            onClick={() => {
+      render: (_: any, record: Student) => {
+        const items: MenuProps['items'] = [
+          {
+            key: 'exams',
+            label: 'View Exams',
+            onClick: () => {
               setSelectedStudentForExams(record);
               setExamsModalVisible(true);
-            }}
-          >
-            Exams
-          </Button>
-          {hasPermission('students:write') && (
-            <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} />
-          )}
-          {hasPermission('students:block') && (
-            <Popconfirm
-              title={`Are you sure you want to ${record.status === 'BLOCKED' ? 'unblock' : 'block'} this student?`}
-              onConfirm={() => handleBlock(record.id, record.status !== 'BLOCKED')}
-            >
-              <Button icon={record.status === 'BLOCKED' ? <CheckCircleOutlined /> : <StopOutlined />} />
-            </Popconfirm>
-          )}
-          {hasPermission('students:delete') && (
-            <Popconfirm
-              title="Are you sure you want to delete this student?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-              okButtonProps={{ danger: true }}
-            >
-              <Button danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
-        </Space>
-      )
+            }
+          },
+          ...(hasPermission('students:write') ? [{
+            key: 'edit',
+            label: 'Edit Student',
+            onClick: () => handleOpenModal(record)
+          }] : []),
+          ...(hasPermission('students:write') && record.status === 'ACTIVE' ? [
+            {
+              key: 'transferred',
+              label: 'Mark as Transferred',
+              onClick: () => {
+                Modal.confirm({
+                  title: 'Mark as Transferred?',
+                  icon: <ExclamationCircleOutlined />,
+                  content: 'This will move the student to the Buffered list.',
+                  onOk: () => handleStatusChange(record.id, 'BUFFERED')
+                });
+              }
+            },
+            {
+              key: 'quit',
+              label: 'Mark as Quit',
+              onClick: () => {
+                Modal.confirm({
+                  title: 'Mark as Quit?',
+                  icon: <ExclamationCircleOutlined />,
+                  content: 'This will remove the student from future batches.',
+                  onOk: () => handleStatusChange(record.id, 'QUIT')
+                });
+              }
+            }
+          ] : []),
+          ...(hasPermission('students:block') ? [{
+            key: 'block',
+            label: record.status === 'BLOCKED' ? 'Unblock' : 'Block',
+            danger: record.status !== 'BLOCKED',
+            onClick: () => {
+              Modal.confirm({
+                title: `${record.status === 'BLOCKED' ? 'Unblock' : 'Block'} Student?`,
+                icon: <ExclamationCircleOutlined />,
+                onOk: () => handleBlock(record.id, record.status !== 'BLOCKED')
+              });
+            }
+          }] : []),
+          ...(hasPermission('students:delete') ? [{
+            key: 'delete',
+            label: 'Delete',
+            danger: true,
+            onClick: () => {
+              Modal.confirm({
+                title: 'Delete Student?',
+                icon: <ExclamationCircleOutlined />,
+                content: 'This action cannot be undone.',
+                okType: 'danger',
+                onOk: () => handleDelete(record.id)
+              });
+            }
+          }] : []),
+        ];
+
+        return (
+          <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
+            <Button icon={<MoreOutlined />} type="text" />
+          </Dropdown>
+        );
+      }
     }
   ];
 
@@ -257,6 +308,21 @@ export const StudentsPage: React.FC = () => {
             className="w-full sm:w-48"
             options={batches.map(b => ({ label: b.name, value: b.id }))}
           />
+          {activeTab === 'all' && (
+            <Select
+              placeholder="Filter by Status"
+              allowClear
+              value={statusFilter}
+              onChange={(val) => { setStatusFilter(val); setPage(1); }}
+              className="w-full sm:w-48"
+              options={[
+                { label: 'Active', value: 'ACTIVE' },
+                { label: 'Blocked', value: 'BLOCKED' },
+                { label: 'Transferred (Buffered)', value: 'BUFFERED' },
+                { label: 'Quit', value: 'QUIT' }
+              ]}
+            />
+          )}
           {activeTab === 'buffered' && (
             <Button 
               type="primary" 
