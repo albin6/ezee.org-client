@@ -150,7 +150,7 @@ export const foundationService = {
 
   // Student Coordinators
   getStudentCoordinators: async () => {
-    const res = await apiClient.get('/foundation/coordinators');
+    const res = await apiClient.get('/foundation/coordinators', { params: { limit: 1000 } });
     return res.data.data || res.data;
   },
 
