@@ -87,6 +87,22 @@ export const ThreadDetailsPage: React.FC = () => {
     };
   }, [selectedThread?.id, activeTab]);
 
+  const renderMessageWithLinks = (text: string) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+            {part}
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
 
   const fetchThread = async () => {
     if (!threadId) return;
@@ -474,7 +490,7 @@ export const ThreadDetailsPage: React.FC = () => {
                                 <span className="font-semibold text-gray-800">{msg.sender?.name || 'System'}</span>
                                 <span className="text-gray-400 text-xs">{dayjs(msg.createdAt).format('MMM D, YYYY h:mm A')}</span>
                               </div>
-                              <div className="text-gray-600 whitespace-pre-wrap">{msg.message}</div>
+                              <div className="text-gray-600 whitespace-pre-wrap">{renderMessageWithLinks(msg.message)}</div>
                             </div>
                           </div>
                         ))}
