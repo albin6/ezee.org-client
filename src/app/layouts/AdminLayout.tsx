@@ -245,16 +245,17 @@ export const AdminLayout: React.FC = () => {
     });
   }
 
-    // Task Management (Visible to everyone in V1 or adapt permissions as needed)
-    menuItems.push({
-      key: '/tasks',
-      icon: <CheckSquareOutlined />,
-      label: 'Tasks',
-      onClick: () => {
-        navigate('/tasks');
-        setMobileMenuOpen(false);
-      },
-    });
+    if (hasPermission('tasks:read')) {
+      menuItems.push({
+        key: '/tasks',
+        icon: <CheckSquareOutlined />,
+        label: 'Tasks',
+        onClick: () => {
+          navigate('/tasks');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
   }
 
   const sidebarContent = (

@@ -68,47 +68,42 @@ export const TaskListPage: React.FC = () => {
         const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
         const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
         
-        let availableOptions: { label: string, value: string }[] = [];
-
-        // Assignees move tasks forward
-        if (isAssignee) {
-          if (status === 'TODO') availableOptions.push({ label: 'IN_PROGRESS', value: 'IN_PROGRESS' });
-          if (status === 'IN_PROGRESS') availableOptions.push({ label: 'COMPLETED', value: 'COMPLETED' });
-        }
-        
-        // Assignors verify or reject completed tasks
-        if ((isAssignor || isSuperAdmin) && status === 'COMPLETED') {
-          // If the assignor is also an assignee, they already have options. We can overwrite or merge.
-          availableOptions = [
-            { label: 'VERIFIED', value: 'VERIFIED' },
-            { label: 'REJECT (IN_PROGRESS)', value: 'IN_PROGRESS' }
-          ];
-        }
-
         const handleStatusChange = async (newStatus: string) => {
           try {
             await useTaskStore.getState().updateTask(record.id, { status: newStatus });
             message.success('Status updated');
+            fetchTasks({ filter: activeTab }); // Ensure UI immediately refreshes
           } catch (error: any) {
             message.error(error.message);
           }
         };
 
-        if (availableOptions.length === 0) {
-          return <Tag>{status}</Tag>;
-        }
-
         return (
           <div className="flex items-center gap-2">
             <Tag>{status}</Tag>
-            <Select 
-              size="small" 
-              placeholder="Update" 
-              onChange={handleStatusChange}
-              options={availableOptions}
-              value={null}
-              style={{ width: 120 }}
-            />
+            
+            {isAssignee && status === 'TODO' && (
+              <Button size="small" type="primary" onClick={() => handleStatusChange('IN_PROGRESS')}>
+                Start Work
+              </Button>
+            )}
+            
+            {isAssignee && status === 'IN_PROGRESS' && (
+              <Button size="small" type="primary" className="bg-blue-600" onClick={() => handleStatusChange('COMPLETED')}>
+                Complete Task
+              </Button>
+            )}
+            
+            {(isAssignor || isSuperAdmin) && status === 'COMPLETED' && (
+              <>
+                <Button size="small" type="primary" className="bg-green-600 hover:bg-green-500" onClick={() => handleStatusChange('VERIFIED')}>
+                  Verify
+                </Button>
+                <Button size="small" danger onClick={() => handleStatusChange('IN_PROGRESS')}>
+                  Reject
+                </Button>
+              </>
+            )}
           </div>
         );
       }
