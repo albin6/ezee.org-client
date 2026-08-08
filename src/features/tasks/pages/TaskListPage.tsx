@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Select } from 'antd';
+import { Card, Table, Tag, Button, Tabs, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useTaskStore } from '../store/task.store';
 import { TaskFormModal } from '../components/TaskFormModal';
@@ -11,14 +11,14 @@ export const TaskListPage: React.FC = () => {
   const { user } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('assigned_to_me');
-  
+
   const anyUser = user as any;
   const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTasks({ filter: activeTab });
-    
+
     const teamId = anyUser?.teamMembers?.[0]?.teamId;
     if (teamId) {
       import('@/features/teams/api/team.service').then(m => {
@@ -67,7 +67,7 @@ export const TaskListPage: React.FC = () => {
         const isAssignor = record.createdById === anyUser?.id;
         const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
         const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
-        
+
         const handleStatusChange = async (newStatus: string) => {
           try {
             await useTaskStore.getState().updateTask(record.id, { status: newStatus });
@@ -81,19 +81,19 @@ export const TaskListPage: React.FC = () => {
         return (
           <div className="flex items-center gap-2">
             <Tag>{status}</Tag>
-            
+
             {isAssignee && status === 'TODO' && (
               <Button size="small" type="primary" onClick={() => handleStatusChange('IN_PROGRESS')}>
                 Start Work
               </Button>
             )}
-            
+
             {isAssignee && status === 'IN_PROGRESS' && (
               <Button size="small" type="primary" className="bg-blue-600" onClick={() => handleStatusChange('COMPLETED')}>
                 Complete Task
               </Button>
             )}
-            
+
             {(isAssignor || isSuperAdmin) && status === 'COMPLETED' && (
               <>
                 <Button size="small" type="primary" className="bg-green-600 hover:bg-green-500" onClick={() => handleStatusChange('VERIFIED')}>
@@ -120,9 +120,9 @@ export const TaskListPage: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Tasks</h1>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={() => setIsModalOpen(true)}
         >
           Create Task
@@ -138,17 +138,17 @@ export const TaskListPage: React.FC = () => {
             { key: 'assigned_by_me', label: 'Assigned by Me' }
           ]}
         />
-        
-        <Table 
-          dataSource={tasks} 
-          columns={columns} 
-          rowKey="id" 
+
+        <Table
+          dataSource={tasks}
+          columns={columns}
+          rowKey="id"
           loading={loading}
           pagination={{ pageSize: 10 }}
         />
       </Card>
 
-      <TaskFormModal 
+      <TaskFormModal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         onSubmit={handleCreate}
