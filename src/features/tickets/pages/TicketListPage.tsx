@@ -8,11 +8,15 @@ import { useTicketStore } from '../store/ticket.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { teamService } from '@/features/teams/api/team.service';
 import { useUserStore } from '@/features/users/store/user.store';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 
 export const TicketListPage: React.FC = () => {
   const navigate = useNavigate();
   const { tickets, loading, total, fetchTickets } = useTicketStore();
+  const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
+
+  const isSuperAdmin = (user as any)?.role?.name === 'Super Admin';
   const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
@@ -94,7 +98,7 @@ export const TicketListPage: React.FC = () => {
       <Select
         placeholder="Status"
         allowClear
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-35'}
         value={params.status || undefined}
         onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
         options={[
@@ -109,7 +113,7 @@ export const TicketListPage: React.FC = () => {
       <Select
         placeholder="Priority"
         allowClear
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[120px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-30'}
         value={params.priority || undefined}
         onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
         options={[
@@ -125,7 +129,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.teamId || undefined}
         onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
         options={teams.map(t => ({ value: t.id, label: t.name }))}
@@ -136,7 +140,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.createdById || undefined}
         onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
@@ -147,14 +151,14 @@ export const TicketListPage: React.FC = () => {
         allowClear
         showSearch
         optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[160px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.assigneeId || undefined}
         onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
         options={users.map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
       <DatePicker.RangePicker
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[240px]'}
+        className={isMobile ? 'w-full' : 'flex-1 min-w-60'}
         onChange={(dates) => {
           setParams({
             ...params,
@@ -179,7 +183,7 @@ export const TicketListPage: React.FC = () => {
                 Filters
               </Button>
             </div>
-            {hasPermission('tickets:create') && (
+            {hasPermission('tickets:create') && !isSuperAdmin && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/tickets/new')}>
                 Create Ticket
               </Button>
@@ -188,14 +192,14 @@ export const TicketListPage: React.FC = () => {
         }
       />
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-100">
-        
+
         {/* Desktop Filters Bar */}
         <div className="hidden md:flex mb-6 flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-md border border-gray-200">
           <div className="flex items-center gap-2 mr-2">
             <FilterOutlined className="text-gray-400" />
             <span className="font-medium text-gray-600">Filters</span>
           </div>
-          <div className="flex-1 min-w-[220px]">
+          <div className="flex-1 min-w-55">
             <Input.Search
               placeholder="Search title, desc, ID..."
               onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
@@ -239,26 +243,26 @@ export const TicketListPage: React.FC = () => {
         {/* Mobile List */}
         <div className="block md:hidden space-y-3">
           {tickets.length > 0 ? tickets.map((ticket: any) => (
-            <div 
-              key={ticket.id} 
+            <div
+              key={ticket.id}
               className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
               onClick={() => navigate(`/tickets/${ticket.id}`)}
             >
-               <div className="flex justify-between items-start">
-                 <div className="flex gap-3 overflow-hidden">
-                    <Avatar className="bg-blue-100 text-blue-600 font-semibold flex-shrink-0 mt-0.5">{ticket.createdBy?.name?.charAt(0) || 'U'}</Avatar>
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <span className="font-semibold text-gray-800 leading-tight text-sm truncate">{ticket.title}</span>
-                      <span className="text-xs text-gray-500 mt-1 truncate">{ticket.createdBy?.name} • {ticket.team?.name || 'No Team'}</span>
-                    </div>
-                 </div>
-                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                   <span className="text-[10px] text-gray-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
-                   {ticket.status === 'OPEN' && (
-                     <span className="bg-[#1677ff] text-white text-[10px] px-2 py-0.5 rounded-full font-medium shadow-sm">New</span>
-                   )}
-                 </div>
-               </div>
+              <div className="flex justify-between items-start">
+                <div className="flex gap-3 overflow-hidden">
+                  <Avatar className="bg-blue-100 text-blue-600 font-semibold shrink-0 mt-0.5">{ticket.createdBy?.name?.charAt(0) || 'U'}</Avatar>
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="font-semibold text-gray-800 leading-tight text-sm truncate">{ticket.title}</span>
+                    <span className="text-xs text-gray-500 mt-1 truncate">{ticket.createdBy?.name} • {ticket.team?.name || 'No Team'}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-[10px] text-gray-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                  {ticket.status === 'OPEN' && (
+                    <span className="bg-[#1677ff] text-white text-[10px] px-2 py-0.5 rounded-full font-medium shadow-sm">New</span>
+                  )}
+                </div>
+              </div>
             </div>
           )) : (
             <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg">
@@ -266,15 +270,15 @@ export const TicketListPage: React.FC = () => {
             </div>
           )}
           <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-100">
-            <Button 
+            <Button
               size="small"
-              disabled={params.page === 1} 
+              disabled={params.page === 1}
               onClick={() => setParams({ ...params, page: params.page - 1 })}
             >
               Previous
             </Button>
             <span className="text-xs text-gray-500">Page {params.page}</span>
-            <Button 
+            <Button
               size="small"
               disabled={tickets.length < params.limit}
               onClick={() => setParams({ ...params, page: params.page + 1 })}

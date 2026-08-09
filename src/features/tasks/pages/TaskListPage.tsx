@@ -9,11 +9,12 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 export const TaskListPage: React.FC = () => {
   const { tasks, loading, fetchTasks, createTask } = useTaskStore();
   const { user } = useAuthStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('assigned_to_me');
-
   const anyUser = user as any;
+  const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
   const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -66,7 +67,6 @@ export const TaskListPage: React.FC = () => {
       render: (status: string, record: any) => {
         const isAssignor = record.createdById === anyUser?.id;
         const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
-        const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
 
         const handleStatusChange = async (newStatus: string) => {
           try {
@@ -120,24 +120,28 @@ export const TaskListPage: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Tasks</h1>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setIsModalOpen(true)}
-        >
-          Create Task
-        </Button>
+        {!isSuperAdmin && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsModalOpen(true)}
+          >
+            Create Task
+          </Button>
+        )}
       </div>
 
       <Card>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            { key: 'assigned_to_me', label: 'Assigned to Me' },
-            { key: 'assigned_by_me', label: 'Assigned by Me' }
-          ]}
-        />
+        {!isSuperAdmin && (
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              { key: 'assigned_to_me', label: 'Assigned to Me' },
+              { key: 'assigned_by_me', label: 'Assigned by Me' }
+            ]}
+          />
+        )}
 
         <Table
           dataSource={tasks}
