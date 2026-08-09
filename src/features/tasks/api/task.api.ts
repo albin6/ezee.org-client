@@ -35,6 +35,11 @@ export const taskApi = {
     return response.data;
   },
 
+  getDashboardMetrics: async (params: any) => {
+    const response = await api.get('/tasks/dashboard', { params });
+    return response.data.data;
+  },
+
   deleteTask: async (id: string) => {
     await api.delete(`/tasks/${id}`);
   },

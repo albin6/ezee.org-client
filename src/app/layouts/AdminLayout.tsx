@@ -247,13 +247,27 @@ export const AdminLayout: React.FC = () => {
 
     if (hasPermission('tasks:read')) {
       menuItems.push({
-        key: '/tasks',
+        key: 'tasks_management',
         icon: <CheckSquareOutlined />,
         label: 'Task Management',
-        onClick: () => {
-          navigate('/tasks');
-          setMobileMenuOpen(false);
-        },
+        children: [
+          {
+            key: '/tasks/dashboard',
+            label: 'Dashboard',
+            onClick: () => {
+              navigate('/tasks/dashboard');
+              setMobileMenuOpen(false);
+            },
+          },
+          {
+            key: '/tasks',
+            label: 'Task List',
+            onClick: () => {
+              navigate('/tasks');
+              setMobileMenuOpen(false);
+            },
+          }
+        ]
       });
     }
   }
