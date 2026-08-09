@@ -11,7 +11,7 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 export const TaskListPage: React.FC = () => {
   const { tasks, loading, total, fetchTasks, createTask } = useTaskStore();
   const { user } = useAuthStore();
-  const { users, fetchUsers } = useUserStore();
+  const { fetchUsers } = useUserStore();
   const anyUser = user as any;
   const isSuperAdmin = anyUser?.role?.name === 'Super Admin' || anyUser?.type === 'super_admin';
   const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
@@ -20,7 +20,8 @@ export const TaskListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
-  const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '', priority: '', teamId: undefined, assignedToUserId: undefined, createdByUserId: undefined });
+  const userTeamId = anyUser?.teamMembers?.[0]?.teamId;
+  const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '', priority: '', teamId: isSuperAdmin ? undefined : userTeamId, assignedToUserId: undefined, createdByUserId: undefined });
 
   useEffect(() => {
     fetchTasks({ ...params, filter: activeTab });
@@ -35,10 +36,10 @@ export const TaskListPage: React.FC = () => {
   }, [fetchUsers, params.teamId]);
 
   useEffect(() => {
-    const teamId = anyUser?.teamMembers?.[0]?.teamId;
-    if (teamId) {
+    const fetchId = isSuperAdmin ? params.teamId : userTeamId;
+    if (fetchId) {
       import('@/features/teams/api/team.service').then(m => {
-        m.teamService.getTeamMembers(teamId, { limit: 1000 }).then(res => {
+        m.teamService.getTeamMembers(fetchId, { limit: 1000 }).then(res => {
           setTeamMembers(res.data || []);
         }).catch(console.error);
       });
@@ -48,12 +49,18 @@ export const TaskListPage: React.FC = () => {
         { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: anyUser?.role?.level, name: anyUser?.role?.name } }
       ]);
     }
-  }, [activeTab, fetchTasks, anyUser]);
+  }, [params.teamId, anyUser, isSuperAdmin, userTeamId]);
+
+  const eligibleAssignees = teamMembers.filter(member => {
+    if (isSuperAdmin) return true;
+    const memberLevel = member.role?.level ?? 99;
+    return currentUserLevel <= memberLevel;
+  });
 
   const handleCreate = async (values: any) => {
     try {
-      // Hardcode teamId for now, ideally selected or fetched from context
-      await createTask({ ...values, teamId: anyUser?.teamMembers?.[0]?.teamId || '' });
+      const targetTeamId = isSuperAdmin ? params.teamId || userTeamId : userTeamId;
+      await createTask({ ...values, teamId: targetTeamId || '' });
       message.success('Task created successfully');
     } catch (err: any) {
       message.error(err.message);
@@ -86,7 +93,7 @@ export const TaskListPage: React.FC = () => {
         const isAssignor = record.createdById === anyUser?.id;
         const assigneeRecord = record.assignees?.find((a: any) => a.userId === anyUser?.id);
         const isAssignee = !!assigneeRecord;
-        
+
         // Determine the effective status to show
         let displayStatus = status;
         let isIndividualStatus = false;
@@ -108,7 +115,7 @@ export const TaskListPage: React.FC = () => {
         return (
           <div className="flex items-center gap-2">
             <Tag>
-              {displayStatus} 
+              {displayStatus}
               {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
                 <span className="ml-1 text-xs text-gray-500">(Group)</span>
               )}
@@ -210,10 +217,11 @@ export const TaskListPage: React.FC = () => {
             placeholder="Team"
             allowClear
             showSearch
+            disabled={!isSuperAdmin}
             optionFilterProp="label"
             className="flex-1 min-w-35"
             value={params.teamId || undefined}
-            onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
+            onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1, assignedToUserId: undefined })}
             options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
           />
           <Select
@@ -224,7 +232,7 @@ export const TaskListPage: React.FC = () => {
             className="flex-1 min-w-35"
             value={params.assignedToUserId || undefined}
             onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
-            options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
+            options={eligibleAssignees.map((member: any) => ({ value: member.user.id, label: member.user.name }))}
           />
         </div>
       </div>
@@ -268,7 +276,7 @@ export const TaskListPage: React.FC = () => {
         onCancel={() => setIsModalOpen(false)}
         onSubmit={handleCreate}
         teamMembers={teamMembers}
-        currentUserLevel={currentUserLevel}
+        currentUserLevel={isSuperAdmin ? 0 : currentUserLevel}
       />
     </div>
   );
