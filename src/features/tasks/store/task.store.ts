@@ -4,6 +4,7 @@ import type { Task } from '../api/task.api';
 
 interface TaskState {
   tasks: Task[];
+  total: number;
   loading: boolean;
   error: string | null;
   fetchTasks: (params: any) => Promise<void>;
@@ -15,14 +16,15 @@ interface TaskState {
 
 export const useTaskStore = create<TaskState>((set) => ({
   tasks: [],
+  total: 0,
   loading: false,
   error: null,
 
   fetchTasks: async (params: any) => {
     set({ loading: true, error: null });
     try {
-      const tasks = await taskApi.getTasks(params);
-      set({ tasks, loading: false });
+      const response = await taskApi.getTasks(params);
+      set({ tasks: response.data || [], total: response.meta?.total || 0, loading: false });
     } catch (err: any) {
       set({ error: err.response?.data?.message || 'Failed to fetch tasks', loading: false });
     }

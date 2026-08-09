@@ -32,7 +32,7 @@ export const taskApi = {
 
   getTasks: async (params: any) => {
     const response = await api.get('/tasks', { params });
-    return response.data.data;
+    return response.data;
   },
 
   deleteTask: async (id: string) => {

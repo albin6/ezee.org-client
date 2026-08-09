@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select } from 'antd';
+import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
+import { teamService } from '@/features/teams/api/team.service';
+import { useUserStore } from '@/features/users/store/user.store';
 import { useTaskStore } from '../store/task.store';
 import { TaskFormModal } from '../components/TaskFormModal';
 import { LiveCountdown } from '../components/LiveCountdown';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
 export const TaskListPage: React.FC = () => {
-  const { tasks, loading, fetchTasks, createTask } = useTaskStore();
+  const { tasks, loading, total, fetchTasks, createTask } = useTaskStore();
   const { user } = useAuthStore();
+  const { users, fetchUsers } = useUserStore();
   const anyUser = user as any;
   const isSuperAdmin = anyUser?.role?.name === 'Super Admin' || anyUser?.type === 'super_admin';
   const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
@@ -16,10 +19,19 @@ export const TaskListPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '', priority: '', teamId: undefined, assignedToUserId: undefined, createdByUserId: undefined });
 
   useEffect(() => {
-    fetchTasks({ filter: activeTab });
+    fetchTasks({ ...params, filter: activeTab });
+  }, [params, activeTab, fetchTasks]);
 
+  useEffect(() => {
+    teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
+    fetchUsers({ page: 1, limit: 100 }).catch(console.error);
+  }, [fetchUsers]);
+
+  useEffect(() => {
     const teamId = anyUser?.teamMembers?.[0]?.teamId;
     if (teamId) {
       import('@/features/teams/api/team.service').then(m => {
@@ -50,11 +62,13 @@ export const TaskListPage: React.FC = () => {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
+      sorter: true,
     },
     {
       title: 'Priority',
       dataIndex: 'priority',
       key: 'priority',
+      sorter: true,
       render: (prio: string) => {
         const colors: any = { LOW: 'green', MEDIUM: 'blue', HIGH: 'orange', CRITICAL: 'red' };
         return <Tag color={colors[prio]}>{prio}</Tag>;
@@ -64,6 +78,7 @@ export const TaskListPage: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      sorter: true,
       render: (status: string, record: any) => {
         const isAssignor = record.createdById === anyUser?.id;
         const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
@@ -131,6 +146,69 @@ export const TaskListPage: React.FC = () => {
         )}
       </div>
 
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center gap-2 mr-2">
+            <FilterOutlined className="text-gray-400" />
+            <span className="font-medium text-gray-600">Filters</span>
+          </div>
+          <div className="flex-1 min-w-50">
+            <Input.Search
+              placeholder="Search tasks..."
+              onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+              allowClear
+            />
+          </div>
+          <Select
+            placeholder="Status"
+            allowClear
+            className="flex-1 min-w-30"
+            value={params.status || undefined}
+            onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
+            options={[
+              { value: 'TODO', label: 'TODO' },
+              { value: 'IN_PROGRESS', label: 'IN PROGRESS' },
+              { value: 'IN_REVIEW', label: 'IN REVIEW' },
+              { value: 'COMPLETED', label: 'COMPLETED' },
+              { value: 'VERIFIED', label: 'VERIFIED' },
+            ]}
+          />
+          <Select
+            placeholder="Priority"
+            allowClear
+            className="flex-1 min-w-30"
+            value={params.priority || undefined}
+            onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
+            options={[
+              { value: 'LOW', label: 'LOW' },
+              { value: 'MEDIUM', label: 'MEDIUM' },
+              { value: 'HIGH', label: 'HIGH' },
+              { value: 'CRITICAL', label: 'CRITICAL' }
+            ]}
+          />
+          <Select
+            placeholder="Team"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            className="flex-1 min-w-35"
+            value={params.teamId || undefined}
+            onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
+            options={teams.map(t => ({ value: t.id, label: t.name }))}
+          />
+          <Select
+            placeholder="Assignee"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            className="flex-1 min-w-35"
+            value={params.assignedToUserId || undefined}
+            onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
+            options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+          />
+        </div>
+      </div>
+
       <Card>
         {!isSuperAdmin && (
           <Tabs
@@ -148,7 +226,20 @@ export const TaskListPage: React.FC = () => {
           columns={columns}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={{
+            current: params.page,
+            pageSize: params.limit,
+            total: total
+          }}
+          onChange={(pagination: any, _filters: any, sorter: any) => {
+            setParams((prev: any) => ({
+              ...prev,
+              page: pagination.current,
+              limit: pagination.pageSize,
+              sortBy: sorter.field,
+              sortOrder: sorter.order === 'ascend' ? 'asc' : sorter.order === 'descend' ? 'desc' : undefined,
+            }));
+          }}
         />
       </Card>
 
