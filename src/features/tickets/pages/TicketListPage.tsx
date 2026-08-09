@@ -16,7 +16,7 @@ export const TicketListPage: React.FC = () => {
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
 
-  const isSuperAdmin = (user as any)?.role?.name === 'Super Admin';
+  const isSuperAdmin = (user as any)?.role?.name === 'Super Admin' || (user as any)?.type === 'super_admin';
   const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();

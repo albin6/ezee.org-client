@@ -10,7 +10,7 @@ export const TaskListPage: React.FC = () => {
   const { tasks, loading, fetchTasks, createTask } = useTaskStore();
   const { user } = useAuthStore();
   const anyUser = user as any;
-  const isSuperAdmin = anyUser?.role?.name === 'Super Admin';
+  const isSuperAdmin = anyUser?.role?.name === 'Super Admin' || anyUser?.type === 'super_admin';
   const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
