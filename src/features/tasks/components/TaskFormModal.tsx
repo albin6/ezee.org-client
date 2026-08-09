@@ -97,6 +97,18 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </Select>
         </Form.Item>
 
+        <Form.Item 
+          name="completionType" 
+          label="Completion Type" 
+          initialValue="INDIVIDUAL"
+          tooltip="Shared: Any assignee completing the task completes it for everyone. Individual: Each assignee must complete it."
+        >
+          <Select>
+            <Select.Option value="INDIVIDUAL">Individual (Requires completion from all assignees)</Select.Option>
+            <Select.Option value="SHARED">Shared (Single completion marks task as done)</Select.Option>
+          </Select>
+        </Form.Item>
+
         <div className="flex justify-end gap-2 mt-4">
           <Button onClick={onCancel}>Cancel</Button>
           <Button type="primary" htmlType="submit" loading={loading}>

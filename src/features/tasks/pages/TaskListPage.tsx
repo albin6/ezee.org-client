@@ -84,7 +84,16 @@ export const TaskListPage: React.FC = () => {
       sorter: true,
       render: (status: string, record: any) => {
         const isAssignor = record.createdById === anyUser?.id;
-        const isAssignee = record.assignees?.some((a: any) => a.userId === anyUser?.id);
+        const assigneeRecord = record.assignees?.find((a: any) => a.userId === anyUser?.id);
+        const isAssignee = !!assigneeRecord;
+        
+        // Determine the effective status to show
+        let displayStatus = status;
+        let isIndividualStatus = false;
+        if (record.completionType === 'INDIVIDUAL' && isAssignee && !isAssignor && !isSuperAdmin) {
+          displayStatus = assigneeRecord.status;
+          isIndividualStatus = true;
+        }
 
         const handleStatusChange = async (newStatus: string) => {
           try {
@@ -98,15 +107,23 @@ export const TaskListPage: React.FC = () => {
 
         return (
           <div className="flex items-center gap-2">
-            <Tag>{status}</Tag>
+            <Tag>
+              {displayStatus} 
+              {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
+                <span className="ml-1 text-xs text-gray-500">(Group)</span>
+              )}
+              {isIndividualStatus && (
+                <span className="ml-1 text-xs text-blue-500">(Yours)</span>
+              )}
+            </Tag>
 
-            {isAssignee && status === 'TODO' && (
+            {isAssignee && displayStatus === 'TODO' && (
               <Button size="small" type="primary" onClick={() => handleStatusChange('IN_PROGRESS')}>
                 Start Work
               </Button>
             )}
 
-            {isAssignee && status === 'IN_PROGRESS' && (
+            {isAssignee && displayStatus === 'IN_PROGRESS' && (
               <Button size="small" type="primary" className="bg-blue-600" onClick={() => handleStatusChange('COMPLETED')}>
                 Complete Task
               </Button>
