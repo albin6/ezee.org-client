@@ -28,8 +28,11 @@ export const TaskListPage: React.FC = () => {
 
   useEffect(() => {
     teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
-    fetchUsers({ page: 1, limit: 100 }).catch(console.error);
-  }, [fetchUsers]);
+  }, []);
+
+  useEffect(() => {
+    fetchUsers({ page: 1, limit: 100, teamId: params.teamId }).catch(console.error);
+  }, [fetchUsers, params.teamId]);
 
   useEffect(() => {
     const teamId = anyUser?.teamMembers?.[0]?.teamId;
@@ -194,7 +197,7 @@ export const TaskListPage: React.FC = () => {
             className="flex-1 min-w-35"
             value={params.teamId || undefined}
             onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
-            options={teams.map(t => ({ value: t.id, label: t.name }))}
+            options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
           />
           <Select
             placeholder="Assignee"
@@ -204,7 +207,7 @@ export const TaskListPage: React.FC = () => {
             className="flex-1 min-w-35"
             value={params.assignedToUserId || undefined}
             onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
-            options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+            options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
           />
         </div>
       </div>

@@ -15,6 +15,7 @@ export interface GetUsersParams {
   search?: string;
   status?: string;
   roleId?: string;
+  teamId?: string;
 }
 
 export interface CreateUserPayload {

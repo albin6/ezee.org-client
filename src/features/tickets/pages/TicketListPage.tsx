@@ -28,8 +28,11 @@ export const TicketListPage: React.FC = () => {
 
   useEffect(() => {
     teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
-    fetchUsers({ page: 1, limit: 100 }).catch(console.error);
-  }, [fetchUsers]);
+  }, []);
+
+  useEffect(() => {
+    fetchUsers({ page: 1, limit: 100, teamId: params.teamId }).catch(console.error);
+  }, [fetchUsers, params.teamId]);
 
   const handleTableChange = (pagination: any, _filters: any, sorter: any) => {
     setParams((prev: any) => ({
@@ -132,7 +135,7 @@ export const TicketListPage: React.FC = () => {
         className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.teamId || undefined}
         onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
-        options={teams.map(t => ({ value: t.id, label: t.name }))}
+        options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
       />
 
       <Select
@@ -143,7 +146,7 @@ export const TicketListPage: React.FC = () => {
         className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.createdById || undefined}
         onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
-        options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+        options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
       <Select
@@ -154,7 +157,7 @@ export const TicketListPage: React.FC = () => {
         className={isMobile ? 'w-full' : 'flex-1 min-w-40'}
         value={params.assigneeId || undefined}
         onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
-        options={users.map((u: any) => ({ value: u.id, label: u.name }))}
+        options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
       <DatePicker.RangePicker
