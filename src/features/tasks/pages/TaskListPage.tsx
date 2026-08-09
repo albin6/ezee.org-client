@@ -137,7 +137,7 @@ export const TaskListPage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Tasks</h1>
+        <h1 className="text-2xl font-bold">Task Management</h1>
         {!isSuperAdmin && (
           <Button
             type="primary"

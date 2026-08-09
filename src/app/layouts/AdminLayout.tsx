@@ -249,7 +249,7 @@ export const AdminLayout: React.FC = () => {
       menuItems.push({
         key: '/tasks',
         icon: <CheckSquareOutlined />,
-        label: 'Tasks',
+        label: 'Task Management',
         onClick: () => {
           navigate('/tasks');
           setMobileMenuOpen(false);
