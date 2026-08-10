@@ -14,7 +14,6 @@ export const TaskListPage: React.FC = () => {
   const { fetchUsers } = useUserStore();
   const anyUser = user as any;
   const isSuperAdmin = anyUser?.role?.name === 'Super Admin' || anyUser?.type === 'super_admin';
-  const currentUserLevel = anyUser?.teamMembers?.[0]?.role?.level ?? anyUser?.role?.level ?? 99;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
@@ -51,10 +50,24 @@ export const TaskListPage: React.FC = () => {
     }
   }, [params.teamId, anyUser, isSuperAdmin, userTeamId]);
 
+  const currentUserMember = teamMembers.find(m => m.user.id === anyUser?.id || m.user.id === anyUser?.sub);
+  const currentUserLevel = isSuperAdmin ? 0 : (currentUserMember?.role?.level ?? anyUser?.role?.level ?? 99);
+
+  console.log('DEBUG_ASSIGNEES', { 
+    userId: anyUser?.id, 
+    userSub: anyUser?.sub,
+    isSuperAdmin, 
+    currentUserLevel, 
+    currentUserMemberLevel: currentUserMember?.role?.level,
+    teamMembersCount: teamMembers.length
+  });
+
   const eligibleAssignees = teamMembers.filter(member => {
     if (isSuperAdmin) return true;
-    const memberLevel = member.role?.level ?? 99;
-    return currentUserLevel <= memberLevel;
+    const memberLevel = Number(member.role?.level ?? 99);
+    const currLevel = Number(currentUserLevel);
+    const isEligible = currLevel <= memberLevel;
+    return isEligible;
   });
 
   const handleCreate = async (values: any) => {
