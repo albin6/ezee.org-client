@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Input, Select, DatePicker, Avatar, Modal } from 'antd';
-import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Input, Select, DatePicker, Avatar, Modal, Tooltip } from 'antd';
+import { PlusOutlined, FilterOutlined, WarningOutlined, AlertOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -44,13 +44,44 @@ export const TicketListPage: React.FC = () => {
     }));
   };
 
+  const getTicketSLAStatus = (ticket: any) => {
+    if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') return 'ok';
+    const createdAt = new Date(ticket.createdAt).getTime();
+    const ageHours = (Date.now() - createdAt) / (1000 * 60 * 60);
+    
+    let slaLimit = 120;
+    if (ticket.priority === 'HIGH' || ticket.priority === 'URGENT') slaLimit = 24;
+    else if (ticket.priority === 'MEDIUM') slaLimit = 72;
+    
+    if (ageHours >= slaLimit) return 'breached';
+    if (ageHours >= slaLimit - 4) return 'approaching';
+    return 'ok';
+  };
+
   const columns = [
     {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
       sorter: true,
-      render: (text: string, record: any) => <Link to={`/tickets/${record.id}`}>{text}</Link>,
+      render: (text: string, record: any) => {
+        const slaStatus = getTicketSLAStatus(record);
+        return (
+          <div className="flex items-center gap-2">
+            <Link to={`/tickets/${record.id}`}>{text}</Link>
+            {slaStatus === 'breached' && (
+              <Tooltip title="SLA Breached!">
+                <Tag color="red" icon={<AlertOutlined />}>BREACHED</Tag>
+              </Tooltip>
+            )}
+            {slaStatus === 'approaching' && (
+              <Tooltip title="SLA Deadline Approaching">
+                <Tag color="orange" icon={<WarningOutlined />}>SLA RISK</Tag>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Status',
@@ -233,6 +264,12 @@ export const TicketListPage: React.FC = () => {
             rowKey="id"
             loading={loading}
             onChange={handleTableChange}
+            rowClassName={(record) => {
+              const status = getTicketSLAStatus(record);
+              if (status === 'breached') return 'bg-red-50';
+              if (status === 'approaching') return 'bg-orange-50';
+              return '';
+            }}
             pagination={{
               current: params.page,
               pageSize: params.limit,
