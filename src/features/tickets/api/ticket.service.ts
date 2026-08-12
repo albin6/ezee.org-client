@@ -12,6 +12,8 @@ export interface Ticket {
   updatedAt: string;
   resolvedAt?: string;
   closedAt?: string;
+  aiSummary?: string;
+  aiConfidence?: number;
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
   assignees?: { user: { id: string; name: string; email: string } }[];

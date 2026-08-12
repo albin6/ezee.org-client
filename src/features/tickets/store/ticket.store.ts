@@ -140,6 +140,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     socket.off('NEW_MESSAGE');
     socket.off('REACTION_UPDATED');
     socket.off('TICKET_UPDATED');
+    socket.off('AI_INSIGHTS_GENERATED');
 
     socket.on('NEW_MESSAGE', (message: any) => {
       get().handleNewMessage(message);
@@ -155,6 +156,19 @@ export const useTicketStore = create<TicketState>((set, get) => ({
         set({ currentTicket: updatedTicket });
       }
     });
+
+    socket.on('AI_INSIGHTS_GENERATED', (data: any) => {
+      const ct = get().currentTicket;
+      if (ct && ct.id === data.ticketId) {
+        set({ 
+          currentTicket: { 
+            ...ct, 
+            aiSummary: data.aiSummary, 
+            aiConfidence: data.aiConfidence 
+          } 
+        });
+      }
+    });
   },
 
   leaveTicketRoom: (ticketId: string) => {
@@ -164,6 +178,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       socket.off('NEW_MESSAGE');
       socket.off('REACTION_UPDATED');
       socket.off('TICKET_UPDATED');
+      socket.off('AI_INSIGHTS_GENERATED');
     }
   },
 

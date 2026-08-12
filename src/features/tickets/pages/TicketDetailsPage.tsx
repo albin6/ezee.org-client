@@ -320,6 +320,23 @@ export const TicketDetailsPage: React.FC = () => {
         <Button onClick={() => navigate('/tickets')}>Back to Tickets</Button>
       </div>
 
+      {ticket.aiSummary && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6 shrink-0 flex items-start gap-3">
+          <div className="text-purple-600 mt-1">
+            <span role="img" aria-label="ai" className="text-xl">✨</span>
+          </div>
+          <div>
+            <Text strong className="text-purple-800 block text-base mb-1">AI Triage Summary</Text>
+            <Text className="text-purple-700">{ticket.aiSummary}</Text>
+            {ticket.aiConfidence && (
+              <div className="mt-2">
+                <Text type="secondary" className="text-xs">Confidence: {(ticket.aiConfidence * 100).toFixed(0)}%</Text>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {ticket.status === 'RESOLVED' && (isCreator || isAdmin) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
           <div>
