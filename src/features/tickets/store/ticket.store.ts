@@ -164,7 +164,11 @@ export const useTicketStore = create<TicketState>((set, get) => ({
           currentTicket: { 
             ...ct, 
             aiSummary: data.aiSummary, 
-            aiConfidence: data.aiConfidence 
+            aiConfidence: data.aiConfidence,
+            ...(data.autoRouted && { 
+              priority: data.suggestedPriority,
+              teamId: data.suggestedTeamId 
+            })
           } 
         });
       }
