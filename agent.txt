@@ -146,3 +146,15 @@ ezee.org-client/
 4. **WebSocket Room Naming**: Socket rooms must strictly match `ticket:<id>`, `thread:<id>`, and `user:<id>`.
 5. **Optimistic Concurrency Control**: When updating ticket status, always pass the current `ticket.version` to prevent overwriting concurrent updates.
 6. **Vercel Rewrites**: Keep `vercel.json` rewrite configuration intact for API reverse-proxying.
+7. **Vendor Code-Splitting**: Preserve `manualChunks` in `vite.config.ts` to keep bundle size optimized across Ant Design, Recharts, and React chunks.
+
+---
+
+## 9. Testing Infrastructure & CI/CD Quality Gates
+- **Test Runner**: Vitest with `@testing-library/react` and `jsdom` (`npm test`).
+- **Configuration**: `vitest.config.ts` with global DOM setup in `src/__tests__/setup.ts`.
+- **Test Suites**:
+  - `src/shared/hooks/__tests__/usePermissions.test.ts`: Verifies Super Admin bypass, permission inclusion, and unauthenticated behavior.
+  - `src/features/auth/store/__tests__/auth.store.test.ts`: Verifies login, profile storage, state persistence, and logout cleanup.
+- **CI Quality Gates**: `.github/workflows/ci.yml` runs on PRs and pushes to `dev`/`main`, executing `npm test` and `npm run build`.
+
