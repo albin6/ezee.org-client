@@ -1,0 +1,148 @@
+# ezee.org Client - AI Agent Context & Architecture Manual
+
+## 1. Module Overview & Purpose
+`ezee.org-client` is a single-page application (SPA) designed as an enterprise operations, ticketing, team coordination, task workflow, and foundation/educational exam tracking system. It serves three distinct user groups:
+- **Super Administrators**: Platform-wide configuration, global RBAC, batch creation, team management, and audit inspection.
+- **Enterprise Team Members & Managers**: Multi-team members who create/manage tasks, triage and resolve tickets, engage in ticket discussions, upload voice notes/attachments, and track SLA statuses.
+- **Student Coordinators**: Educational coordinators managing foundation student batches, evaluating daily progress, conducting mock/final exams, logging theory/practical marks, and coordinating student exam schedules.
+
+---
+
+## 2. Technology Stack & Frameworks
+- **Core**: React 19.2.6, React DOM 19.2.6, TypeScript 6.0.2 (strict mode), Vite 8.0.12
+- **UI Design System**: Ant Design 6.4.3 (`antd`), `@ant-design/icons` 6.2.5, configured with custom purple primary theme token (`#9333ea`)
+- **Styling**: Tailwind CSS v4 (`@tailwindcss/vite` 4.3.0, `tailwindcss` 4.3.0) with Vanilla CSS utilities
+- **Routing**: React Router DOM 7.17.0 (`createBrowserRouter`, `RouterProvider`, `Navigate`, `Outlet`)
+- **Global State Management**: Zustand 5.0.14 with `persist` middleware for persistent storage
+- **Server Communication**: Axios 1.17.0 (`apiClient` with request/response interceptors)
+- **Real-Time WebSockets**: `socket.io-client` 4.8.3 (`socketService` singleton)
+- **Drag and Drop**: `@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/modifiers` 9.0.0
+- **Form Architecture & Validation**: `react-hook-form` 7.77.0 + `@hookform/resolvers` 5.4.0 + `zod` 4.4.3
+- **Data Visualization**: `recharts` 3.10.1
+- **Multimedia & Emoji**: `emoji-picker-react` 4.19.1, Browser Web Audio `MediaRecorder` API
+- **PWA & Push Notifications**: Service Worker (`/sw.js`), native Web Push API via VAPID public key
+
+---
+
+## 3. Directory & Module Structure
+```
+ezee.org-client/
+├── public/
+│   ├── sw.js                  # Service Worker for push notifications & caching
+│   └── pwa-icons/             # PWA app icons
+├── src/
+│   ├── app/
+│   │   ├── layouts/
+│   │   │   └── AdminLayout.tsx# Main responsive dashboard layout with role-filtered sidebar
+│   │   └── router/
+│   │       └── index.tsx      # Route definitions & hierarchy wrapped with ProtectedRoute
+│   ├── features/
+│   │   ├── auth/              # Authentication, login pages (User/Admin/Coordinator), auth store
+│   │   ├── dashboard/         # Role-specific dashboard overview (Admin/User vs Coordinator)
+│   │   ├── foundation/        # Batches, Students, Overview, Coordinators, Threads, Results
+│   │   ├── notifications/     # NotificationBell, notification store, push subscription API
+│   │   ├── rbac/              # Global Roles & Permissions administration
+│   │   ├── tasks/             # TaskListPage, TaskDashboardPage, task store, LiveCountdown
+│   │   ├── teams/             # TeamsPage, TeamDetailsPage (Members, Roles drag-drop, Permissions)
+│   │   ├── tickets/           # TicketListPage (SLA badges), CreateTicketPage, TicketDetailsPage
+│   │   └── users/             # User management, user store, status toggling
+│   ├── shared/
+│   │   ├── api/
+│   │   │   └── axios.ts       # Axios instance with Bearer token & 401 auto-logout interceptor
+│   │   ├── components/        # ProtectedRoute, PageContainer, PageHeader, PWAInstallPrompt, etc.
+│   │   ├── hooks/             # usePermissions (checks permission array & super admin bypass)
+│   │   └── services/          # socketService (Socket.io connection & room management)
+│   ├── App.tsx                # Ant Design ConfigProvider, RouterProvider, SW registration
+│   ├── main.tsx               # React 19 root entrypoint
+│   └── index.css              # Global styles
+└── vercel.json                # Vercel deployment rewrites & SPA router configuration
+```
+
+---
+
+## 4. Key Entry Points & Navigation
+- `src/main.tsx` → `src/App.tsx`: Bootstraps React, applies Ant Design theme token, registers Service Worker.
+- `src/app/router/index.tsx`:
+  - Public routes: `/login` (with User and Admin tabs), `/coordinator/login` (specialized coordinator entry).
+  - Protected routes (wrapped with `ProtectedRoute`): `/dashboard`, `/profile`, `/roles`, `/foundation/*`, `/batches`, `/students`, `/users`, `/teams`, `/teams/:id`, `/tasks`, `/tasks/dashboard`, `/tickets`, `/tickets/new`, `/tickets/:id`.
+  - Fallback: Catch-all `*` redirects to `/dashboard`.
+
+---
+
+## 5. Major Features & Workflows
+
+### A. Authentication & Session Handling
+- Multi-persona login via `authService`:
+  - `userLogin`: Calls `POST /auth/login` → fetches user profile via `GET /auth/profile`.
+  - `login` (Admin): Calls `POST /auth/admin/login` → fetches profile via `GET /auth/admin/profile`.
+  - `coordinatorLogin`: Calls `POST /auth/coordinator/login`.
+- Tokens & Profile: Stored in Zustand (`useAuthStore`) and persisted to `localStorage` under `auth-storage`.
+- Axios interceptor automatically adds `Authorization: Bearer <accessToken>`. On HTTP 401, triggers automatic logout.
+
+### B. Role-Based Access Control (RBAC) & Permissions
+- Permission hook: `usePermissions()`. Checks `user.type === 'super_admin'` (bypasses all checks) or checks whether `user.permissions` includes the required string (e.g., `tickets:create`, `tasks:read`).
+- Route-level and element-level authorization: `AdminLayout.tsx` hides menu items based on permissions and displays an "Access Denied" placeholder if an unauthorized URL is accessed directly.
+- Team-Level Permissions: `TeamPermissionsManager` allows teams to be granted a subset of global permissions. `TeamRolesTable` uses `@dnd-kit` vertical drag-and-drop to reorder roles, assigning numeric hierarchy levels (0 = highest privilege).
+
+### C. Task Management System
+- Task List (`TaskListPage.tsx`): Tabs for "All Tasks" (for Super Admins) vs "Assigned to Me" (for standard users). Filterable by status, priority, team, assignee, creator.
+- Task Creation & Hierarchy Constraints: Assignor's priority level (`currentUserLevel`) must be <= the assignee's level (`memberLevel`). Lower integer = higher authority. Users cannot assign tasks to superiors.
+- State Machine & Completion Types:
+  - `INDIVIDUAL`: Each assignee has an independent status. Task completes globally only when all assignees mark their portion `COMPLETED`.
+  - `SHARED`: Collective workflow (`TODO` -> `IN_PROGRESS` -> `COMPLETED` -> `VERIFIED`). Only assignor or Super Admin can verify or reject.
+- Deadlines & Real-Time Countdown: `LiveCountdown` displays active countdown timers with warning styles for approaching/overdue deadlines.
+
+### D. Ticket & Helpdesk System
+- Ticket Listing (`TicketListPage.tsx`): Displays status, priority, creator, and dynamic SLA indicators:
+  - `HIGH`/`URGENT`: 24h SLA. Warning tag `SLA RISK` at <= 4 hours remaining; `BREACHED` if overdue.
+  - `MEDIUM`: 72h SLA. Warning tag at <= 4 hours remaining.
+  - `LOW`: 120h SLA. Warning tag at <= 4 hours remaining.
+- Ticket Creation (`CreateTicketPage.tsx`): Selects team, assigns members, attaches initial voice recording or documents.
+- Real-Time Ticket Details (`TicketDetailsPage.tsx`):
+  - WebSockets: Joins room `ticket:<id>`. Receives real-time `NEW_MESSAGE`, `TICKET_UPDATED`, `REACTION_UPDATED`, `AI_INSIGHTS_GENERATED`.
+  - Optimistic Concurrency Control (OCC): Sends current `version` integer on status change; catches 409 Conflict if modified concurrently.
+  - Auto-Transition: First assignee reply to an `OPEN` ticket automatically transitions ticket to `IN_PROGRESS`.
+  - Voice Notes: Built-in `MediaRecorder` audio recording with pause/resume, playback waveform preview, and Cloudinary upload.
+  - AI Triage Panel (`AIInsightsPanel`): Live display of AI-generated summary, predicted priority, and confidence score.
+
+### E. Foundation & Student Educational Management
+- Student Batches (`BatchesPage.tsx`): Creation, description, start date, blocking/unblocking.
+- Students (`StudentsPage.tsx`): Full CRUD, CSV bulk import, status toggle (`ACTIVE`, `BLOCKED`, `BUFFERED`).
+- Examination Threads (`ThreadsPage.tsx`, `ThreadDetailsPage.tsx`):
+  - Discussion Tab: Real-time chat with `@Coordinator` autocomplete mentions.
+  - Coordinator Tab: Meeting link configuration (Google Meet / Zoom links per coordinator).
+  - Assignments Tab: Round-robin auto-assignment of batch students to coordinators; schedule generation based on start time and interval; absent marking (moves student to `BUFFERED`).
+  - Exam Completion Modal (`CompleteExamModal.tsx`): Theory marks (0-10), practical marks (0-10), feedback text, questions asked, video recording URL or justification.
+- Exam Results & Audits (`ResultsPage.tsx`): View passed/failed students, edit marks via `EditResultModal` which enforces mandatory audit reason.
+
+### F. Notifications & Real-Time Events
+- In-App Notifications: `NotificationBell.tsx` with live unread badge. Listens to `NEW_NOTIFICATION` via WebSocket. Suppresses notification sound/toast if user is actively viewing the target ticket or thread.
+- Web Push Notifications: `PushNotificationManager.tsx` registers Service Worker (`/sw.js`), requests browser permission, gets VAPID key from backend, and stores push subscription endpoint.
+
+---
+
+## 6. Critical Dependencies & Services
+- API Base URL: `import.meta.env.VITE_API_BASE_URL` (defaults to `http://localhost:3000/api/v1`).
+- WebSocket Base URL: Inferred dynamically from `VITE_API_BASE_URL` by stripping `/api/v1`.
+- Authentication Storage: `localStorage.getItem('auth-storage')`.
+
+---
+
+## 7. Development & Coding Conventions
+- **Strict TypeScript**: Functional components with explicit interfaces/props. No `any` where avoidable.
+- **Component Styling**: Ant Design components styled with Tailwind CSS utility classes.
+- **Modularity**: Feature-slice organization. Feature pages, components, API calls, and stores stay inside `src/features/<feature>/`.
+- **State Separation**:
+  - Global cross-cutting state: Zustand (`src/features/*/store`).
+  - Local component state: React `useState` / `useRef` / `useMemo`.
+  - Server state: Fetched via feature API services, synchronized via WebSockets.
+
+---
+
+## 8. Things Future AI Agents Must NOT Break
+1. **Zustand Persist Schema**: Do not break `useAuthStore` structure (`accessToken`, `isAuthenticated`, `user`). `ProtectedRoute` and `apiClient` interceptors rely on these exact keys.
+2. **Permission Check Signatures**: `usePermissions().hasPermission(permissionName)` must retain super admin bypass (`user?.type === 'super_admin'`).
+3. **Role Hierarchy Level Logic**: Always maintain the rule that lower integer = higher authority (Level 0 = Super Admin / Head). Never invert `<` and `>` in hierarchy checks.
+4. **WebSocket Room Naming**: Socket rooms must strictly match `ticket:<id>`, `thread:<id>`, and `user:<id>`.
+5. **Optimistic Concurrency Control**: When updating ticket status, always pass the current `ticket.version` to prevent overwriting concurrent updates.
+6. **Vercel Rewrites**: Keep `vercel.json` rewrite configuration intact for API reverse-proxying.
