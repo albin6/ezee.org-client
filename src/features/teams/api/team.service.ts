@@ -4,6 +4,8 @@ export interface Team {
   id: string;
   name: string;
   description?: string;
+  type?: 'OPERATIONAL' | 'TOWER';
+  priorityOrder?: number;
   status: 'ACTIVE' | 'BLOCKED';
   createdAt: string;
   updatedAt: string;

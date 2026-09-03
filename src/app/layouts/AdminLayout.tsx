@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Button, Drawer } from 'antd';
-import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined, MessageOutlined, FileDoneOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, DashboardOutlined, ProfileOutlined, MenuOutlined, SafetyCertificateOutlined, DatabaseOutlined, TeamOutlined, FolderOutlined, BugOutlined, CheckSquareOutlined, MessageOutlined, FileDoneOutlined, AimOutlined, RadarChartOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -268,6 +268,61 @@ export const AdminLayout: React.FC = () => {
             },
           }
         ]
+      });
+    }
+
+    if (hasPermission('kpi:read_executive_report')) {
+      menuItems.push({
+        key: '/kpi/executive',
+        icon: <DashboardOutlined />,
+        label: 'Executive KPI Portal',
+        onClick: () => {
+          navigate('/kpi/executive');
+          setMobileMenuOpen(false);
+        },
+      });
+    }
+
+    if (hasPermission('kpi:read_all') || hasPermission('kpi:curate_report')) {
+      const melChildren: any[] = [
+        {
+          key: '/kpi/mel',
+          label: 'Analytics Center',
+          onClick: () => {
+            navigate('/kpi/mel');
+            setMobileMenuOpen(false);
+          },
+        },
+      ];
+
+      if (hasPermission('kpi:curate_report')) {
+        melChildren.push({
+          key: '/kpi/curator',
+          label: 'Report Curator',
+          onClick: () => {
+            navigate('/kpi/curator');
+            setMobileMenuOpen(false);
+          },
+        });
+      }
+
+      menuItems.push({
+        key: 'mel_kpi',
+        icon: <RadarChartOutlined />,
+        label: 'MEL KPI Center',
+        children: melChildren,
+      });
+    }
+
+    if (hasPermission('kpi:read')) {
+      menuItems.push({
+        key: '/kpi/teams',
+        icon: <AimOutlined />,
+        label: 'Team KPIs',
+        onClick: () => {
+          navigate('/kpi/teams');
+          setMobileMenuOpen(false);
+        },
       });
     }
   }

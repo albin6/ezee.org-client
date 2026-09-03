@@ -21,6 +21,10 @@ import { TicketDetailsPage } from '@/features/tickets/pages/TicketDetailsPage';
 import { CreateTicketPage } from '@/features/tickets/pages/CreateTicketPage';
 import { TaskListPage } from '@/features/tasks/pages/TaskListPage';
 import { TaskDashboardPage } from '@/features/tasks/pages/TaskDashboardPage';
+import { ExecutiveDashboardPage } from '@/features/kpi/pages/ExecutiveDashboardPage';
+import { MELAnalyticsDashboardPage } from '@/features/kpi/pages/MELAnalyticsDashboardPage';
+import { TeamKPIPage } from '@/features/kpi/pages/TeamKPIPage';
+import { ExecutiveReportCuratorPage } from '@/features/kpi/pages/ExecutiveReportCuratorPage';
 
 export const router = createBrowserRouter([
   {
@@ -112,6 +116,22 @@ export const router = createBrowserRouter([
           {
             path: '/tickets/:id',
             element: <TicketDetailsPage />,
+          },
+          {
+            path: '/kpi/executive',
+            element: <ExecutiveDashboardPage />,
+          },
+          {
+            path: '/kpi/mel',
+            element: <MELAnalyticsDashboardPage />,
+          },
+          {
+            path: '/kpi/curator',
+            element: <ExecutiveReportCuratorPage />,
+          },
+          {
+            path: '/kpi/teams/:teamId?',
+            element: <TeamKPIPage />,
           },
         ],
       },

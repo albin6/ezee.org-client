@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Input, Select, Modal, Form, message, Popconfirm, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Input, InputNumber, Select, Modal, Form, message, Popconfirm, Tooltip, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined, EyeOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -108,6 +108,14 @@ export const TeamsPage: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string, record: Team) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-slate-800">{name}</span>
+          {record.type === 'TOWER' && (
+            <Tag color="purple" icon={<SafetyCertificateOutlined />}>Tower Level</Tag>
+          )}
+        </div>
+      ),
     },
     {
       title: 'Description',
@@ -234,6 +242,20 @@ export const TeamsPage: React.FC = () => {
           >
             <Input.TextArea rows={4} />
           </Form.Item>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Form.Item name="type" label="Team Classification" initialValue="OPERATIONAL">
+              <Select
+                options={[
+                  { label: 'Operational Delivery Team', value: 'OPERATIONAL' },
+                  { label: 'Tower Level (Oversight / MEL)', value: 'TOWER' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="priorityOrder" label="Priority Order" initialValue={0}>
+              <InputNumber min={0} className="w-full" />
+            </Form.Item>
+          </div>
 
           <Form.Item className="mb-0 flex justify-end">
             <Space>

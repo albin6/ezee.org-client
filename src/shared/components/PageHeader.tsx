@@ -5,8 +5,8 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 const { Title, Text } = Typography;
 
 interface PageHeaderProps {
-  title: string;
-  description?: string;
+  title: React.ReactNode;
+  description?: React.ReactNode;
   extra?: React.ReactNode;
   onBack?: () => void | Promise<void>;
 }

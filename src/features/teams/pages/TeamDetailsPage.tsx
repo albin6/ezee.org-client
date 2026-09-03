@@ -43,6 +43,12 @@ export const TeamDetailsPage: React.FC = () => {
         <div>
           <Descriptions title="Team Information" bordered>
             <Descriptions.Item label="Name">{team.name}</Descriptions.Item>
+            <Descriptions.Item label="Type">
+              <Tag color={team.type === 'TOWER' ? 'purple' : 'blue'}>
+                {team.type === 'TOWER' ? 'Tower Level (Oversight)' : 'Operational Delivery'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Priority Order">{team.priorityOrder ?? 0}</Descriptions.Item>
             <Descriptions.Item label="Status">
               <Tag color={team.status === 'ACTIVE' ? 'success' : 'error'}>{team.status}</Tag>
             </Descriptions.Item>
