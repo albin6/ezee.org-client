@@ -17,6 +17,7 @@ export const TaskListPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
@@ -98,6 +99,11 @@ export const TaskListPage: React.FC = () => {
           message.success('Task created successfully and added to Assigned by Me');
           setActiveTab('assigned_by_me');
           setTab('assigned_by_me');
+        } else if (isAssignedToMe && activeTab === 'assigned_by_me' && !isSuperAdmin) {
+          // Task assigned to self; switch to 'assigned_to_me' so creator sees it immediately
+          message.success('Task created successfully and added to Assigned to Me');
+          setActiveTab('assigned_to_me');
+          setTab('assigned_to_me');
         } else {
           message.success('Task created successfully');
           await fetchTasks({ ...params, filter: activeTab });
@@ -150,18 +156,23 @@ export const TaskListPage: React.FC = () => {
         // Determine the effective status to show
         let displayStatus = status;
         let isIndividualStatus = false;
-        if (record.completionType === 'INDIVIDUAL' && isAssignee && !isAssignor && !isSuperAdmin) {
+        if (record.completionType === 'INDIVIDUAL' && isAssignee) {
           displayStatus = assigneeRecord.status;
           isIndividualStatus = true;
         }
 
         const handleStatusChange = async (newStatus: string) => {
+          const actionKey = `${record.id}-${newStatus}`;
+          if (actionLoadingId === actionKey) return;
           try {
+            setActionLoadingId(actionKey);
             await useTaskStore.getState().updateTask(record.id, { status: newStatus });
             message.success('Status updated');
-            fetchTasks({ ...params, filter: activeTab }); // Ensure UI immediately refreshes
+            await fetchTasks({ ...params, filter: activeTab }); // Ensure UI immediately refreshes
           } catch (error: any) {
             message.error(error.message);
+          } finally {
+            setActionLoadingId(null);
           }
         };
 
@@ -175,6 +186,10 @@ export const TaskListPage: React.FC = () => {
           CANCELLED: 'default',
         };
 
+        const completedAssigneesCount = record.completionType === 'INDIVIDUAL' && record.assignees
+          ? record.assignees.filter((a: any) => a.status === 'COMPLETED' || a.status === 'VERIFIED').length
+          : 0;
+
         return (
           <div className="flex items-center gap-2">
             <Tag color={statusColors[displayStatus] || 'default'}>
@@ -187,10 +202,18 @@ export const TaskListPage: React.FC = () => {
               )}
             </Tag>
 
+            {record.completionType === 'INDIVIDUAL' && record.assignees?.length > 1 && (
+              <span className="text-xs text-gray-400">
+                ({completedAssigneesCount}/{record.assignees.length} completed)
+              </span>
+            )}
+
             {isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED') && (
               <Button
                 size="small"
                 type="primary"
+                loading={actionLoadingId === `${record.id}-IN_PROGRESS`}
+                disabled={!!actionLoadingId}
                 className={displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}
                 onClick={() => handleStatusChange('IN_PROGRESS')}
               >
@@ -199,17 +222,37 @@ export const TaskListPage: React.FC = () => {
             )}
 
             {isAssignee && displayStatus === 'IN_PROGRESS' && (
-              <Button size="small" type="primary" className="bg-blue-600" onClick={() => handleStatusChange('COMPLETED')}>
+              <Button
+                size="small"
+                type="primary"
+                loading={actionLoadingId === `${record.id}-COMPLETED`}
+                disabled={!!actionLoadingId}
+                className="bg-blue-600"
+                onClick={() => handleStatusChange('COMPLETED')}
+              >
                 Complete Task
               </Button>
             )}
 
             {(isAssignor || isSuperAdmin) && status === 'COMPLETED' && (
               <>
-                <Button size="small" type="primary" className="bg-green-600 hover:bg-green-500" onClick={() => handleStatusChange('VERIFIED')}>
+                <Button
+                  size="small"
+                  type="primary"
+                  loading={actionLoadingId === `${record.id}-VERIFIED`}
+                  disabled={!!actionLoadingId}
+                  className="bg-green-600 hover:bg-green-500"
+                  onClick={() => handleStatusChange('VERIFIED')}
+                >
                   Verify
                 </Button>
-                <Button size="small" danger onClick={() => handleStatusChange('REJECTED')}>
+                <Button
+                  size="small"
+                  danger
+                  loading={actionLoadingId === `${record.id}-REJECTED`}
+                  disabled={!!actionLoadingId}
+                  onClick={() => handleStatusChange('REJECTED')}
+                >
                   Reject
                 </Button>
               </>

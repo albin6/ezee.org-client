@@ -83,7 +83,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
            data.assigneeIds?.includes(currentUserId))
         : false;
 
-      const isAssignedByMe = currentUserId ? newTask.createdById === currentUserId : true;
+      // Self-assigned tasks belong to 'assigned_to_me'; 'assigned_by_me' is strictly for tasks assigned to others
+      const isAssignedByMe = currentUserId
+        ? (newTask.createdById === currentUserId && !isAssignedToMe)
+        : true;
 
       set((state) => {
         const newByTab = { ...state.tasksByTab };
