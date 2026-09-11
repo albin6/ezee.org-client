@@ -165,9 +165,19 @@ export const TaskListPage: React.FC = () => {
           }
         };
 
+        const statusColors: any = {
+          TODO: 'default',
+          IN_PROGRESS: 'blue',
+          IN_REVIEW: 'purple',
+          COMPLETED: 'gold',
+          VERIFIED: 'green',
+          REJECTED: 'red',
+          CANCELLED: 'default',
+        };
+
         return (
           <div className="flex items-center gap-2">
-            <Tag>
+            <Tag color={statusColors[displayStatus] || 'default'}>
               {displayStatus}
               {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
                 <span className="ml-1 text-xs text-gray-500">(Group)</span>
@@ -177,9 +187,14 @@ export const TaskListPage: React.FC = () => {
               )}
             </Tag>
 
-            {isAssignee && displayStatus === 'TODO' && (
-              <Button size="small" type="primary" onClick={() => handleStatusChange('IN_PROGRESS')}>
-                Start Work
+            {isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED') && (
+              <Button
+                size="small"
+                type="primary"
+                className={displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}
+                onClick={() => handleStatusChange('IN_PROGRESS')}
+              >
+                {displayStatus === 'REJECTED' ? 'Start Work Again' : 'Start Work'}
               </Button>
             )}
 
@@ -194,7 +209,7 @@ export const TaskListPage: React.FC = () => {
                 <Button size="small" type="primary" className="bg-green-600 hover:bg-green-500" onClick={() => handleStatusChange('VERIFIED')}>
                   Verify
                 </Button>
-                <Button size="small" danger onClick={() => handleStatusChange('IN_PROGRESS')}>
+                <Button size="small" danger onClick={() => handleStatusChange('REJECTED')}>
                   Reject
                 </Button>
               </>
@@ -287,6 +302,7 @@ export const TaskListPage: React.FC = () => {
               { value: 'IN_REVIEW', label: 'IN REVIEW' },
               { value: 'COMPLETED', label: 'COMPLETED' },
               { value: 'VERIFIED', label: 'VERIFIED' },
+              { value: 'REJECTED', label: 'REJECTED' },
             ]}
           />
           <Select
