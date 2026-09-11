@@ -9,7 +9,7 @@ import { LiveCountdown } from '../components/LiveCountdown';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
 export const TaskListPage: React.FC = () => {
-  const { tasks, loading, total, fetchTasks, createTask, updateTask, deleteTask } = useTaskStore();
+  const { tasks, loading, total, fetchTasks, createTask, updateTask, deleteTask, setTab } = useTaskStore();
   const { user } = useAuthStore();
   const { fetchUsers } = useUserStore();
   const anyUser = user as any;
@@ -26,6 +26,11 @@ export const TaskListPage: React.FC = () => {
   useEffect(() => {
     fetchTasks({ ...params, filter: activeTab });
   }, [params, activeTab, fetchTasks]);
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    setTab(key);
+  };
 
   useEffect(() => {
     teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
@@ -75,17 +80,31 @@ export const TaskListPage: React.FC = () => {
 
   const handleSubmitTask = async (values: any) => {
     try {
+      const currentUserId = anyUser?.id || anyUser?.sub;
       if (editingTask) {
         await updateTask(editingTask.id, values);
         message.success('Task updated successfully');
+        await fetchTasks({ ...params, filter: activeTab });
       } else {
         const targetTeamId = isSuperAdmin ? params.teamId || userTeamId : userTeamId;
-        await createTask({ ...values, teamId: targetTeamId || '' });
-        message.success('Task created successfully');
+        const createdTask = await createTask({ ...values, teamId: targetTeamId || '' }, currentUserId);
+
+        const isAssignedToMe = createdTask?.assignees?.some(
+          (a: any) => (a.userId || a.user?.id) === currentUserId
+        ) || values.assigneeIds?.includes(currentUserId);
+
+        if (!isAssignedToMe && activeTab === 'assigned_to_me' && !isSuperAdmin) {
+          // Task assigned to someone else; switch to 'assigned_by_me' so creator sees it immediately
+          message.success('Task created successfully and added to Assigned by Me');
+          setActiveTab('assigned_by_me');
+          setTab('assigned_by_me');
+        } else {
+          message.success('Task created successfully');
+          await fetchTasks({ ...params, filter: activeTab });
+        }
       }
       setIsModalOpen(false);
       setEditingTask(null);
-      fetchTasks({ ...params, filter: activeTab });
     } catch (err: any) {
       message.error(err.message);
     }
@@ -95,7 +114,7 @@ export const TaskListPage: React.FC = () => {
     try {
       await deleteTask(taskId);
       message.success('Task deleted successfully');
-      fetchTasks({ ...params, filter: activeTab });
+      await fetchTasks({ ...params, filter: activeTab });
     } catch (err: any) {
       message.error(err.message);
     }
@@ -314,7 +333,7 @@ export const TaskListPage: React.FC = () => {
         {!isSuperAdmin && (
           <Tabs
             activeKey={activeTab}
-            onChange={setActiveTab}
+            onChange={handleTabChange}
             items={[
               { key: 'assigned_to_me', label: 'Assigned to Me' },
               { key: 'assigned_by_me', label: 'Assigned by Me' }
