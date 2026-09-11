@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Input, Select } from 'antd';
-import { PlusOutlined, FilterOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space } from 'antd';
+import { PlusOutlined, FilterOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { teamService } from '@/features/teams/api/team.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useTaskStore } from '../store/task.store';
@@ -9,13 +9,14 @@ import { LiveCountdown } from '../components/LiveCountdown';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
 export const TaskListPage: React.FC = () => {
-  const { tasks, loading, total, fetchTasks, createTask } = useTaskStore();
+  const { tasks, loading, total, fetchTasks, createTask, updateTask, deleteTask } = useTaskStore();
   const { user } = useAuthStore();
   const { fetchUsers } = useUserStore();
   const anyUser = user as any;
   const isSuperAdmin = anyUser?.role?.name === 'Super Admin' || anyUser?.type === 'super_admin';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
@@ -43,38 +44,58 @@ export const TaskListPage: React.FC = () => {
         }).catch(console.error);
       });
     } else {
-      // Fallback if no team (e.g. Super Admin not bound to a team yet, just show themselves for now)
+      // Fallback if no team
       setTeamMembers([
-        { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: anyUser?.role?.level, name: anyUser?.role?.name } }
+        { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: 99, name: anyUser?.role?.name } }
       ]);
     }
   }, [params.teamId, anyUser, isSuperAdmin, userTeamId]);
 
-  const currentUserMember = teamMembers.find(m => m.user.id === anyUser?.id || m.user.id === anyUser?.sub);
-  const currentUserLevel = isSuperAdmin ? 0 : (currentUserMember?.role?.level ?? anyUser?.role?.level ?? 99);
-
-  console.log('DEBUG_ASSIGNEES', { 
-    userId: anyUser?.id, 
-    userSub: anyUser?.sub,
-    isSuperAdmin, 
-    currentUserLevel, 
-    currentUserMemberLevel: currentUserMember?.role?.level,
-    teamMembersCount: teamMembers.length
-  });
+  // Authority in task management is strictly governed by team role level
+  const currentUserMember = teamMembers.find(
+    m => m.user?.id === anyUser?.id || m.user?.id === anyUser?.sub || m.userId === anyUser?.id || m.userId === anyUser?.sub
+  );
+  const currentUserLevel = isSuperAdmin ? 0 : Number(currentUserMember?.role?.level ?? 99);
 
   const eligibleAssignees = teamMembers.filter(member => {
     if (isSuperAdmin) return true;
     const memberLevel = Number(member.role?.level ?? 99);
-    const currLevel = Number(currentUserLevel);
-    const isEligible = currLevel <= memberLevel;
-    return isEligible;
+    return currentUserLevel <= memberLevel;
   });
 
-  const handleCreate = async (values: any) => {
+  const handleOpenCreate = () => {
+    setEditingTask(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (task: any) => {
+    setEditingTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmitTask = async (values: any) => {
     try {
-      const targetTeamId = isSuperAdmin ? params.teamId || userTeamId : userTeamId;
-      await createTask({ ...values, teamId: targetTeamId || '' });
-      message.success('Task created successfully');
+      if (editingTask) {
+        await updateTask(editingTask.id, values);
+        message.success('Task updated successfully');
+      } else {
+        const targetTeamId = isSuperAdmin ? params.teamId || userTeamId : userTeamId;
+        await createTask({ ...values, teamId: targetTeamId || '' });
+        message.success('Task created successfully');
+      }
+      setIsModalOpen(false);
+      setEditingTask(null);
+      fetchTasks({ ...params, filter: activeTab });
+    } catch (err: any) {
+      message.error(err.message);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
+      message.success('Task deleted successfully');
+      fetchTasks({ ...params, filter: activeTab });
     } catch (err: any) {
       message.error(err.message);
     }
@@ -103,8 +124,8 @@ export const TaskListPage: React.FC = () => {
       key: 'status',
       sorter: true,
       render: (status: string, record: any) => {
-        const isAssignor = record.createdById === anyUser?.id;
-        const assigneeRecord = record.assignees?.find((a: any) => a.userId === anyUser?.id);
+        const isAssignor = record.createdById === anyUser?.id || record.createdById === anyUser?.sub;
+        const assigneeRecord = record.assignees?.find((a: any) => a.userId === anyUser?.id || a.userId === anyUser?.sub);
         const isAssignee = !!assigneeRecord;
 
         // Determine the effective status to show
@@ -119,7 +140,7 @@ export const TaskListPage: React.FC = () => {
           try {
             await useTaskStore.getState().updateTask(record.id, { status: newStatus });
             message.success('Status updated');
-            fetchTasks({ filter: activeTab }); // Ensure UI immediately refreshes
+            fetchTasks({ ...params, filter: activeTab }); // Ensure UI immediately refreshes
           } catch (error: any) {
             message.error(error.message);
           }
@@ -168,6 +189,42 @@ export const TaskListPage: React.FC = () => {
       dataIndex: 'deadline',
       key: 'deadline',
       render: (deadline: string) => <LiveCountdown deadline={deadline} />
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => {
+        const isAssignor = record.createdById === anyUser?.id || record.createdById === anyUser?.sub;
+        const canEdit = isAssignor || isSuperAdmin;
+
+        if (!canEdit) return null;
+
+        return (
+          <Space size="small">
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEdit(record)}
+            >
+              Edit
+            </Button>
+            <Popconfirm
+              title="Delete Task"
+              description="Are you sure you want to delete this task?"
+              okText="Delete"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDeleteTask(record.id)}
+            >
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Popconfirm>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -179,7 +236,7 @@ export const TaskListPage: React.FC = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreate}
           >
             Create Task
           </Button>
@@ -245,7 +302,10 @@ export const TaskListPage: React.FC = () => {
             className="flex-1 min-w-35"
             value={params.assignedToUserId || undefined}
             onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
-            options={eligibleAssignees.map((member: any) => ({ value: member.user.id, label: member.user.name }))}
+            options={eligibleAssignees.map((member: any) => ({
+              value: member.user?.id || member.id,
+              label: member.user?.name || member.name
+            }))}
           />
         </div>
       </div>
@@ -286,8 +346,12 @@ export const TaskListPage: React.FC = () => {
 
       <TaskFormModal
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        onSubmit={handleCreate}
+        onCancel={() => {
+          setIsModalOpen(false);
+          setEditingTask(null);
+        }}
+        onSubmit={handleSubmitTask}
+        initialValues={editingTask}
         teamMembers={teamMembers}
         currentUserLevel={isSuperAdmin ? 0 : currentUserLevel}
       />
