@@ -363,14 +363,7 @@ export const TicketDetailsPage: React.FC = () => {
       )}
 
       <div className="flex flex-col lg:flex-row gap-0 lg:gap-6 h-auto lg:flex-1 lg:min-h-0 -mx-4 sm:mx-0 lg:mx-0 mt-[-24px] lg:mt-0">
-        <div className="flex-1 flex flex-col space-y-6 min-w-0 h-full">
-          <div className="hidden lg:block shrink-0">
-            <Card>
-              <Title level={5}>Description</Title>
-              <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
-            </Card>
-          </div>
-
+        <div className="flex-1 flex flex-col min-w-0 h-full">
           <div className="flex flex-col flex-1 border-0 lg:border border-gray-200 rounded-none lg:rounded-lg bg-white overflow-hidden shadow-none lg:shadow-sm fixed inset-0 top-[64px] z-40 lg:static lg:z-auto lg:min-h-0">
             <div className="flex justify-between items-center px-4 py-3 border-b bg-white z-10 flex-shrink-0 shadow-sm sticky top-0">
               <div className="flex items-center gap-2">
@@ -713,9 +706,16 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 space-y-6">
+        <div className="hidden lg:block lg:w-80 xl:w-96 flex-shrink-0 space-y-6 overflow-y-auto">
           <Card title="Details">
             <div className="space-y-4">
+              <div>
+                <Text type="secondary" className="block mb-1">Description</Text>
+                <Paragraph className="whitespace-pre-wrap !mb-0">{ticket.description || 'No description provided.'}</Paragraph>
+              </div>
+
+              <Divider />
+
               <div>
                 <Text type="secondary" className="block mb-1">Status</Text>
                 {canEditStatus ? (
