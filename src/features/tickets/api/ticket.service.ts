@@ -31,6 +31,15 @@ export interface Ticket {
   version: number;
 }
 
+export interface MentionUser {
+  id: string;
+  name: string;
+  email: string;
+  designation?: string;
+  teamId: string | null;
+  teamName: string;
+}
+
 export const ticketService = {
   getTickets: async (params: any) => {
     const { data } = await apiClient.get('/tickets', { params });
@@ -42,10 +51,15 @@ export const ticketService = {
     return data;
   },
 
+  getUsersMentionLookup: async (search?: string): Promise<MentionUser[]> => {
+    const { data } = await apiClient.get('/tickets/users-mention-lookup', { params: { search } });
+    return data.data;
+  },
+
   createTicket: async (payload: { 
     title: string; 
     description?: string; 
-    teamId: string; 
+    teamId?: string; 
     assignees?: string[];
     firstMessage?: {
       content?: string;

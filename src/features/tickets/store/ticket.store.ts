@@ -14,14 +14,14 @@ interface TicketState {
   createTicket: (payload: { 
     title: string; 
     description?: string; 
-    teamId: string; 
+    teamId?: string; 
     assignees?: string[];
     firstMessage?: {
       content?: string;
       audioUrl?: string;
       attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[];
     }
-  }) => Promise<void>;
+  }) => Promise<any>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
   addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
@@ -61,8 +61,9 @@ export const useTicketStore = create<TicketState>((set, get) => ({
   createTicket: async (payload) => {
     set({ loading: true, error: null });
     try {
-      await ticketService.createTicket(payload);
+      const res = await ticketService.createTicket(payload);
       set({ loading: false });
+      return res.data;
     } catch (error: any) {
       set({ error: error.message || 'Failed to create ticket', loading: false });
       throw error;
