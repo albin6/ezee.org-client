@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Popconfirm } from 'antd';
-import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService } from '../api/ticket.service';
@@ -58,8 +58,12 @@ export const TicketDetailsPage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [openReactionPopoverId, setOpenReactionPopoverId] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-  
+  const isLongDescription = Boolean(
+    ticket?.description && 
+    (ticket.description.length > 120 || ticket.description.split('\n').length > 3)
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
@@ -711,7 +715,30 @@ export const TicketDetailsPage: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <Text type="secondary" className="block mb-1">Description</Text>
-                <Paragraph className="whitespace-pre-wrap !mb-0">{ticket.description || 'No description provided.'}</Paragraph>
+                {ticket.description ? (
+                  <div>
+                    <Paragraph 
+                      className={`whitespace-pre-wrap !mb-0 text-sm text-gray-800 ${!isDescriptionExpanded ? 'line-clamp-3' : ''}`}
+                    >
+                      {ticket.description}
+                    </Paragraph>
+                    {isLongDescription && (
+                      <button
+                        type="button"
+                        onClick={() => setIsDescriptionExpanded(prev => !prev)}
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium mt-1.5 cursor-pointer inline-flex items-center gap-1 hover:underline"
+                      >
+                        {isDescriptionExpanded ? (
+                          <>View less <UpOutlined className="text-[10px]" /></>
+                        ) : (
+                          <>View more <DownOutlined className="text-[10px]" /></>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <Text type="secondary" className="text-sm italic">No description provided.</Text>
+                )}
               </div>
 
               <Divider />
@@ -846,7 +873,30 @@ export const TicketDetailsPage: React.FC = () => {
         <div className="space-y-6">
           <div>
             <Title level={5}>Description</Title>
-            <Paragraph className="whitespace-pre-wrap">{ticket.description || 'No description provided.'}</Paragraph>
+            {ticket.description ? (
+              <div>
+                <Paragraph 
+                  className={`whitespace-pre-wrap !mb-0 text-sm text-gray-800 ${!isDescriptionExpanded ? 'line-clamp-3' : ''}`}
+                >
+                  {ticket.description}
+                </Paragraph>
+                {isLongDescription && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionExpanded(prev => !prev)}
+                    className="text-blue-600 hover:text-blue-800 text-xs font-medium mt-1.5 cursor-pointer inline-flex items-center gap-1 hover:underline"
+                  >
+                    {isDescriptionExpanded ? (
+                      <>View less <UpOutlined className="text-[10px]" /></>
+                    ) : (
+                      <>View more <DownOutlined className="text-[10px]" /></>
+                    )}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <Paragraph className="whitespace-pre-wrap text-gray-400 italic">No description provided.</Paragraph>
+            )}
           </div>
           <Divider />
           <div className="space-y-4">
