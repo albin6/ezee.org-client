@@ -58,12 +58,14 @@ beforeEach(() => {
 
   vi.mocked(teamService.getTeams).mockResolvedValue({
     data: [
-      { id: 'team-dev-id', name: 'Dev Team' },
-      { id: 'team-ops-id', name: 'Ops Team' }
+      { id: 'team-dev-id', name: 'Dev Team', status: 'ACTIVE', createdAt: '', updatedAt: '' },
+      { id: 'team-ops-id', name: 'Ops Team', status: 'ACTIVE', createdAt: '', updatedAt: '' }
     ],
-    total: 2,
-    page: 1,
-    limit: 100
+    meta: {
+      total: 2,
+      page: 1,
+      limit: 100
+    }
   });
 });
 
