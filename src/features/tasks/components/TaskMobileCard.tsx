@@ -4,13 +4,16 @@ import {
   EditOutlined, 
   DeleteOutlined, 
   ClockCircleOutlined, 
+  CalendarOutlined,
   UserOutlined, 
+  TeamOutlined,
   SyncOutlined,
   DownOutlined,
   UpOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { LiveCountdown } from './LiveCountdown';
 
 interface TaskMobileCardProps {
@@ -121,7 +124,7 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
         )}
       </div>
 
-      {/* Badges row: Priority, Status, Recurrence */}
+      {/* Badges row: Priority, Status, Completion Type, Recurrence */}
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         <Tag color={PRIORITY_COLORS[task.priority] || 'default'} className="m-0 font-medium text-xs">
           {task.priority}
@@ -137,11 +140,12 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
           )}
         </Tag>
 
-        {task.completionType === 'INDIVIDUAL' && task.assignees?.length > 1 && (
-          <Tag color="cyan" className="m-0 text-xs">
-            {completedAssigneesCount}/{task.assignees.length} done
-          </Tag>
-        )}
+        <Tag 
+          color={task.completionType === 'INDIVIDUAL' ? 'purple' : 'geekblue'} 
+          className="m-0 text-xs font-medium"
+        >
+          {task.completionType === 'INDIVIDUAL' ? 'Individual' : 'Shared'}
+        </Tag>
 
         {task.recurrencePattern && (
           <Tag icon={<SyncOutlined />} className="m-0 text-xs text-gray-600 bg-gray-50">
@@ -150,43 +154,87 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
         )}
       </div>
 
-      {/* Meta Grid: Deadline & Assignees */}
-      <div className="bg-gray-50/80 rounded-lg p-2.5 mb-3 space-y-2 text-xs border border-gray-100">
-        {/* Deadline row */}
+      {/* Structured Details Box */}
+      <div className="bg-gray-50/90 rounded-xl p-3 mb-3 space-y-2.5 text-xs border border-gray-100">
+        {/* Creator / Assigned by */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-gray-500 flex items-center gap-1.5 shrink-0">
+            <UserOutlined className="text-gray-400" />
+            <span>Assigned by:</span>
+          </span>
+          <span className="font-medium text-gray-800">
+            {task.createdBy?.name || 'Assignor'}
+          </span>
+        </div>
+
+        {/* Due Date */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-200/50">
+          <span className="text-gray-500 flex items-center gap-1.5 shrink-0">
+            <CalendarOutlined className="text-gray-400" />
+            <span>Due Date:</span>
+          </span>
+          <span className="font-medium text-gray-800">
+            {dayjs(task.deadline).format('MMM DD, YYYY • hh:mm A')}
+          </span>
+        </div>
+
+        {/* Countdown */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-gray-500 flex items-center gap-1.5 shrink-0">
             <ClockCircleOutlined className="text-gray-400" />
-            <span>Due Countdown:</span>
+            <span>Countdown:</span>
           </span>
           <div className="font-mono text-right font-medium">
             <LiveCountdown deadline={task.deadline} />
           </div>
         </div>
 
-        {/* Assignees row */}
-        <div className="flex items-start justify-between gap-2 pt-1 border-t border-gray-100">
-          <span className="text-gray-500 flex items-center gap-1.5 shrink-0 mt-0.5">
-            <UserOutlined className="text-gray-400" />
-            <span>Assignees:</span>
-          </span>
-          <div className="flex flex-wrap gap-1 justify-end max-w-[70%]">
+        {/* Assignees & Completion Status Section */}
+        <div className="pt-2 border-t border-gray-200/60">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-gray-600 font-medium flex items-center gap-1.5">
+              <TeamOutlined className="text-gray-400" />
+              <span>Assignees & Status:</span>
+            </span>
+            {task.completionType === 'INDIVIDUAL' && task.assignees?.length > 1 && (
+              <Tag color="cyan" className="m-0 text-[10px] font-medium">
+                {completedAssigneesCount}/{task.assignees.length} completed
+              </Tag>
+            )}
+            {task.completionType === 'SHARED' && (
+              <span className="text-[11px] text-gray-400 italic">Shared completion</span>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
             {task.assignees && task.assignees.length > 0 ? (
               task.assignees.map((a: any) => {
                 const name = a.user?.name || a.name || 'Unknown';
                 const isMe = (a.userId || a.user?.id) === currentUserId;
-                const isIndividualDone = a.status === 'COMPLETED' || a.status === 'VERIFIED';
+                const status = a.status || task.status;
                 return (
-                  <Tag 
+                  <div 
                     key={a.userId || a.id} 
-                    className={`m-0 text-[11px] py-0 px-1.5 ${isMe ? 'border-blue-400 bg-blue-50 text-blue-700' : ''}`}
+                    className="flex items-center justify-between py-1 px-2 rounded-md bg-white border border-gray-100"
                   >
-                    {name}
-                    {task.completionType === 'INDIVIDUAL' && (
-                      <span className="ml-1 text-[10px]">
-                        {isIndividualDone ? '✓' : '…'}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`font-medium text-gray-800 truncate ${isMe ? 'text-blue-700' : ''}`}>
+                        {name}
                       </span>
-                    )}
-                  </Tag>
+                      {isMe && (
+                        <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-1 rounded">
+                          You
+                        </span>
+                      )}
+                    </div>
+
+                    <Tag 
+                      color={STATUS_COLORS[status] || 'default'} 
+                      className="m-0 text-[10px] py-0 px-1.5 font-medium shrink-0"
+                    >
+                      {status}
+                    </Tag>
+                  </div>
                 );
               })
             ) : (
@@ -196,11 +244,11 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
         </div>
       </div>
 
-      {/* Expandable description if available */}
+      {/* Description Snippet */}
       {task.description && (
         <div className="mb-3 text-xs text-gray-600">
           {expanded ? (
-            <div className="whitespace-pre-wrap bg-gray-50 rounded p-2 border border-gray-100 text-gray-700">
+            <div className="whitespace-pre-wrap bg-gray-50 rounded-lg p-2.5 border border-gray-100 text-gray-700">
               {task.description}
             </div>
           ) : (
@@ -213,7 +261,7 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
             onClick={() => setExpanded(!expanded)}
             className="text-blue-600 hover:text-blue-800 text-xs mt-1 font-medium flex items-center gap-1 cursor-pointer"
           >
-            {expanded ? <>Show less <UpOutlined className="text-[10px]" /></> : <>Show details <DownOutlined className="text-[10px]" /></>}
+            {expanded ? <>Hide description <UpOutlined className="text-[10px]" /></> : <>View description <DownOutlined className="text-[10px]" /></>}
           </button>
         </div>
       )}

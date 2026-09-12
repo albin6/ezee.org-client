@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin } from 'antd';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin, Tooltip, Popover } from 'antd';
 import { 
   PlusOutlined, 
   FilterOutlined, 
@@ -7,8 +7,13 @@ import {
   DeleteOutlined, 
   CloseCircleOutlined,
   DownOutlined,
-  UpOutlined
+  UpOutlined,
+  SyncOutlined,
+  CalendarOutlined,
+  UserOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { teamService } from '@/features/teams/api/team.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useTaskStore } from '../store/task.store';
@@ -198,10 +203,122 @@ export const TaskListPage: React.FC = () => {
 
   const columns = [
     {
-      title: 'Title',
+      title: 'Task',
       dataIndex: 'title',
       key: 'title',
       sorter: true,
+      render: (title: string, record: any) => (
+        <div className="flex flex-col gap-1 max-w-[260px]">
+          <span className="font-semibold text-gray-900 text-sm leading-snug">{title}</span>
+          {record.description && (
+            <Tooltip title={record.description} placement="topLeft">
+              <span className="text-xs text-gray-500 truncate cursor-help">
+                {record.description}
+              </span>
+            </Tooltip>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+            <Tag 
+              color={record.completionType === 'INDIVIDUAL' ? 'purple' : 'geekblue'} 
+              className="m-0 text-[10px] py-0 px-1 font-medium"
+            >
+              {record.completionType === 'INDIVIDUAL' ? 'Individual' : 'Shared'}
+            </Tag>
+            {record.recurrencePattern && (
+              <Tag icon={<SyncOutlined />} className="m-0 text-[10px] text-gray-600 bg-gray-50 py-0 px-1">
+                {record.recurrencePattern}
+              </Tag>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: 'Assignor',
+      key: 'createdById',
+      render: (_: any, record: any) => (
+        <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium whitespace-nowrap">
+          <UserOutlined className="text-gray-400 text-xs" />
+          <span>{record.createdBy?.name || 'Assignor'}</span>
+        </div>
+      )
+    },
+    {
+      title: (
+        <span className="flex items-center gap-1.5">
+          <TeamOutlined className="text-gray-400" />
+          <span>Assignees & Status</span>
+        </span>
+      ),
+      key: 'assignees',
+      render: (_: any, record: any) => {
+        const assignees = record.assignees || [];
+        const completedCount = record.completionType === 'INDIVIDUAL'
+          ? assignees.filter((a: any) => a.status === 'COMPLETED' || a.status === 'VERIFIED').length
+          : 0;
+
+        return (
+          <div className="flex flex-col gap-1.5 min-w-[170px] max-w-[220px]">
+            {record.completionType === 'INDIVIDUAL' && assignees.length > 0 && (
+              <div className="flex items-center justify-between text-[11px] font-medium text-gray-600 mb-0.5">
+                <span>Progress:</span>
+                <Tag color="cyan" className="m-0 text-[10px] py-0 px-1.5 font-medium">
+                  {completedCount}/{assignees.length} done
+                </Tag>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              {assignees.slice(0, 2).map((a: any) => {
+                const isMe = (a.userId || a.user?.id) === currentUserId;
+                const status = a.status || record.status;
+                return (
+                  <div key={a.userId || a.id} className="flex items-center justify-between gap-1 text-xs">
+                    <span className={`truncate text-gray-700 font-medium text-[11px] ${isMe ? 'text-blue-700' : ''}`}>
+                      {a.user?.name || 'User'} {isMe && '(You)'}
+                    </span>
+                    <Tag color={STATUS_COLORS[status] || 'default'} className="m-0 text-[10px] py-0 px-1 shrink-0">
+                      {status}
+                    </Tag>
+                  </div>
+                );
+              })}
+
+              {assignees.length > 2 && (
+                <Popover
+                  title="All Assignees & Status"
+                  content={
+                    <div className="space-y-1.5 min-w-[200px]">
+                      {assignees.map((a: any) => {
+                        const isMe = (a.userId || a.user?.id) === currentUserId;
+                        const status = a.status || record.status;
+                        return (
+                          <div key={a.userId || a.id} className="flex items-center justify-between gap-2 text-xs py-0.5 border-b border-gray-50 last:border-0">
+                            <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}`}>
+                              {a.user?.name || 'User'} {isMe && '(You)'}
+                            </span>
+                            <Tag color={STATUS_COLORS[status] || 'default'} className="m-0 text-[10px]">
+                              {status}
+                            </Tag>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  }
+                >
+                  <span className="text-[11px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+                    +{assignees.length - 2} more assignees...
+                  </span>
+                </Popover>
+              )}
+
+              {assignees.length === 0 && (
+                <span className="text-gray-400 italic text-xs">Unassigned</span>
+              )}
+            </div>
+          </div>
+        );
+      }
     },
     {
       title: 'Priority',
@@ -209,7 +326,7 @@ export const TaskListPage: React.FC = () => {
       key: 'priority',
       sorter: true,
       render: (prio: string) => {
-        return <Tag color={PRIORITY_COLORS[prio] || 'default'}>{prio}</Tag>;
+        return <Tag color={PRIORITY_COLORS[prio] || 'default'} className="m-0 font-medium">{prio}</Tag>;
       }
     },
     {
@@ -231,12 +348,8 @@ export const TaskListPage: React.FC = () => {
           isIndividualStatus = true;
         }
 
-        const completedAssigneesCount = record.completionType === 'INDIVIDUAL' && record.assignees
-          ? record.assignees.filter((a: any) => a.status === 'COMPLETED' || a.status === 'VERIFIED').length
-          : 0;
-
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Tag color={STATUS_COLORS[displayStatus] || 'default'}>
               {displayStatus}
               {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
@@ -246,12 +359,6 @@ export const TaskListPage: React.FC = () => {
                 <span className="ml-1 text-xs text-blue-500">(Yours)</span>
               )}
             </Tag>
-
-            {record.completionType === 'INDIVIDUAL' && record.assignees?.length > 1 && (
-              <span className="text-xs text-gray-400">
-                ({completedAssigneesCount}/{record.assignees.length} completed)
-              </span>
-            )}
 
             {isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED') && (
               <Button
@@ -307,10 +414,24 @@ export const TaskListPage: React.FC = () => {
       }
     },
     {
-      title: 'Deadline Countdown',
+      title: 'Deadline & Countdown',
       dataIndex: 'deadline',
       key: 'deadline',
-      render: (deadline: string) => <LiveCountdown deadline={deadline} />
+      sorter: true,
+      render: (deadline: string) => (
+        <div className="flex flex-col gap-0.5 text-xs whitespace-nowrap">
+          <span className="text-gray-700 font-medium flex items-center gap-1">
+            <CalendarOutlined className="text-gray-400 text-xs" />
+            {dayjs(deadline).format('MMM DD, YYYY')}
+          </span>
+          <span className="text-[11px] text-gray-400 pl-4">
+            {dayjs(deadline).format('hh:mm A')}
+          </span>
+          <div className="mt-0.5">
+            <LiveCountdown deadline={deadline} />
+          </div>
+        </div>
+      )
     },
     {
       title: 'Actions',

@@ -6,9 +6,11 @@ export interface Task {
   description?: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETED' | 'VERIFIED' | 'CANCELLED' | 'REJECTED';
+  completionType?: 'INDIVIDUAL' | 'SHARED';
   deadline: string;
   teamId: string;
   createdById: string;
+  createdBy?: { id: string; name: string };
   recurrencePattern?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   assignees: any[];
   createdAt: string;
