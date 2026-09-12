@@ -271,7 +271,7 @@ export const TaskDashboardPage: React.FC = () => {
                 title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Total Tasks</span>} 
                 value={metrics.summary.total} 
                 prefix={<ProfileOutlined className="text-gray-400" />} 
-                valueStyle={{ fontSize: '1.25rem', fontWeight: 600 }}
+                styles={{ content: { fontSize: '1.25rem', fontWeight: 600 } }}
               />
             </Card>
 
@@ -283,7 +283,7 @@ export const TaskDashboardPage: React.FC = () => {
               <Statistic 
                 title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Active</span>} 
                 value={metrics.summary.active} 
-                valueStyle={{ color: '#1890ff', fontSize: '1.25rem', fontWeight: 600 }} 
+                styles={{ content: { color: '#1890ff', fontSize: '1.25rem', fontWeight: 600 } }} 
                 prefix={<ClockCircleOutlined />} 
               />
             </Card>
@@ -296,7 +296,7 @@ export const TaskDashboardPage: React.FC = () => {
               <Statistic 
                 title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Completed</span>} 
                 value={metrics.summary.completed} 
-                valueStyle={{ color: '#52c41a', fontSize: '1.25rem', fontWeight: 600 }} 
+                styles={{ content: { color: '#52c41a', fontSize: '1.25rem', fontWeight: 600 } }} 
                 prefix={<CheckCircleOutlined />} 
               />
             </Card>
@@ -309,7 +309,7 @@ export const TaskDashboardPage: React.FC = () => {
               <Statistic 
                 title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Blocked</span>} 
                 value={metrics.summary.blocked} 
-                valueStyle={{ color: '#cf1322', fontSize: '1.25rem', fontWeight: 600 }} 
+                styles={{ content: { color: '#cf1322', fontSize: '1.25rem', fontWeight: 600 } }} 
                 prefix={<PauseCircleOutlined />} 
               />
             </Card>
@@ -322,7 +322,7 @@ export const TaskDashboardPage: React.FC = () => {
               <Statistic 
                 title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Overdue</span>} 
                 value={metrics.summary.overdue} 
-                valueStyle={{ color: '#f5222d', fontSize: '1.25rem', fontWeight: 600 }} 
+                styles={{ content: { color: '#f5222d', fontSize: '1.25rem', fontWeight: 600 } }} 
                 prefix={<WarningOutlined />} 
               />
             </Card>

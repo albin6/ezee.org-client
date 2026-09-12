@@ -81,7 +81,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       open={open}
       onCancel={onCancel}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width="100%"
       style={{ maxWidth: 540, top: 16 }}
       styles={{

@@ -3,6 +3,7 @@ import { inAppNotificationService } from '../api/notification.service';
 import type { InAppNotification } from "../api/notification.service"
 import { notification } from 'antd';
 import { socketService } from '@/shared/services/socket.service';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 
 interface NotificationState {
   notifications: InAppNotification[];
@@ -26,6 +27,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   isSocketConnected: false,
 
   fetchNotifications: async () => {
+    const token = useAuthStore.getState().accessToken;
+    if (!token) return;
     set({ loading: true, error: null });
     try {
       const response = await inAppNotificationService.getMyNotifications();
