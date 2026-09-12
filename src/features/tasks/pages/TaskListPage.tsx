@@ -1,12 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space } from 'antd';
-import { PlusOutlined, FilterOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin } from 'antd';
+import { 
+  PlusOutlined, 
+  FilterOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  CloseCircleOutlined,
+  DownOutlined,
+  UpOutlined
+} from '@ant-design/icons';
 import { teamService } from '@/features/teams/api/team.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useTaskStore } from '../store/task.store';
 import { TaskFormModal } from '../components/TaskFormModal';
 import { LiveCountdown } from '../components/LiveCountdown';
+import { TaskMobileCard } from '../components/TaskMobileCard';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+
+const STATUS_COLORS: Record<string, string> = {
+  TODO: 'default',
+  IN_PROGRESS: 'blue',
+  IN_REVIEW: 'purple',
+  COMPLETED: 'gold',
+  VERIFIED: 'green',
+  REJECTED: 'red',
+  CANCELLED: 'default',
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  LOW: 'green',
+  MEDIUM: 'blue',
+  HIGH: 'orange',
+  CRITICAL: 'red',
+};
 
 export const TaskListPage: React.FC = () => {
   const { tasks, loading, total, fetchTasks, createTask, updateTask, deleteTask, setTab } = useTaskStore();
@@ -21,8 +47,19 @@ export const TaskListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'all' : 'assigned_to_me');
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
   const userTeamId = anyUser?.teamMembers?.[0]?.teamId;
-  const [params, setParams] = useState<any>({ page: 1, limit: 10, search: '', status: '', priority: '', teamId: isSuperAdmin ? undefined : userTeamId, assignedToUserId: undefined, createdByUserId: undefined });
+  const [params, setParams] = useState<any>({ 
+    page: 1, 
+    limit: 10, 
+    search: '', 
+    status: '', 
+    priority: '', 
+    teamId: isSuperAdmin ? undefined : userTeamId, 
+    assignedToUserId: undefined, 
+    createdByUserId: undefined 
+  });
 
   useEffect(() => {
     fetchTasks({ ...params, filter: activeTab });
@@ -50,14 +87,12 @@ export const TaskListPage: React.FC = () => {
         }).catch(console.error);
       });
     } else {
-      // Fallback if no team
       setTeamMembers([
         { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: 99, name: anyUser?.role?.name } }
       ]);
     }
   }, [params.teamId, anyUser, isSuperAdmin, userTeamId]);
 
-  // Authority in task management is strictly governed by team role level
   const currentUserMember = teamMembers.find(
     m => m.user?.id === anyUser?.id || m.user?.id === anyUser?.sub || m.userId === anyUser?.id || m.userId === anyUser?.sub
   );
@@ -95,12 +130,10 @@ export const TaskListPage: React.FC = () => {
         ) || values.assigneeIds?.includes(currentUserId);
 
         if (!isAssignedToMe && activeTab === 'assigned_to_me' && !isSuperAdmin) {
-          // Task assigned to someone else; switch to 'assigned_by_me' so creator sees it immediately
           message.success('Task created successfully and added to Assigned by Me');
           setActiveTab('assigned_by_me');
           setTab('assigned_by_me');
         } else if (isAssignedToMe && activeTab === 'assigned_by_me' && !isSuperAdmin) {
-          // Task assigned to self; switch to 'assigned_to_me' so creator sees it immediately
           message.success('Task created successfully and added to Assigned to Me');
           setActiveTab('assigned_to_me');
           setTab('assigned_to_me');
@@ -126,6 +159,43 @@ export const TaskListPage: React.FC = () => {
     }
   };
 
+  const handleStatusChange = async (record: any, newStatus: string) => {
+    const actionKey = `${record.id}-${newStatus}`;
+    if (actionLoadingId === actionKey) return;
+    try {
+      setActionLoadingId(actionKey);
+      await useTaskStore.getState().updateTask(record.id, { status: newStatus });
+      message.success('Status updated');
+      await fetchTasks({ ...params, filter: activeTab });
+    } catch (error: any) {
+      message.error(error.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const resetFilters = () => {
+    setParams({
+      ...params,
+      search: '',
+      status: '',
+      priority: '',
+      teamId: isSuperAdmin ? undefined : userTeamId,
+      assignedToUserId: undefined,
+      page: 1,
+    });
+  };
+
+  const activeFiltersCount = [
+    params.search,
+    params.status,
+    params.priority,
+    isSuperAdmin && params.teamId,
+    params.assignedToUserId,
+  ].filter(Boolean).length;
+
+  const currentUserId = anyUser?.id || anyUser?.sub;
+
   const columns = [
     {
       title: 'Title',
@@ -139,8 +209,7 @@ export const TaskListPage: React.FC = () => {
       key: 'priority',
       sorter: true,
       render: (prio: string) => {
-        const colors: any = { LOW: 'green', MEDIUM: 'blue', HIGH: 'orange', CRITICAL: 'red' };
-        return <Tag color={colors[prio]}>{prio}</Tag>;
+        return <Tag color={PRIORITY_COLORS[prio] || 'default'}>{prio}</Tag>;
       }
     },
     {
@@ -149,11 +218,12 @@ export const TaskListPage: React.FC = () => {
       key: 'status',
       sorter: true,
       render: (status: string, record: any) => {
-        const isAssignor = record.createdById === anyUser?.id || record.createdById === anyUser?.sub;
-        const assigneeRecord = record.assignees?.find((a: any) => a.userId === anyUser?.id || a.userId === anyUser?.sub);
+        const isAssignor = record.createdById === currentUserId;
+        const assigneeRecord = record.assignees?.find(
+          (a: any) => (a.userId || a.user?.id) === currentUserId
+        );
         const isAssignee = !!assigneeRecord;
 
-        // Determine the effective status to show
         let displayStatus = status;
         let isIndividualStatus = false;
         if (record.completionType === 'INDIVIDUAL' && isAssignee) {
@@ -161,38 +231,13 @@ export const TaskListPage: React.FC = () => {
           isIndividualStatus = true;
         }
 
-        const handleStatusChange = async (newStatus: string) => {
-          const actionKey = `${record.id}-${newStatus}`;
-          if (actionLoadingId === actionKey) return;
-          try {
-            setActionLoadingId(actionKey);
-            await useTaskStore.getState().updateTask(record.id, { status: newStatus });
-            message.success('Status updated');
-            await fetchTasks({ ...params, filter: activeTab }); // Ensure UI immediately refreshes
-          } catch (error: any) {
-            message.error(error.message);
-          } finally {
-            setActionLoadingId(null);
-          }
-        };
-
-        const statusColors: any = {
-          TODO: 'default',
-          IN_PROGRESS: 'blue',
-          IN_REVIEW: 'purple',
-          COMPLETED: 'gold',
-          VERIFIED: 'green',
-          REJECTED: 'red',
-          CANCELLED: 'default',
-        };
-
         const completedAssigneesCount = record.completionType === 'INDIVIDUAL' && record.assignees
           ? record.assignees.filter((a: any) => a.status === 'COMPLETED' || a.status === 'VERIFIED').length
           : 0;
 
         return (
           <div className="flex items-center gap-2">
-            <Tag color={statusColors[displayStatus] || 'default'}>
+            <Tag color={STATUS_COLORS[displayStatus] || 'default'}>
               {displayStatus}
               {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
                 <span className="ml-1 text-xs text-gray-500">(Group)</span>
@@ -215,7 +260,7 @@ export const TaskListPage: React.FC = () => {
                 loading={actionLoadingId === `${record.id}-IN_PROGRESS`}
                 disabled={!!actionLoadingId}
                 className={displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}
-                onClick={() => handleStatusChange('IN_PROGRESS')}
+                onClick={() => handleStatusChange(record, 'IN_PROGRESS')}
               >
                 {displayStatus === 'REJECTED' ? 'Start Work Again' : 'Start Work'}
               </Button>
@@ -228,7 +273,7 @@ export const TaskListPage: React.FC = () => {
                 loading={actionLoadingId === `${record.id}-COMPLETED`}
                 disabled={!!actionLoadingId}
                 className="bg-blue-600"
-                onClick={() => handleStatusChange('COMPLETED')}
+                onClick={() => handleStatusChange(record, 'COMPLETED')}
               >
                 Complete Task
               </Button>
@@ -242,7 +287,7 @@ export const TaskListPage: React.FC = () => {
                   loading={actionLoadingId === `${record.id}-VERIFIED`}
                   disabled={!!actionLoadingId}
                   className="bg-green-600 hover:bg-green-500"
-                  onClick={() => handleStatusChange('VERIFIED')}
+                  onClick={() => handleStatusChange(record, 'VERIFIED')}
                 >
                   Verify
                 </Button>
@@ -251,7 +296,7 @@ export const TaskListPage: React.FC = () => {
                   danger
                   loading={actionLoadingId === `${record.id}-REJECTED`}
                   disabled={!!actionLoadingId}
-                  onClick={() => handleStatusChange('REJECTED')}
+                  onClick={() => handleStatusChange(record, 'REJECTED')}
                 >
                   Reject
                 </Button>
@@ -271,7 +316,7 @@ export const TaskListPage: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       render: (_: any, record: any) => {
-        const isAssignor = record.createdById === anyUser?.id || record.createdById === anyUser?.sub;
+        const isAssignor = record.createdById === currentUserId;
         const canEdit = isAssignor || isSuperAdmin;
 
         if (!canEdit) return null;
@@ -306,37 +351,48 @@ export const TaskListPage: React.FC = () => {
   ];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Task Management</h1>
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Task Management</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track, assign, and manage team workflows</p>
+        </div>
         {!isSuperAdmin && (
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleOpenCreate}
+            className="w-full sm:w-auto h-9 font-medium shadow-xs"
           >
             Create Task
           </Button>
         )}
       </div>
 
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2 mr-2">
+      {/* Filters Section */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-xl shadow-xs border border-gray-200/80">
+        {/* Desktop Filter Bar (md: and up) */}
+        <div className="hidden md:flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2 mr-1 text-gray-600">
             <FilterOutlined className="text-gray-400" />
-            <span className="font-medium text-gray-600">Filters</span>
+            <span className="font-medium text-sm">Filters</span>
           </div>
-          <div className="flex-1 min-w-50">
+
+          <div className="flex-1 min-w-[200px]">
             <Input.Search
               placeholder="Search tasks..."
+              value={params.search}
+              onChange={(e) => setParams({ ...params, search: e.target.value })}
               onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
               allowClear
             />
           </div>
+
           <Select
             placeholder="Status"
             allowClear
-            className="flex-1 min-w-30"
+            className="w-36"
             value={params.status || undefined}
             onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
             options={[
@@ -348,10 +404,11 @@ export const TaskListPage: React.FC = () => {
               { value: 'REJECTED', label: 'REJECTED' },
             ]}
           />
+
           <Select
             placeholder="Priority"
             allowClear
-            className="flex-1 min-w-30"
+            className="w-32"
             value={params.priority || undefined}
             onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
             options={[
@@ -361,23 +418,26 @@ export const TaskListPage: React.FC = () => {
               { value: 'CRITICAL', label: 'CRITICAL' }
             ]}
           />
-          <Select
-            placeholder="Team"
-            allowClear
-            showSearch
-            disabled={!isSuperAdmin}
-            optionFilterProp="label"
-            className="flex-1 min-w-35"
-            value={params.teamId || undefined}
-            onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1, assignedToUserId: undefined })}
-            options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
-          />
+
+          {isSuperAdmin && (
+            <Select
+              placeholder="Team"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              className="w-40"
+              value={params.teamId || undefined}
+              onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1, assignedToUserId: undefined })}
+              options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
+            />
+          )}
+
           <Select
             placeholder="Assignee"
             allowClear
             showSearch
             optionFilterProp="label"
-            className="flex-1 min-w-35"
+            className="w-40"
             value={params.assignedToUserId || undefined}
             onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
             options={eligibleAssignees.map((member: any) => ({
@@ -385,14 +445,142 @@ export const TaskListPage: React.FC = () => {
               label: member.user?.name || member.name
             }))}
           />
+
+          {activeFiltersCount > 0 && (
+            <Button 
+              type="text" 
+              icon={<CloseCircleOutlined />} 
+              onClick={resetFilters}
+              className="text-gray-500 hover:text-red-500 text-xs"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Mobile Filter Bar (< md) */}
+        <div className="md:hidden space-y-3">
+          <div className="flex gap-2 items-center">
+            <div className="flex-1">
+              <Input.Search
+                placeholder="Search tasks..."
+                value={params.search}
+                onChange={(e) => setParams({ ...params, search: e.target.value })}
+                onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+                allowClear
+              />
+            </div>
+            <Badge count={activeFiltersCount} size="small" offset={[-2, 2]}>
+              <Button
+                icon={<FilterOutlined />}
+                onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+                className={mobileFiltersOpen ? 'border-blue-500 text-blue-600' : ''}
+              >
+                Filters {mobileFiltersOpen ? <UpOutlined className="text-xs" /> : <DownOutlined className="text-xs" />}
+              </Button>
+            </Badge>
+          </div>
+
+          {mobileFiltersOpen && (
+            <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <Select
+                  placeholder="All Statuses"
+                  allowClear
+                  className="w-full"
+                  value={params.status || undefined}
+                  onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
+                  options={[
+                    { value: 'TODO', label: 'TODO' },
+                    { value: 'IN_PROGRESS', label: 'IN PROGRESS' },
+                    { value: 'IN_REVIEW', label: 'IN REVIEW' },
+                    { value: 'COMPLETED', label: 'COMPLETED' },
+                    { value: 'VERIFIED', label: 'VERIFIED' },
+                    { value: 'REJECTED', label: 'REJECTED' },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Priority</label>
+                <Select
+                  placeholder="All Priorities"
+                  allowClear
+                  className="w-full"
+                  value={params.priority || undefined}
+                  onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
+                  options={[
+                    { value: 'LOW', label: 'LOW' },
+                    { value: 'MEDIUM', label: 'MEDIUM' },
+                    { value: 'HIGH', label: 'HIGH' },
+                    { value: 'CRITICAL', label: 'CRITICAL' }
+                  ]}
+                />
+              </div>
+
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Team</label>
+                  <Select
+                    placeholder="All Teams"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    className="w-full"
+                    value={params.teamId || undefined}
+                    onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1, assignedToUserId: undefined })}
+                    options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Assignee</label>
+                <Select
+                  placeholder="All Assignees"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  className="w-full"
+                  value={params.assignedToUserId || undefined}
+                  onChange={(val) => setParams({ ...params, assignedToUserId: val || undefined, page: 1 })}
+                  options={eligibleAssignees.map((member: any) => ({
+                    value: member.user?.id || member.id,
+                    label: member.user?.name || member.name
+                  }))}
+                />
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <div className="col-span-full pt-1 flex justify-end">
+                  <Button 
+                    type="link" 
+                    danger 
+                    size="small"
+                    icon={<CloseCircleOutlined />} 
+                    onClick={resetFilters}
+                    className="p-0 text-xs"
+                  >
+                    Reset all filters
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <Card>
+      {/* Main Content Card: Tabs + View (Table or Mobile Cards) */}
+      <Card 
+        className="rounded-xl border border-gray-200/80 shadow-xs overflow-hidden"
+        styles={{ body: { padding: '16px sm:24px' } }}
+      >
         {!isSuperAdmin && (
           <Tabs
             activeKey={activeTab}
             onChange={handleTabChange}
+            className="mb-3"
             items={[
               { key: 'assigned_to_me', label: 'Assigned to Me' },
               { key: 'assigned_by_me', label: 'Assigned by Me' }
@@ -400,28 +588,81 @@ export const TaskListPage: React.FC = () => {
           />
         )}
 
-        <Table
-          dataSource={tasks}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: params.page,
-            pageSize: params.limit,
-            total: total
-          }}
-          onChange={(pagination: any, _filters: any, sorter: any) => {
-            setParams((prev: any) => ({
-              ...prev,
-              page: pagination.current,
-              limit: pagination.pageSize,
-              sortBy: sorter.field,
-              sortOrder: sorter.order === 'ascend' ? 'asc' : sorter.order === 'descend' ? 'desc' : undefined,
-            }));
-          }}
-        />
+        {/* Desktop View: Full Table (md: and up) */}
+        <div className="hidden md:block">
+          <Table
+            dataSource={tasks}
+            columns={columns}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              current: params.page,
+              pageSize: params.limit,
+              total: total,
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50'],
+            }}
+            onChange={(pagination: any, _filters: any, sorter: any) => {
+              setParams((prev: any) => ({
+                ...prev,
+                page: pagination.current,
+                limit: pagination.pageSize,
+                sortBy: sorter.field,
+                sortOrder: sorter.order === 'ascend' ? 'asc' : sorter.order === 'descend' ? 'desc' : undefined,
+              }));
+            }}
+          />
+        </div>
+
+        {/* Mobile View: Dedicated Mobile Cards (< md) */}
+        <div className="md:hidden">
+          {loading && (!tasks || tasks.length === 0) ? (
+            <div className="flex justify-center items-center py-12">
+              <Spin size="large" />
+            </div>
+          ) : !tasks || tasks.length === 0 ? (
+            <div className="py-10">
+              <Empty description="No tasks found" />
+            </div>
+          ) : (
+            <div>
+              <div className="space-y-3">
+                {tasks.map((task: any) => (
+                  <TaskMobileCard
+                    key={task.id}
+                    task={task}
+                    currentUserId={currentUserId}
+                    isSuperAdmin={isSuperAdmin}
+                    actionLoadingId={actionLoadingId}
+                    onStatusChange={handleStatusChange}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDeleteTask}
+                  />
+                ))}
+              </div>
+
+              {/* Mobile Pagination */}
+              {total > params.limit && (
+                <div className="flex justify-center items-center mt-5 pt-3 border-t border-gray-100">
+                  <Pagination
+                    size="small"
+                    current={params.page}
+                    pageSize={params.limit}
+                    total={total}
+                    showSizeChanger={false}
+                    onChange={(page, pageSize) => {
+                      setParams((prev: any) => ({ ...prev, page, limit: pageSize }));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Card>
 
+      {/* Task Create / Edit Modal */}
       <TaskFormModal
         open={isModalOpen}
         onCancel={() => {

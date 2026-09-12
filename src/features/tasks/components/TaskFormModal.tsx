@@ -73,11 +73,20 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   return (
     <Modal
-      title={initialValues ? 'Edit Task' : 'Create Task'}
+      title={
+        <span className="font-semibold text-base sm:text-lg text-gray-900">
+          {initialValues ? 'Edit Task' : 'Create Task'}
+        </span>
+      }
       open={open}
       onCancel={onCancel}
       footer={null}
       destroyOnClose
+      width="100%"
+      style={{ maxWidth: 540, top: 16 }}
+      styles={{
+        body: { paddingTop: '8px' }
+      }}
     >
       <Form
         form={form}
@@ -88,26 +97,50 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           completionType: 'INDIVIDUAL',
         }}
       >
-        <Form.Item name="title" label="Title" rules={[{ required: true, message: 'Please enter a task title' }]}>
-          <Input placeholder="Task title" />
-        </Form.Item>
-
-        <Form.Item name="description" label="Description">
-          <Input.TextArea placeholder="Task description" rows={3} />
-        </Form.Item>
-
-        <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
-          <Select>
-            <Select.Option value="LOW">Low</Select.Option>
-            <Select.Option value="MEDIUM">Medium</Select.Option>
-            <Select.Option value="HIGH">High</Select.Option>
-            <Select.Option value="CRITICAL">Critical</Select.Option>
-          </Select>
+        <Form.Item 
+          name="title" 
+          label={<span className="text-xs sm:text-sm font-medium text-gray-700">Title</span>} 
+          rules={[{ required: true, message: 'Please enter a task title' }]}
+        >
+          <Input placeholder="Task title" className="h-9 text-sm" />
         </Form.Item>
 
         <Form.Item 
+          name="description" 
+          label={<span className="text-xs sm:text-sm font-medium text-gray-700">Description</span>}
+        >
+          <Input.TextArea placeholder="Task description" rows={3} className="text-sm" />
+        </Form.Item>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <Form.Item 
+            name="priority" 
+            label={<span className="text-xs sm:text-sm font-medium text-gray-700">Priority</span>} 
+            rules={[{ required: true }]}
+          >
+            <Select className="w-full h-9">
+              <Select.Option value="LOW">Low</Select.Option>
+              <Select.Option value="MEDIUM">Medium</Select.Option>
+              <Select.Option value="HIGH">High</Select.Option>
+              <Select.Option value="CRITICAL">Critical</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item 
+            name="recurrencePattern" 
+            label={<span className="text-xs sm:text-sm font-medium text-gray-700">Recurrence Pattern</span>}
+          >
+            <Select allowClear placeholder="Does not repeat" className="w-full h-9">
+              <Select.Option value="DAILY">Daily</Select.Option>
+              <Select.Option value="WEEKLY">Weekly</Select.Option>
+              <Select.Option value="MONTHLY">Monthly</Select.Option>
+            </Select>
+          </Form.Item>
+        </div>
+
+        <Form.Item 
           name="deadline" 
-          label="Deadline" 
+          label={<span className="text-xs sm:text-sm font-medium text-gray-700">Deadline</span>} 
           rules={[
             { required: true, message: 'Please select a deadline' },
             {
@@ -120,14 +153,19 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             }
           ]}
         >
-          <DatePicker showTime className="w-full" />
+          <DatePicker showTime className="w-full h-9" />
         </Form.Item>
 
-        <Form.Item name="assigneeIds" label="Assignees">
+        <Form.Item 
+          name="assigneeIds" 
+          label={<span className="text-xs sm:text-sm font-medium text-gray-700">Assignees</span>}
+        >
           <Select 
             mode="multiple" 
             placeholder="Select assignees"
             optionFilterProp="label"
+            maxTagCount="responsive"
+            className="w-full min-h-9"
           >
             {eligibleAssignees.map(member => (
               <Select.Option 
@@ -141,28 +179,22 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </Select>
         </Form.Item>
 
-        <Form.Item name="recurrencePattern" label="Recurrence Pattern">
-          <Select allowClear placeholder="Does not repeat">
-            <Select.Option value="DAILY">Daily</Select.Option>
-            <Select.Option value="WEEKLY">Weekly</Select.Option>
-            <Select.Option value="MONTHLY">Monthly</Select.Option>
-          </Select>
-        </Form.Item>
-
         <Form.Item 
           name="completionType" 
-          label="Completion Type" 
+          label={<span className="text-xs sm:text-sm font-medium text-gray-700">Completion Type</span>} 
           tooltip="Shared: Any assignee completing the task completes it for everyone. Individual: Each assignee must complete it."
         >
-          <Select>
+          <Select className="w-full h-9">
             <Select.Option value="INDIVIDUAL">Individual (Requires completion from all assignees)</Select.Option>
             <Select.Option value="SHARED">Shared (Single completion marks task as done)</Select.Option>
           </Select>
         </Form.Item>
 
-        <div className="flex justify-end gap-2 mt-4">
-          <Button onClick={onCancel}>Cancel</Button>
-          <Button type="primary" htmlType="submit" loading={loading}>
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-6 pt-2 border-t border-gray-100">
+          <Button onClick={onCancel} className="w-full sm:w-auto h-9">
+            Cancel
+          </Button>
+          <Button type="primary" htmlType="submit" loading={loading} className="w-full sm:w-auto h-9 font-medium shadow-xs">
             {initialValues ? 'Update Task' : 'Create Task'}
           </Button>
         </div>
@@ -170,4 +202,3 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     </Modal>
   );
 };
-

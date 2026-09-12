@@ -5,14 +5,22 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { taskApi } from '../api/task.api';
 import { teamService } from '@/features/teams/api/team.service';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { CheckCircleOutlined, ClockCircleOutlined, WarningOutlined, ProfileOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { 
+  CheckCircleOutlined, 
+  ClockCircleOutlined, 
+  WarningOutlined, 
+  ProfileOutlined, 
+  PauseCircleOutlined,
+  CalendarOutlined,
+  UserOutlined
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
 const STATUS_COLORS: Record<string, string> = {
-  TODO: '#d9d9d9',
+  TODO: '#9ca3af',
   IN_PROGRESS: '#1890ff',
   REVIEW: '#faad14',
   COMPLETED: '#52c41a',
@@ -22,10 +30,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  LOW: '#d9d9d9',
-  MEDIUM: '#1890ff',
-  HIGH: '#faad14',
-  CRITICAL: '#f5222d'
+  LOW: 'green',
+  MEDIUM: 'blue',
+  HIGH: 'orange',
+  CRITICAL: 'red'
 };
 
 export const TaskDashboardPage: React.FC = () => {
@@ -88,150 +96,374 @@ export const TaskDashboardPage: React.FC = () => {
   };
 
   const renderOverdueColumns = () => [
-    { title: 'Title', dataIndex: 'title', key: 'title', render: (text: string) => <a onClick={() => navigate(`/tasks`)}>{text}</a> },
-    { title: 'Assignee', dataIndex: 'assignees', key: 'assignees', render: (assignees: any[]) => assignees.map(a => <Tag key={a.userId}>{a.user.name}</Tag>) },
-    { title: 'Due Date', dataIndex: 'deadline', key: 'deadline', render: (date: string) => <span className="text-red-500 font-semibold">{dayjs(date).format('MMM DD, YYYY')}</span> },
-    { title: 'Priority', dataIndex: 'priority', key: 'priority', render: (p: string) => <Tag color={PRIORITY_COLORS[p]}>{p}</Tag> }
+    { 
+      title: 'Title', 
+      dataIndex: 'title', 
+      key: 'title', 
+      render: (text: string) => (
+        <a onClick={() => navigate(`/tasks`)} className="font-medium text-blue-600 hover:text-blue-800">
+          {text}
+        </a>
+      )
+    },
+    { 
+      title: 'Assignee', 
+      dataIndex: 'assignees', 
+      key: 'assignees', 
+      render: (assignees: any[]) => (
+        <div className="flex flex-wrap gap-1">
+          {assignees?.map(a => (
+            <Tag key={a.userId || a.user?.id} className="m-0 text-xs">
+              {a.user?.name || 'User'}
+            </Tag>
+          ))}
+        </div>
+      )
+    },
+    { 
+      title: 'Due Date', 
+      dataIndex: 'deadline', 
+      key: 'deadline', 
+      render: (date: string) => (
+        <span className="text-red-500 font-semibold text-xs">
+          {dayjs(date).format('MMM DD, YYYY')}
+        </span>
+      ) 
+    },
+    { 
+      title: 'Priority', 
+      dataIndex: 'priority', 
+      key: 'priority', 
+      render: (p: string) => <Tag color={PRIORITY_COLORS[p] || 'default'} className="m-0">{p}</Tag> 
+    }
   ];
+
+  const renderUpcomingColumns = () => [
+    { 
+      title: 'Title', 
+      dataIndex: 'title', 
+      key: 'title', 
+      render: (text: string) => (
+        <a onClick={() => navigate(`/tasks`)} className="font-medium text-blue-600 hover:text-blue-800">
+          {text}
+        </a>
+      )
+    },
+    { 
+      title: 'Assignee', 
+      dataIndex: 'assignees', 
+      key: 'assignees', 
+      render: (assignees: any[]) => (
+        <div className="flex flex-wrap gap-1">
+          {assignees?.map(a => (
+            <Tag key={a.userId || a.user?.id} className="m-0 text-xs">
+              {a.user?.name || 'User'}
+            </Tag>
+          ))}
+        </div>
+      )
+    },
+    { 
+      title: 'Due Date', 
+      dataIndex: 'deadline', 
+      key: 'deadline', 
+      render: (date: string) => (
+        <span className="text-blue-600 font-semibold text-xs">
+          {dayjs(date).format('MMM DD, YYYY')}
+        </span>
+      ) 
+    },
+    { 
+      title: 'Priority', 
+      dataIndex: 'priority', 
+      key: 'priority', 
+      render: (p: string) => <Tag color={PRIORITY_COLORS[p] || 'default'} className="m-0">{p}</Tag> 
+    }
+  ];
+
+  // Mobile card list for deadlines/overdue
+  const renderMobileTaskList = (taskList: any[], isOverdue: boolean) => {
+    if (!taskList || taskList.length === 0) {
+      return (
+        <div className="py-6 text-center text-gray-400 text-xs">
+          {isOverdue ? 'No overdue tasks!' : 'No upcoming deadlines.'}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2.5">
+        {taskList.map((task: any) => (
+          <div
+            key={task.id}
+            onClick={() => navigate('/tasks')}
+            className="p-3 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-100 transition cursor-pointer"
+          >
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <span className="font-semibold text-gray-900 text-sm hover:text-blue-600 transition">
+                {task.title}
+              </span>
+              <Tag color={PRIORITY_COLORS[task.priority] || 'default'} className="m-0 text-[11px] shrink-0">
+                {task.priority}
+              </Tag>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-200/50">
+              <span className="flex items-center gap-1">
+                <UserOutlined className="text-gray-400 text-[11px]" />
+                <span className="truncate max-w-[140px]">
+                  {task.assignees?.map((a: any) => a.user?.name).join(', ') || 'Unassigned'}
+                </span>
+              </span>
+              <span className={`font-medium flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
+                <CalendarOutlined className="text-[11px]" />
+                {dayjs(task.deadline).format('MMM DD, YYYY')}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <PageContainer>
       <PageHeader
         title="Task Dashboard"
+        description="Monitor team workloads, distribution, and critical task deadlines"
       />
 
-      <div className="bg-white p-4 mb-6 rounded shadow flex gap-4 items-center">
+      {/* Filter Bar */}
+      <div className="bg-white p-3.5 sm:p-5 mb-4 sm:mb-6 rounded-xl shadow-xs border border-gray-200/80 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <Select
           placeholder="Filter by Team"
           allowClear
-          className="w-64"
+          className="w-full sm:w-64"
           options={teams.map(t => ({ value: t.id, label: t.name }))}
           onChange={(val) => setFilters(prev => ({ ...prev, teamId: val || undefined }))}
         />
-        <RangePicker onChange={handleDateChange} />
+        <RangePicker onChange={handleDateChange} className="w-full sm:w-auto" />
       </div>
 
-      {error && <Alert type="error" title={error} className="mb-6" />}
+      {error && <Alert type="error" title={error} className="mb-6 rounded-xl" />}
 
       {loading ? (
         <div className="flex justify-center p-12"><Spin size="large" /></div>
       ) : metrics ? (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {/* Actionable Insights */}
-          <Alert type="info" title="Actionable Insights" description={getMetricInsight()} showIcon />
+          <Alert 
+            type="info" 
+            title="Actionable Insights" 
+            description={getMetricInsight()} 
+            showIcon 
+            className="rounded-xl border border-blue-100"
+          />
 
-          {/* KPI Row */}
-          <Row gutter={16}>
-            <Col span={4}>
-              <Card onClick={() => navigate('/tasks')} className="cursor-pointer hover:shadow-md transition">
-                <Statistic title="Total Tasks" value={metrics.summary.total} prefix={<ProfileOutlined />} />
+          {/* KPI Grid: Responsive for mobile (2 columns on xs, 3 on sm, 5 on lg) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <Card 
+              onClick={() => navigate('/tasks')} 
+              className="cursor-pointer hover:shadow-md transition-all rounded-xl border border-gray-200/80"
+              styles={{ body: { padding: '14px 16px' } }}
+            >
+              <Statistic 
+                title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Total Tasks</span>} 
+                value={metrics.summary.total} 
+                prefix={<ProfileOutlined className="text-gray-400" />} 
+                valueStyle={{ fontSize: '1.25rem', fontWeight: 600 }}
+              />
+            </Card>
+
+            <Card 
+              onClick={() => navigate('/tasks?status=IN_PROGRESS')} 
+              className="cursor-pointer hover:shadow-md transition-all rounded-xl border border-gray-200/80"
+              styles={{ body: { padding: '14px 16px' } }}
+            >
+              <Statistic 
+                title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Active</span>} 
+                value={metrics.summary.active} 
+                valueStyle={{ color: '#1890ff', fontSize: '1.25rem', fontWeight: 600 }} 
+                prefix={<ClockCircleOutlined />} 
+              />
+            </Card>
+
+            <Card 
+              onClick={() => navigate('/tasks?status=COMPLETED')} 
+              className="cursor-pointer hover:shadow-md transition-all rounded-xl border border-gray-200/80"
+              styles={{ body: { padding: '14px 16px' } }}
+            >
+              <Statistic 
+                title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Completed</span>} 
+                value={metrics.summary.completed} 
+                valueStyle={{ color: '#52c41a', fontSize: '1.25rem', fontWeight: 600 }} 
+                prefix={<CheckCircleOutlined />} 
+              />
+            </Card>
+
+            <Card 
+              onClick={() => navigate('/tasks?status=BLOCKED')} 
+              className="cursor-pointer hover:shadow-md transition-all rounded-xl border border-gray-200/80"
+              styles={{ body: { padding: '14px 16px' } }}
+            >
+              <Statistic 
+                title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Blocked</span>} 
+                value={metrics.summary.blocked} 
+                valueStyle={{ color: '#cf1322', fontSize: '1.25rem', fontWeight: 600 }} 
+                prefix={<PauseCircleOutlined />} 
+              />
+            </Card>
+
+            <Card 
+              onClick={() => navigate('/tasks')} 
+              className="cursor-pointer hover:shadow-md transition-all rounded-xl border border-gray-200/80 col-span-2 sm:col-span-1"
+              styles={{ body: { padding: '14px 16px' } }}
+            >
+              <Statistic 
+                title={<span className="text-xs sm:text-sm text-gray-500 font-medium">Overdue</span>} 
+                value={metrics.summary.overdue} 
+                valueStyle={{ color: '#f5222d', fontSize: '1.25rem', fontWeight: 600 }} 
+                prefix={<WarningOutlined />} 
+              />
+            </Card>
+          </div>
+
+          {/* Charts Row: Stack on mobile (xs=24), 3 columns on desktop (lg=8) */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={8}>
+              <Card 
+                title={<span className="font-semibold text-sm sm:text-base">Status Distribution</span>} 
+                className="rounded-xl border border-gray-200/80 shadow-xs h-full"
+                styles={{ body: { padding: '12px' } }}
+              >
+                <div className="w-full h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={metrics.statusDistribution}
+                        dataKey="count"
+                        nameKey="status"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={75}
+                        label
+                      >
+                        {metrics.statusDistribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#8884d8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </Col>
-            <Col span={5}>
-              <Card onClick={() => navigate('/tasks?status=IN_PROGRESS')} className="cursor-pointer hover:shadow-md transition">
-                <Statistic title="Active" value={metrics.summary.active} valueStyle={{ color: '#1890ff' }} prefix={<ClockCircleOutlined />} />
+
+            <Col xs={24} lg={8}>
+              <Card 
+                title={<span className="font-semibold text-sm sm:text-base">Priority Distribution</span>} 
+                className="rounded-xl border border-gray-200/80 shadow-xs h-full"
+                styles={{ body: { padding: '12px' } }}
+              >
+                <div className="w-full h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={metrics.priorityDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="priority" tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                        {metrics.priorityDistribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.priority] || '#1890ff'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </Col>
-            <Col span={5}>
-              <Card onClick={() => navigate('/tasks?status=COMPLETED')} className="cursor-pointer hover:shadow-md transition">
-                <Statistic title="Completed" value={metrics.summary.completed} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} />
-              </Card>
-            </Col>
-            <Col span={5}>
-              <Card onClick={() => navigate('/tasks?status=BLOCKED')} className="cursor-pointer hover:shadow-md transition">
-                <Statistic title="Blocked" value={metrics.summary.blocked} valueStyle={{ color: '#cf1322' }} prefix={<PauseCircleOutlined />} />
-              </Card>
-            </Col>
-            <Col span={5}>
-              <Card onClick={() => navigate('/tasks')} className="cursor-pointer hover:shadow-md transition">
-                <Statistic title="Overdue" value={metrics.summary.overdue} valueStyle={{ color: '#f5222d' }} prefix={<WarningOutlined />} />
+
+            <Col xs={24} lg={8}>
+              <Card 
+                title={<span className="font-semibold text-sm sm:text-base">Workload Overview (Top 10)</span>} 
+                className="rounded-xl border border-gray-200/80 shadow-xs h-full"
+                styles={{ body: { padding: '12px' } }}
+              >
+                <div className="w-full h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={metrics.workload} layout="vertical" margin={{ top: 5, right: 10, left: -5, bottom: 5 }}>
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <YAxis dataKey="userName" type="category" width={75} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Bar dataKey="activeTasks" name="Active" stackId="a" fill="#1890ff" />
+                      <Bar dataKey="completedTasks" name="Completed" stackId="a" fill="#52c41a" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </Col>
           </Row>
 
-          {/* Charts Row */}
-          <Row gutter={16}>
-            <Col span={8}>
-              <Card title="Status Distribution" className="h-87.5">
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={metrics.statusDistribution}
-                      dataKey="count"
-                      nameKey="status"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label
-                    >
-                      {metrics.statusDistribution.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#8884d8'} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+          {/* Overdue & Upcoming Lists: Stack on mobile (xs=24), 2 columns on desktop (lg=12) */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card 
+                title={
+                  <Space>
+                    <WarningOutlined className="text-red-500" />
+                    <span className="font-semibold text-sm sm:text-base">Overdue Tasks</span>
+                  </Space>
+                } 
+                className="rounded-xl border border-gray-200/80 shadow-xs h-full"
+                styles={{ body: { padding: '12px 16px' } }}
+              >
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <Table
+                    dataSource={metrics.overdue}
+                    columns={renderOverdueColumns()}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: 'No overdue tasks!' }}
+                  />
+                </div>
+
+                {/* Mobile Card List View */}
+                <div className="md:hidden">
+                  {renderMobileTaskList(metrics.overdue, true)}
+                </div>
               </Card>
             </Col>
 
-            <Col span={8}>
-              <Card title="Priority Distribution" className="h-87.5">
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={metrics.priorityDistribution}>
-                    <XAxis dataKey="priority" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {metrics.priorityDistribution.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority] || '#8884d8'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </Col>
+            <Col xs={24} lg={12}>
+              <Card 
+                title={
+                  <Space>
+                    <ClockCircleOutlined className="text-blue-500" />
+                    <span className="font-semibold text-sm sm:text-base">Upcoming Deadlines</span>
+                  </Space>
+                } 
+                className="rounded-xl border border-gray-200/80 shadow-xs h-full"
+                styles={{ body: { padding: '12px 16px' } }}
+              >
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <Table
+                    dataSource={metrics.upcoming}
+                    columns={renderUpcomingColumns()}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: 'No upcoming deadlines.' }}
+                  />
+                </div>
 
-            <Col span={8}>
-              <Card title="Workload Overview (Top 10)" className="h-87.5">
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={metrics.workload} layout="vertical" margin={{ left: 20 }}>
-                    <XAxis type="number" allowDecimals={false} />
-                    <YAxis dataKey="userName" type="category" width={80} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="activeTasks" name="Active" stackId="a" fill="#1890ff" />
-                    <Bar dataKey="completedTasks" name="Completed" stackId="a" fill="#52c41a" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Lists Row */}
-          <Row gutter={16}>
-            <Col span={12}>
-              <Card title={<Space><WarningOutlined className="text-red-500" /> Overdue Tasks</Space>} className="h-full">
-                <Table
-                  dataSource={metrics.overdue}
-                  columns={renderOverdueColumns()}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  locale={{ emptyText: 'No overdue tasks!' }}
-                />
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title={<Space><ClockCircleOutlined className="text-blue-500" /> Upcoming Deadlines</Space>} className="h-full">
-                <Table
-                  dataSource={metrics.upcoming}
-                  columns={renderOverdueColumns()}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  locale={{ emptyText: 'No upcoming deadlines.' }}
-                />
+                {/* Mobile Card List View */}
+                <div className="md:hidden">
+                  {renderMobileTaskList(metrics.upcoming, false)}
+                </div>
               </Card>
             </Col>
           </Row>
