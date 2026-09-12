@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin, Tooltip, Popover } from 'antd';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin, Tooltip, Popover, Avatar } from 'antd';
 import { 
   PlusOutlined, 
   FilterOutlined, 
@@ -10,8 +10,8 @@ import {
   UpOutlined,
   SyncOutlined,
   CalendarOutlined,
-  UserOutlined,
-  TeamOutlined
+  TeamOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { teamService } from '@/features/teams/api/team.service';
@@ -212,7 +212,7 @@ export const TaskListPage: React.FC = () => {
           <span className="font-semibold text-gray-900 text-sm leading-snug">{title}</span>
           {record.description && (
             <Tooltip title={record.description} placement="topLeft">
-              <span className="text-xs text-gray-500 truncate cursor-help">
+              <span className="text-xs text-gray-500 line-clamp-2 cursor-help">
                 {record.description}
               </span>
             </Tooltip>
@@ -220,12 +220,12 @@ export const TaskListPage: React.FC = () => {
           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
             <Tag 
               color={record.completionType === 'INDIVIDUAL' ? 'purple' : 'geekblue'} 
-              className="m-0 text-[10px] py-0 px-1 font-medium"
+              className="m-0 text-[10px] py-0 px-1.5 font-medium rounded"
             >
               {record.completionType === 'INDIVIDUAL' ? 'Individual' : 'Shared'}
             </Tag>
             {record.recurrencePattern && (
-              <Tag icon={<SyncOutlined />} className="m-0 text-[10px] text-gray-600 bg-gray-50 py-0 px-1">
+              <Tag icon={<SyncOutlined />} className="m-0 text-[10px] text-gray-600 bg-gray-50 py-0 px-1.5 rounded">
                 {record.recurrencePattern}
               </Tag>
             )}
@@ -236,12 +236,24 @@ export const TaskListPage: React.FC = () => {
     {
       title: 'Assignor',
       key: 'createdById',
-      render: (_: any, record: any) => (
-        <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium whitespace-nowrap">
-          <UserOutlined className="text-gray-400 text-xs" />
-          <span>{record.createdBy?.name || 'Assignor'}</span>
-        </div>
-      )
+      width: 135,
+      render: (_: any, record: any) => {
+        const name = record.createdBy?.name || 'Assignor';
+        const initial = name.charAt(0).toUpperCase();
+        return (
+          <div className="flex items-center gap-2 pt-0.5">
+            <Avatar size={26} className="bg-purple-100 text-purple-700 font-semibold text-xs shrink-0 border border-purple-200">
+              {initial}
+            </Avatar>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-gray-900 truncate" title={name}>
+                {name}
+              </span>
+              <span className="text-[10px] text-gray-400">Created by</span>
+            </div>
+          </div>
+        );
+      }
     },
     {
       title: (
@@ -258,26 +270,40 @@ export const TaskListPage: React.FC = () => {
           : 0;
 
         return (
-          <div className="flex flex-col gap-1.5 min-w-[170px] max-w-[220px]">
-            {record.completionType === 'INDIVIDUAL' && assignees.length > 0 && (
-              <div className="flex items-center justify-between text-[11px] font-medium text-gray-600 mb-0.5">
-                <span>Progress:</span>
-                <Tag color="cyan" className="m-0 text-[10px] py-0 px-1.5 font-medium">
+          <div className="bg-gray-50/90 rounded-lg p-2 border border-gray-200/60 flex flex-col gap-1.5 min-w-[190px] max-w-[240px]">
+            <div className="flex items-center justify-between gap-1 pb-1 border-b border-gray-200/50">
+              <span className="text-[11px] font-medium text-gray-500">
+                {record.completionType === 'INDIVIDUAL' ? 'Progress:' : 'Assignment:'}
+              </span>
+              {record.completionType === 'INDIVIDUAL' ? (
+                <Tag color={completedCount === assignees.length && assignees.length > 0 ? 'green' : 'cyan'} className="m-0 text-[10px] py-0 px-1.5 font-semibold">
                   {completedCount}/{assignees.length} done
                 </Tag>
-              </div>
-            )}
+              ) : (
+                <Tag color="geekblue" className="m-0 text-[10px] py-0 px-1.5 font-medium">
+                  Shared
+                </Tag>
+              )}
+            </div>
 
             <div className="space-y-1">
               {assignees.slice(0, 2).map((a: any) => {
                 const isMe = (a.userId || a.user?.id) === currentUserId;
                 const status = a.status || record.status;
+                const name = a.user?.name || 'User';
                 return (
-                  <div key={a.userId || a.id} className="flex items-center justify-between gap-1 text-xs">
-                    <span className={`truncate text-gray-700 font-medium text-[11px] ${isMe ? 'text-blue-700' : ''}`}>
-                      {a.user?.name || 'User'} {isMe && '(You)'}
-                    </span>
-                    <Tag color={STATUS_COLORS[status] || 'default'} className="m-0 text-[10px] py-0 px-1 shrink-0">
+                  <div key={a.userId || a.id} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className={`text-[11px] truncate ${isMe ? 'text-blue-700 font-semibold' : 'text-gray-700 font-medium'}`}>
+                        {name}
+                      </span>
+                      {isMe && (
+                        <span className="text-[9px] bg-blue-100 text-blue-700 font-semibold px-1 rounded">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <Tag color={STATUS_COLORS[status] || 'default'} className="m-0 text-[10px] py-0 px-1 font-medium shrink-0">
                       {status}
                     </Tag>
                   </div>
@@ -293,7 +319,7 @@ export const TaskListPage: React.FC = () => {
                         const isMe = (a.userId || a.user?.id) === currentUserId;
                         const status = a.status || record.status;
                         return (
-                          <div key={a.userId || a.id} className="flex items-center justify-between gap-2 text-xs py-0.5 border-b border-gray-50 last:border-0">
+                          <div key={a.userId || a.id} className="flex items-center justify-between gap-2 text-xs py-1 border-b border-gray-50 last:border-0">
                             <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}`}>
                               {a.user?.name || 'User'} {isMe && '(You)'}
                             </span>
@@ -306,14 +332,14 @@ export const TaskListPage: React.FC = () => {
                     </div>
                   }
                 >
-                  <span className="text-[11px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+                  <span className="text-[11px] text-blue-600 hover:text-blue-800 cursor-pointer font-medium pt-0.5 block">
                     +{assignees.length - 2} more assignees...
                   </span>
                 </Popover>
               )}
 
               {assignees.length === 0 && (
-                <span className="text-gray-400 italic text-xs">Unassigned</span>
+                <span className="text-gray-400 italic text-[11px]">Unassigned</span>
               )}
             </div>
           </div>
@@ -325,9 +351,13 @@ export const TaskListPage: React.FC = () => {
       dataIndex: 'priority',
       key: 'priority',
       sorter: true,
-      render: (prio: string) => {
-        return <Tag color={PRIORITY_COLORS[prio] || 'default'} className="m-0 font-medium">{prio}</Tag>;
-      }
+      render: (prio: string) => (
+        <div className="pt-0.5">
+          <Tag color={PRIORITY_COLORS[prio] || 'default'} className="m-0 font-medium text-xs">
+            {prio}
+          </Tag>
+        </div>
+      )
     },
     {
       title: 'Status',
@@ -349,14 +379,14 @@ export const TaskListPage: React.FC = () => {
         }
 
         return (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Tag color={STATUS_COLORS[displayStatus] || 'default'}>
+          <div className="flex flex-col gap-1.5 pt-0.5 items-start">
+            <Tag color={STATUS_COLORS[displayStatus] || 'default'} className="m-0 font-medium">
               {displayStatus}
               {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
-                <span className="ml-1 text-xs text-gray-500">(Group)</span>
+                <span className="ml-1 text-xs text-gray-500 font-normal">(Group)</span>
               )}
               {isIndividualStatus && (
-                <span className="ml-1 text-xs text-blue-500">(Yours)</span>
+                <span className="ml-1 text-xs text-blue-600 font-normal">(Yours)</span>
               )}
             </Tag>
 
@@ -366,7 +396,7 @@ export const TaskListPage: React.FC = () => {
                 type="primary"
                 loading={actionLoadingId === `${record.id}-IN_PROGRESS`}
                 disabled={!!actionLoadingId}
-                className={displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}
+                className={`text-xs ${displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}`}
                 onClick={() => handleStatusChange(record, 'IN_PROGRESS')}
               >
                 {displayStatus === 'REJECTED' ? 'Start Work Again' : 'Start Work'}
@@ -379,7 +409,7 @@ export const TaskListPage: React.FC = () => {
                 type="primary"
                 loading={actionLoadingId === `${record.id}-COMPLETED`}
                 disabled={!!actionLoadingId}
-                className="bg-blue-600"
+                className="bg-blue-600 text-xs"
                 onClick={() => handleStatusChange(record, 'COMPLETED')}
               >
                 Complete Task
@@ -387,13 +417,13 @@ export const TaskListPage: React.FC = () => {
             )}
 
             {(isAssignor || isSuperAdmin) && status === 'COMPLETED' && (
-              <>
+              <div className="flex items-center gap-1.5">
                 <Button
                   size="small"
                   type="primary"
                   loading={actionLoadingId === `${record.id}-VERIFIED`}
                   disabled={!!actionLoadingId}
-                  className="bg-green-600 hover:bg-green-500"
+                  className="bg-green-600 hover:bg-green-500 text-xs"
                   onClick={() => handleStatusChange(record, 'VERIFIED')}
                 >
                   Verify
@@ -403,11 +433,12 @@ export const TaskListPage: React.FC = () => {
                   danger
                   loading={actionLoadingId === `${record.id}-REJECTED`}
                   disabled={!!actionLoadingId}
+                  className="text-xs"
                   onClick={() => handleStatusChange(record, 'REJECTED')}
                 >
                   Reject
                 </Button>
-              </>
+              </div>
             )}
           </div>
         );
@@ -419,15 +450,13 @@ export const TaskListPage: React.FC = () => {
       key: 'deadline',
       sorter: true,
       render: (deadline: string) => (
-        <div className="flex flex-col gap-0.5 text-xs whitespace-nowrap">
-          <span className="text-gray-700 font-medium flex items-center gap-1">
+        <div className="flex flex-col gap-1 pt-0.5 whitespace-nowrap">
+          <div className="flex items-center gap-1.5 text-xs text-gray-800 font-medium">
             <CalendarOutlined className="text-gray-400 text-xs" />
-            {dayjs(deadline).format('MMM DD, YYYY')}
-          </span>
-          <span className="text-[11px] text-gray-400 pl-4">
-            {dayjs(deadline).format('hh:mm A')}
-          </span>
-          <div className="mt-0.5">
+            <span>{dayjs(deadline).format('MMM DD, YYYY • hh:mm A')}</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100/90 border border-gray-200/60 font-mono text-xs text-gray-700 w-fit">
+            <ClockCircleOutlined className="text-gray-400 text-[11px]" />
             <LiveCountdown deadline={deadline} />
           </div>
         </div>
@@ -443,29 +472,31 @@ export const TaskListPage: React.FC = () => {
         if (!canEdit) return null;
 
         return (
-          <Space size="small">
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleOpenEdit(record)}
-            >
-              Edit
-            </Button>
-            <Popconfirm
-              title="Delete Task"
-              description="Are you sure you want to delete this task?"
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDeleteTask(record.id)}
-            >
+          <div className="pt-0.5">
+            <Space size="small">
               <Button
                 size="small"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Popconfirm>
-          </Space>
+                icon={<EditOutlined />}
+                onClick={() => handleOpenEdit(record)}
+              >
+                Edit
+              </Button>
+              <Popconfirm
+                title="Delete Task"
+                description="Are you sure you want to delete this task?"
+                okText="Delete"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDeleteTask(record.id)}
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                />
+              </Popconfirm>
+            </Space>
+          </div>
         );
       }
     }
@@ -710,7 +741,7 @@ export const TaskListPage: React.FC = () => {
         )}
 
         {/* Desktop View: Full Table (md: and up) */}
-        <div className="hidden md:block">
+        <div className="hidden md:block [&_.ant-table-tbody_>_tr_>_td]:align-top [&_.ant-table-tbody_>_tr_>_td]:py-3.5">
           <Table
             dataSource={tasks}
             columns={columns}
