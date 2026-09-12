@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, Select, DatePicker } from 'antd';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Modal, Form, Input, Select, DatePicker, Tag } from 'antd';
 import dayjs from 'dayjs';
+import { useUserStore } from '@/features/users/store/user.store';
+import { userService } from '@/features/users/api/user.service';
 
 interface TaskFormModalProps {
   open: boolean;
@@ -10,6 +12,16 @@ interface TaskFormModalProps {
   teamMembers: any[]; // Expecting users with team roles
   currentUserLevel: number;
 }
+
+const getAssigneeId = (a: any): string => {
+  if (typeof a === 'string') return a;
+  return a?.userId || a?.user?.id || a?.id || '';
+};
+
+const getAssigneeName = (a: any): string => {
+  if (typeof a === 'string') return '';
+  return a?.user?.name || a?.name || a?.userName || '';
+};
 
 export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   open,
@@ -21,15 +33,18 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const { users: storeUsers } = useUserStore();
+  const [extraNames, setExtraNames] = useState<Record<string, string>>({});
 
   // Synchronize form fields when opening or switching tasks to edit
   useEffect(() => {
     if (open) {
       if (initialValues) {
         // Extract assignee IDs whether they are an array of objects or strings
-        const assigneeIds = initialValues.assignees
-          ? initialValues.assignees.map((a: any) => a.userId || a.user?.id || a)
-          : initialValues.assigneeIds || [];
+        const rawAssignees = initialValues.assignees || initialValues.assigneeIds || [];
+        const assigneeIds = Array.isArray(rawAssignees)
+          ? rawAssignees.map(getAssigneeId).filter(Boolean)
+          : [];
 
         form.setFieldsValue({
           title: initialValues.title,
@@ -46,14 +61,141 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     }
   }, [open, initialValues, form]);
 
+  // Asynchronously resolve any missing assignee names if needed
+  useEffect(() => {
+    if (!open || !initialValues) return;
+
+    const rawAssignees = initialValues.assignees || initialValues.assigneeIds || [];
+    if (!Array.isArray(rawAssignees)) return;
+
+    const missingIds: string[] = [];
+
+    rawAssignees.forEach((a: any) => {
+      const id = getAssigneeId(a);
+      const name = getAssigneeName(a);
+      if (id && !name && !extraNames[id]) {
+        const inTeam = teamMembers.find((m: any) => (m.user?.id || m.userId || m.id) === id);
+        const inStore = storeUsers.find((u: any) => u.id === id);
+        if (inTeam) {
+          setExtraNames(prev => ({ ...prev, [id]: inTeam.user?.name || inTeam.name }));
+        } else if (inStore) {
+          setExtraNames(prev => ({ ...prev, [id]: inStore.name }));
+        } else {
+          missingIds.push(id);
+        }
+      }
+    });
+
+    if (missingIds.length > 0) {
+      missingIds.forEach(id => {
+        userService.getUser(id).then(res => {
+          if (res?.name) {
+            setExtraNames(prev => ({ ...prev, [id]: res.name }));
+          }
+        }).catch(err => {
+          console.error(`Failed to fetch user name for ${id}:`, err);
+        });
+      });
+    }
+  }, [open, initialValues, teamMembers, storeUsers, extraNames]);
+
   // Team-specific role-aware filtering:
   // Only allow assigning to team members with level >= currentUserLevel (lower number = higher authority)
   // Super Admin (level 0) can assign to anyone.
-  const eligibleAssignees = teamMembers.filter(member => {
-    if (currentUserLevel === 0) return true;
-    const memberLevel = Number(member.role?.level ?? 99);
-    return currentUserLevel <= memberLevel;
-  });
+  const eligibleAssignees = useMemo(() => {
+    return teamMembers.filter(member => {
+      if (currentUserLevel === 0) return true;
+      const memberLevel = Number(member.role?.level ?? 99);
+      return currentUserLevel <= memberLevel;
+    });
+  }, [teamMembers, currentUserLevel]);
+
+  // Combined options map ensuring assignee names are always resolved and displayed
+  const assigneeOptions = useMemo(() => {
+    const optionsMap = new Map<string, { value: string; label: string; role?: string }>();
+
+    // 1. Eligible team members
+    eligibleAssignees.forEach((member: any) => {
+      const id = member.user?.id || member.userId || member.id;
+      const name = member.user?.name || member.name;
+      const roleName = member.role?.name;
+      if (id && name) {
+        optionsMap.set(id, {
+          value: id,
+          label: name,
+          role: roleName,
+        });
+      }
+    });
+
+    // 2. Add all users from user store for Super Admin (level 0)
+    if (currentUserLevel === 0 && storeUsers.length > 0) {
+      storeUsers.forEach((u: any) => {
+        if (u.id && !optionsMap.has(u.id)) {
+          optionsMap.set(u.id, {
+            value: u.id,
+            label: u.name,
+            role: u.role?.name || u.designation || undefined,
+          });
+        }
+      });
+    }
+
+    // 3. Existing assignees from initialValues (guarantees existing assignees have name labels immediately)
+    if (initialValues) {
+      const existingAssignees = initialValues.assignees || initialValues.assigneeIds || [];
+      if (Array.isArray(existingAssignees)) {
+        existingAssignees.forEach((a: any) => {
+          const id = getAssigneeId(a);
+          const name = getAssigneeName(a);
+          if (id && !optionsMap.has(id)) {
+            const storeUser = storeUsers.find((u: any) => u.id === id) as any;
+            const teamMember = teamMembers.find((m: any) => (m.user?.id || m.userId || m.id) === id);
+            const resolvedName = name || teamMember?.user?.name || teamMember?.name || storeUser?.name || extraNames[id] || 'Assignee';
+            const resolvedRole = a.role?.name || teamMember?.role?.name || storeUser?.role?.name || storeUser?.designation;
+            optionsMap.set(id, {
+              value: id,
+              label: resolvedName,
+              role: resolvedRole,
+            });
+          }
+        });
+      }
+    }
+
+    // 4. Any extra resolved names
+    Object.entries(extraNames).forEach(([id, name]) => {
+      if (id && !optionsMap.has(id)) {
+        optionsMap.set(id, {
+          value: id,
+          label: name,
+        });
+      }
+    });
+
+    return Array.from(optionsMap.values());
+  }, [eligibleAssignees, storeUsers, initialValues, currentUserLevel, teamMembers, extraNames]);
+
+  // Fail-safe tag renderer ensuring raw UUIDs are never displayed
+  const tagRender = (props: any) => {
+    const { label, value, closable, onClose } = props;
+    const isUUID = typeof label === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(label);
+    let displayLabel = label;
+    if (isUUID || !label) {
+      const match = assigneeOptions.find(o => o.value === value);
+      displayLabel = match?.label || extraNames[value] || 'Assignee';
+    }
+
+    return (
+      <Tag
+        closable={closable}
+        onClose={onClose}
+        className="inline-flex items-center gap-1 my-0.5 mr-1 px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-800 border-blue-200"
+      >
+        {displayLabel}
+      </Tag>
+    );
+  };
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -163,20 +305,25 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           <Select 
             mode="multiple" 
             placeholder="Select assignees"
-            optionFilterProp="label"
-            maxTagCount="responsive"
+            options={assigneeOptions}
+            tagRender={tagRender}
+            optionRender={(option) => (
+              <div className="flex items-center justify-between py-0.5">
+                <span className="font-medium text-gray-900">{option.data.label}</span>
+                {option.data.role && (
+                  <span className="text-xs text-gray-400 font-normal">({option.data.role})</span>
+                )}
+              </div>
+            )}
+            filterOption={(input, option) => {
+              const label = (option?.label ?? '').toString().toLowerCase();
+              const role = (option?.role ?? '').toString().toLowerCase();
+              const search = input.toLowerCase();
+              return label.includes(search) || role.includes(search);
+            }}
+            maxTagCount={10}
             className="w-full min-h-9"
-          >
-            {eligibleAssignees.map(member => (
-              <Select.Option 
-                key={member.user?.id || member.id} 
-                value={member.user?.id || member.id}
-                label={member.user?.name || member.name}
-              >
-                {member.user?.name || member.name} {member.role?.name ? `(${member.role.name})` : ''}
-              </Select.Option>
-            ))}
-          </Select>
+          />
         </Form.Item>
 
         <Form.Item 

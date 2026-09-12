@@ -80,17 +80,15 @@ export const TaskListPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchUsers({ page: 1, limit: 100, teamId: params.teamId }).catch(console.error);
+    fetchUsers({ page: 1, limit: 1000, teamId: params.teamId }).catch(console.error);
   }, [fetchUsers, params.teamId]);
 
   useEffect(() => {
     const fetchId = isSuperAdmin ? params.teamId : userTeamId;
     if (fetchId) {
-      import('@/features/teams/api/team.service').then(m => {
-        m.teamService.getTeamMembers(fetchId, { limit: 1000 }).then(res => {
-          setTeamMembers(res.data || []);
-        }).catch(console.error);
-      });
+      teamService.getTeamMembers(fetchId, { limit: 1000 }).then(res => {
+        setTeamMembers(res.data || []);
+      }).catch(console.error);
     } else {
       setTeamMembers([
         { user: { id: anyUser?.id, name: anyUser?.name }, role: { level: 99, name: anyUser?.role?.name } }
@@ -111,11 +109,26 @@ export const TaskListPage: React.FC = () => {
 
   const handleOpenCreate = () => {
     setEditingTask(null);
+    const targetTeamId = isSuperAdmin ? params.teamId || userTeamId : userTeamId;
+    if (targetTeamId) {
+      teamService.getTeamMembers(targetTeamId, { limit: 1000 }).then(res => {
+        if (res.data && res.data.length > 0) {
+          setTeamMembers(res.data);
+        }
+      }).catch(console.error);
+    }
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (task: any) => {
     setEditingTask(task);
+    if (task.teamId) {
+      teamService.getTeamMembers(task.teamId, { limit: 1000 }).then(res => {
+        if (res.data && res.data.length > 0) {
+          setTeamMembers(res.data);
+        }
+      }).catch(console.error);
+    }
     setIsModalOpen(true);
   };
 
