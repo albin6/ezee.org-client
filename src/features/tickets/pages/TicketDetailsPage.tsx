@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Popconfirm } from 'antd';
-import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Popconfirm, message as antMessage } from 'antd';
+import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
-import { ticketService } from '../api/ticket.service';
+import { ticketService, type MentionUser } from '../api/ticket.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
@@ -35,13 +35,45 @@ const AIInsightsPanel = React.memo(({ summary, confidence }: { summary: string; 
 export const TicketDetailsPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentTicket: ticket, loading, fetchTicket, addMessage, updateStatus, joinTicketRoom, leaveTicketRoom, toggleReaction } = useTicketStore();
+  const { currentTicket: ticket, loading, fetchTicket, addMessage, updateStatus, joinTicketRoom, leaveTicketRoom, toggleReaction, addAssignee } = useTicketStore();
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
   const [message, setMessage] = useState('');
   const [showResolvePrompt, setShowResolvePrompt] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string, name: string, content: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
+
+  // Mention & Assignee Autocomplete State
+  const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const [isAddingAssignee, setIsAddingAssignee] = useState(false);
+
+  const mentionDropdownRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<any>(null);
+
+  // Pre-load mentionable users on mount
+  useEffect(() => {
+    ticketService.getUsersMentionLookup()
+      .then((users) => setMentionUsers(users || []))
+      .catch((err) => console.error('Failed to load mention users', err));
+  }, []);
+
+  // Dismiss mention dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        mentionDropdownRef.current &&
+        !mentionDropdownRef.current.contains(e.target as Node)
+      ) {
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -307,8 +339,134 @@ export const TicketDetailsPage: React.FC = () => {
   const isCreator = (ticket.createdById || ticket.createdBy?.id) === authUserId;
   const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
   const canAddAssignee = isCreator || isAssignee || isAdmin;
-
   const canEditStatus = isAssignee || isAdmin || isCreator;
+
+  // Check if a user is already an associated participant (creator or assignee)
+  const isParticipant = (userId: string) => {
+    if (!ticket) return false;
+    const creatorId = ticket.createdById || ticket.createdBy?.id;
+    if (creatorId === userId) return true;
+    return ticket.assignees?.some((a: any) => (a.userId || a.user?.id) === userId);
+  };
+
+  // Filter mention suggestions based on typed query
+  const filteredMentionUsers = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase().trim();
+
+    return mentionUsers.filter((u) => {
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.teamName && u.teamName.toLowerCase().includes(q)) ||
+        (u.designation && u.designation.toLowerCase().includes(q))
+      );
+    }).slice(0, 8);
+  }, [mentionQuery, mentionUsers]);
+
+  // Handle typing & detecting @ trigger
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setMessage(val);
+
+    const rawArea = e.target;
+    const cursorPos = rawArea.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/@([\w\s]*)$/);
+
+    if (atMatch) {
+      setMentionQuery(atMatch[1]);
+      setMentionDropdownOpen(true);
+      setHighlightedMentionIndex(0);
+    } else {
+      setMentionDropdownOpen(false);
+      setMentionQuery(null);
+    }
+  };
+
+  // Select user from autocomplete: context-aware for mention vs assignee addition
+  const handleSelectMentionUser = async (selectedUser: MentionUser) => {
+    const isPart = isParticipant(selectedUser.id);
+    const rawArea = textareaRef.current?.resizableTextArea?.textArea || textareaRef.current;
+    const cursorPos = rawArea?.selectionStart ?? message.length;
+    const textBeforeCursor = message.slice(0, cursorPos);
+    const textAfterCursor = message.slice(cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+
+    // New-assignee intent: if user is not yet a participant and current user can add assignees
+    if (!isPart && canAddAssignee && ticket?.id) {
+      try {
+        setIsAddingAssignee(true);
+        await addAssignee(ticket.id, selectedUser.id);
+        antMessage.success(`Added ${selectedUser.name} as an assignee`);
+
+        // If the message was solely an assignee search command at the start (e.g. "@John" or "@" with nothing else),
+        // clear the search text so unfinished assignment text is not sent as a message (Requirement 7).
+        const isOnlyMentionQuery = atIndex === 0 && textAfterCursor.trim() === '';
+        if (isOnlyMentionQuery) {
+          setMessage('');
+        } else {
+          // If part of a larger message, replace `@query` with `@UserName `
+          const newText = textBeforeCursor.slice(0, atIndex) + `@${selectedUser.name} ` + textAfterCursor;
+          setMessage(newText);
+        }
+      } catch (err: any) {
+        antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
+      } finally {
+        setIsAddingAssignee(false);
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+        setTimeout(() => {
+          rawArea?.focus();
+        }, 50);
+      }
+    } else {
+      // Existing-user mention intent (already participant or cannot add)
+      if (atIndex !== -1) {
+        const newText = textBeforeCursor.slice(0, atIndex) + `@${selectedUser.name} ` + textAfterCursor;
+        setMessage(newText);
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+
+        setTimeout(() => {
+          rawArea?.focus();
+          const newPos = atIndex + selectedUser.name.length + 2;
+          rawArea?.setSelectionRange(newPos, newPos);
+        }, 50);
+      }
+    }
+  };
+
+  // Keyboard navigation for mention autocomplete
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionDropdownOpen && filteredMentionUsers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedMentionIndex((prev) => (prev + 1) % filteredMentionUsers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedMentionIndex((prev) => (prev - 1 + filteredMentionUsers.length) % filteredMentionUsers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const targetUser = filteredMentionUsers[highlightedMentionIndex];
+        if (targetUser) {
+          handleSelectMentionUser(targetUser);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+        return;
+      }
+    }
+  };
 
   const getStatusOptions = () => {
     if (isAdmin) {
@@ -616,6 +774,74 @@ export const TicketDetailsPage: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Contextual Autocomplete Mention & Assignee Dropdown */}
+                  {mentionDropdownOpen && filteredMentionUsers.length > 0 && (
+                    <div
+                      ref={mentionDropdownRef}
+                      className="absolute bottom-full mb-2 left-2 right-2 sm:left-14 sm:right-auto sm:w-[380px] bg-white rounded-xl shadow-2xl border border-gray-200 py-1.5 z-50 animate-fadeIn"
+                      style={{ maxHeight: '280px' }}
+                    >
+                      <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                        <span>{canAddAssignee ? 'Mention or Add Assignee' : 'Mention Participant'}</span>
+                        <span className="text-[10px] text-gray-400 font-normal">↑↓ navigate • ↵ select</span>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
+                        {filteredMentionUsers.map((u, idx) => {
+                          const isPart = isParticipant(u.id);
+                          const isHighlighted = idx === highlightedMentionIndex;
+
+                          return (
+                            <div
+                              key={u.id}
+                              onClick={() => handleSelectMentionUser(u)}
+                              onMouseEnter={() => setHighlightedMentionIndex(idx)}
+                              className={`px-3 py-2 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                                isHighlighted ? 'bg-blue-50 text-blue-900' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Avatar size="small" className="bg-blue-600 text-white font-semibold shrink-0">
+                                  {u.name.charAt(0).toUpperCase()}
+                                </Avatar>
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-semibold text-gray-800 truncate">
+                                      {u.name}
+                                    </span>
+                                    {u.teamName && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 shrink-0 font-normal">
+                                        {u.teamName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-gray-400 truncate">
+                                    {u.designation || u.email}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 flex items-center">
+                                {isPart ? (
+                                  <Tag color="default" className="text-[10px] rounded-full mr-0 text-gray-500 bg-gray-100 border-gray-200">
+                                    Already added
+                                  </Tag>
+                                ) : canAddAssignee ? (
+                                  <Tag color="cyan" className="text-[10px] rounded-full mr-0 text-teal-700 bg-teal-50 border-teal-200 font-medium flex items-center gap-1">
+                                    <UserAddOutlined className="text-[9px]" /> Add assignee
+                                  </Tag>
+                                ) : (
+                                  <Tag color="default" className="text-[10px] rounded-full mr-0 text-gray-400">
+                                    Not participant
+                                  </Tag>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 w-full">
                     <div className="flex items-center gap-1">
                       <Popover 
@@ -666,19 +892,25 @@ export const TicketDetailsPage: React.FC = () => {
                         </div>
                       ) : (
                         <Input.TextArea
+                          ref={textareaRef}
                           variant="borderless"
                           rows={1}
                           autoSize={{ minRows: 1, maxRows: 5 }}
-                          placeholder="Type a message"
+                          placeholder="Type a message or @name to mention/assign..."
                           value={message}
-                          onChange={(e) => setMessage(e.target.value)}
+                          onChange={handleTextChange}
+                          onKeyDown={handleKeyDown}
                           onPressEnter={(e) => {
+                            if (mentionDropdownOpen && filteredMentionUsers.length > 0) {
+                              e.preventDefault();
+                              return;
+                            }
                             if (!e.shiftKey) {
                               e.preventDefault();
                               handleSendMessage();
                             }
                           }}
-                          disabled={isSending}
+                          disabled={isSending || isAddingAssignee}
                           className="resize-none !px-0 !py-2.5 text-[15px] leading-relaxed bg-transparent"
                         />
                       )}
