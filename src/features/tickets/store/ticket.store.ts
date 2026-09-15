@@ -25,6 +25,7 @@ interface TicketState {
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
   addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
+  addAssignee: (ticketId: string, userId: string) => Promise<any>;
   joinTicketRoom: (ticketId: string) => void;
   leaveTicketRoom: (ticketId: string) => void;
   handleNewMessage: (message: any) => void;
@@ -102,6 +103,22 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       // UI update is handled via socket REACTION_UPDATED
     } catch (error: any) {
       console.error('Failed to toggle reaction', error);
+      throw error;
+    }
+  },
+
+  addAssignee: async (ticketId: string, userId: string) => {
+    try {
+      set({ loading: true, error: null });
+      const res = await ticketService.addAssignee(ticketId, userId);
+      if (res && res.data) {
+        set({ currentTicket: res.data, loading: false });
+      } else {
+        set({ loading: false });
+      }
+      return res?.data;
+    } catch (error: any) {
+      set({ error: error.message || 'Failed to add assignee', loading: false });
       throw error;
     }
   },

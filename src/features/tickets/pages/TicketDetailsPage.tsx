@@ -8,6 +8,7 @@ import { ticketService } from '../api/ticket.service';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
+import { TicketAssigneesSection } from '../components/TicketAssigneesSection';
 import EmojiPicker from 'emoji-picker-react';
 
 const { Title, Text, Paragraph } = Typography;
@@ -302,9 +303,10 @@ export const TicketDetailsPage: React.FC = () => {
 
   const authUser: any = user;
   const authUserId = authUser?.id || authUser?.sub;
-  const isAssignee = ticket.assignees?.some((a: any) => a.user.id === authUserId);
-  const isCreator = ticket.createdBy?.id === authUserId;
+  const isAssignee = ticket.assignees?.some((a: any) => (a.userId || a.user?.id) === authUserId);
+  const isCreator = (ticket.createdById || ticket.createdBy?.id) === authUserId;
   const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
+  const canAddAssignee = isCreator || isAssignee || isAdmin;
 
   const canEditStatus = isAssignee || isAdmin || isCreator;
 
@@ -772,21 +774,10 @@ export const TicketDetailsPage: React.FC = () => {
 
               <Divider />
 
-              <div>
-                <Text type="secondary" className="block mb-2">Assignees</Text>
-                {ticket.assignees?.length ? (
-                  <div className="flex flex-col gap-2 w-full">
-                    {ticket.assignees.map((a: any) => (
-                      <div key={a.user.id} className="flex items-center gap-2">
-                        <Avatar size="small" icon={<UserOutlined />} />
-                        <Text>{a.user.name}</Text>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Text type="secondary">Unassigned</Text>
-                )}
-              </div>
+              <TicketAssigneesSection 
+                ticket={ticket} 
+                canAddAssignee={canAddAssignee} 
+              />
             </div>
           </Card>
         </div>
@@ -927,21 +918,12 @@ export const TicketDetailsPage: React.FC = () => {
               <Text>{ticket.team?.name || 'N/A'}</Text>
             </div>
 
-            <div>
-              <Text type="secondary" className="block mb-2">Assignees</Text>
-              {ticket.assignees?.length ? (
-                <div className="flex flex-col gap-2 w-full">
-                  {ticket.assignees.map((a: any) => (
-                    <div key={a.user.id} className="flex items-center gap-2">
-                      <Avatar size="small" icon={<UserOutlined />} />
-                      <Text>{a.user.name}</Text>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Text type="secondary">Unassigned</Text>
-              )}
-            </div>
+            <Divider />
+
+            <TicketAssigneesSection 
+              ticket={ticket} 
+              canAddAssignee={canAddAssignee} 
+            />
           </div>
         </div>
       </Drawer>

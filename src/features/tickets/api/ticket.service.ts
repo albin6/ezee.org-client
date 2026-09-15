@@ -16,7 +16,7 @@ export interface Ticket {
   aiConfidence?: number;
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
-  assignees?: { user: { id: string; name: string; email: string } }[];
+  assignees?: { userId?: string; createdAt?: string; user: { id: string; name: string; email: string } }[];
   messages?: { 
     id: string; 
     content: string; 
@@ -113,6 +113,11 @@ export const ticketService = {
 
   toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages/${messageId}/reactions`, { reaction });
+    return data;
+  },
+
+  addAssignee: async (ticketId: string, userId: string) => {
+    const { data } = await apiClient.post(`/tickets/${ticketId}/assignees`, { userId });
     return data;
   }
 };
