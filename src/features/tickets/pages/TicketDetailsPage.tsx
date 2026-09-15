@@ -330,16 +330,13 @@ export const TicketDetailsPage: React.FC = () => {
     });
   };
 
-  if (loading && !ticket) return <PageContainer className="!px-0 sm:!px-4 lg:!px-6 !max-w-full lg:!max-w-7xl">Loading...</PageContainer>;
-  if (!ticket) return <PageContainer>Ticket not found</PageContainer>;
-
   const authUser: any = user;
   const authUserId = authUser?.id || authUser?.sub;
-  const isAssignee = ticket.assignees?.some((a: any) => (a.userId || a.user?.id) === authUserId);
-  const isCreator = (ticket.createdById || ticket.createdBy?.id) === authUserId;
+  const isAssignee = ticket?.assignees?.some((a: any) => (a.userId || a.user?.id) === authUserId);
+  const isCreator = (ticket?.createdById || ticket?.createdBy?.id) === authUserId;
   const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
-  const canAddAssignee = isCreator || isAssignee || isAdmin;
-  const canEditStatus = isAssignee || isAdmin || isCreator;
+  const canAddAssignee = Boolean(isCreator || isAssignee || isAdmin);
+  const canEditStatus = Boolean(isAssignee || isAdmin || isCreator);
 
   // Check if a user is already an associated participant (creator or assignee)
   const isParticipant = (userId: string) => {
@@ -479,6 +476,8 @@ export const TicketDetailsPage: React.FC = () => {
       ];
     }
 
+    if (!ticket) return [];
+
     if (ticket.status === 'OPEN' && isAssignee) return [{ value: 'OPEN', label: 'Open' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
     if (ticket.status === 'REOPENED' && isAssignee) return [{ value: 'REOPENED', label: 'Reopened' }, { value: 'IN_PROGRESS', label: 'In Progress' }];
     if (ticket.status === 'IN_PROGRESS' && isAssignee) return [{ value: 'IN_PROGRESS', label: 'In Progress' }, { value: 'RESOLVED', label: 'Resolved' }];
@@ -486,6 +485,9 @@ export const TicketDetailsPage: React.FC = () => {
     
     return [{ value: ticket.status, label: ticket.status }];
   };
+
+  if (loading && !ticket) return <PageContainer className="!px-0 sm:!px-4 lg:!px-6 !max-w-full lg:!max-w-7xl">Loading...</PageContainer>;
+  if (!ticket) return <PageContainer>Ticket not found</PageContainer>;
 
   const statusOptions = getStatusOptions();
 
