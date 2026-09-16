@@ -52,6 +52,7 @@ export const TicketDetailsPage: React.FC = () => {
 
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<any>(null);
+  const justSelectedMentionRef = useRef(false);
 
   // Pre-load mentionable users on mount
   useEffect(() => {
@@ -176,8 +177,61 @@ export const TicketDetailsPage: React.FC = () => {
   }, [ticket?.messages, user]);
 
   const handleSendMessage = async () => {
-    if ((!message.trim() && !audioBlob && attachments.length === 0) || !id || isSending || isUploadingAttachments) return;
-    
+    const trimmed = message.trim();
+    if ((!trimmed && !audioBlob && attachments.length === 0) || !id || isSending || isUploadingAttachments) return;
+
+    // Intercept standalone @mention / assignee command (e.g. "@Albin", "@Vineesh")
+    const standaloneMentionMatch = !audioBlob && attachments.length === 0 && trimmed.match(/^@([a-zA-Z0-9\s._-]+)$/);
+    if (standaloneMentionMatch) {
+      const queryName = standaloneMentionMatch[1].trim().toLowerCase();
+      const targetUser =
+        mentionUsers.find(
+          (u) =>
+            u.name.toLowerCase() === queryName ||
+            u.email.toLowerCase() === queryName ||
+            u.name.toLowerCase().startsWith(queryName)
+        ) || mentionUsers.find((u) => u.name.toLowerCase().includes(queryName));
+
+      if (targetUser) {
+        const isPart = isParticipant(targetUser.id);
+        if (isPart) {
+          antMessage.info(`${targetUser.name} is already assigned to this ticket`);
+          setMessage('');
+          setMentionDropdownOpen(false);
+          setMentionQuery(null);
+          return;
+        }
+
+        if (canAddAssignee && ticket?.id) {
+          try {
+            setIsAddingAssignee(true);
+            await addAssignee(ticket.id, targetUser.id);
+            antMessage.success(`Added ${targetUser.name} as an assignee`);
+          } catch (err: any) {
+            antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
+          } finally {
+            setIsAddingAssignee(false);
+            setMessage('');
+            setMentionDropdownOpen(false);
+            setMentionQuery(null);
+          }
+          return;
+        } else {
+          antMessage.warning('Only ticket creator or current assignees can add new assignees');
+          setMessage('');
+          setMentionDropdownOpen(false);
+          setMentionQuery(null);
+          return;
+        }
+      } else {
+        antMessage.error(`User "${standaloneMentionMatch[1].trim()}" not found`);
+        setMessage('');
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     const authUser: any = user;
     const authUserId = authUser?.id || authUser?.sub;
     const isCreator = ticket?.createdBy?.id === authUserId;
@@ -384,12 +438,18 @@ export const TicketDetailsPage: React.FC = () => {
 
   // Select user from autocomplete: context-aware for mention vs assignee addition
   const handleSelectMentionUser = async (selectedUser: MentionUser) => {
+    justSelectedMentionRef.current = true;
+    setTimeout(() => {
+      justSelectedMentionRef.current = false;
+    }, 300);
+
     const isPart = isParticipant(selectedUser.id);
     const rawArea = textareaRef.current?.resizableTextArea?.textArea || textareaRef.current;
     const cursorPos = rawArea?.selectionStart ?? message.length;
     const textBeforeCursor = message.slice(0, cursorPos);
     const textAfterCursor = message.slice(cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf('@');
+    const isOnlyMentionQuery = atIndex === 0 && textAfterCursor.trim() === '';
 
     // New-assignee intent: if user is not yet a participant and current user can add assignees
     if (!isPart && canAddAssignee && ticket?.id) {
@@ -399,8 +459,7 @@ export const TicketDetailsPage: React.FC = () => {
         antMessage.success(`Added ${selectedUser.name} as an assignee`);
 
         // If the message was solely an assignee search command at the start (e.g. "@John" or "@" with nothing else),
-        // clear the search text so unfinished assignment text is not sent as a message (Requirement 7).
-        const isOnlyMentionQuery = atIndex === 0 && textAfterCursor.trim() === '';
+        // clear the search text so unfinished assignment text is not sent as a message.
         if (isOnlyMentionQuery) {
           setMessage('');
         } else {
@@ -421,6 +480,22 @@ export const TicketDetailsPage: React.FC = () => {
     } else {
       // Existing-user mention intent (already participant or cannot add)
       if (atIndex !== -1) {
+        if (isPart && isOnlyMentionQuery) {
+          antMessage.info(`${selectedUser.name} is already assigned to this ticket`);
+          setMessage('');
+          setMentionDropdownOpen(false);
+          setMentionQuery(null);
+          return;
+        }
+
+        if (!isPart && !canAddAssignee && isOnlyMentionQuery) {
+          antMessage.warning('Only ticket creator or current assignees can add new assignees');
+          setMessage('');
+          setMentionDropdownOpen(false);
+          setMentionQuery(null);
+          return;
+        }
+
         const newText = textBeforeCursor.slice(0, atIndex) + `@${selectedUser.name} ` + textAfterCursor;
         setMessage(newText);
         setMentionDropdownOpen(false);
@@ -450,7 +525,12 @@ export const TicketDetailsPage: React.FC = () => {
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        const targetUser = filteredMentionUsers[highlightedMentionIndex];
+        e.stopPropagation();
+        justSelectedMentionRef.current = true;
+        setTimeout(() => {
+          justSelectedMentionRef.current = false;
+        }, 300);
+        const targetUser = filteredMentionUsers[highlightedMentionIndex] || filteredMentionUsers[0];
         if (targetUser) {
           handleSelectMentionUser(targetUser);
         }
@@ -570,7 +650,7 @@ export const TicketDetailsPage: React.FC = () => {
                     return (
                       <div key={msg.id} className="flex justify-center my-2">
                         <div className="bg-[#f0f2f5] text-gray-600 text-[11px] px-3 py-1 rounded-lg text-center shadow-sm shadow-black/5">
-                          {msg.content} by {msg.user.name} • {new Date(msg.createdAt).toLocaleDateString()}
+                          {msg.content} by {msg.user?.name || 'System'} • {new Date(msg.createdAt).toLocaleDateString()}
                         </div>
                       </div>
                     );
@@ -903,8 +983,20 @@ export const TicketDetailsPage: React.FC = () => {
                           onChange={handleTextChange}
                           onKeyDown={handleKeyDown}
                           onPressEnter={(e) => {
+                            if (justSelectedMentionRef.current) {
+                              e.preventDefault();
+                              return;
+                            }
                             if (mentionDropdownOpen && filteredMentionUsers.length > 0) {
                               e.preventDefault();
+                              justSelectedMentionRef.current = true;
+                              setTimeout(() => {
+                                justSelectedMentionRef.current = false;
+                              }, 300);
+                              const targetUser = filteredMentionUsers[highlightedMentionIndex] || filteredMentionUsers[0];
+                              if (targetUser) {
+                                handleSelectMentionUser(targetUser);
+                              }
                               return;
                             }
                             if (!e.shiftKey) {
