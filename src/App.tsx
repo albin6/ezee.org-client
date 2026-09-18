@@ -1,5 +1,5 @@
 import { RouterProvider } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntdApp } from 'antd';
 import { router } from '@/app/router';
 import { PWAInstallPrompt } from '@/shared/components/PWAInstallPrompt';
 import { useEffect } from 'react';
@@ -45,8 +45,10 @@ function App() {
         },
       }}
     >
-      <RouterProvider router={router} />
-      <PWAInstallPrompt />
+      <AntdApp>
+        <RouterProvider router={router} />
+        <PWAInstallPrompt />
+      </AntdApp>
     </ConfigProvider>
   );
 }

@@ -97,7 +97,8 @@ export const KPICriteriaDrawer: React.FC = () => {
         </div>
       }
       placement="right"
-      width={600}
+      size="large"
+      styles={{ wrapper: { width: '100%', maxWidth: 600 } }}
       onClose={closeDrawer}
       open={isOpen}
       extra={

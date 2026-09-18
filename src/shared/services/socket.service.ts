@@ -43,9 +43,11 @@ class SocketService {
       });
       
       this.socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error.message);
         if (error.message?.includes('Authentication error') || error.message?.includes('jwt') || error.message?.includes('token')) {
-          this.socket?.disconnect();
+          console.warn('Socket auth expired or invalid. Disconnecting socket.');
+          this.disconnect();
+        } else {
+          console.warn('Socket connection error:', error.message);
         }
       });
     }

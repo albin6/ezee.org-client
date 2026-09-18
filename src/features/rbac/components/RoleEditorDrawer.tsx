@@ -65,11 +65,13 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
   return (
     <Drawer
       title={<span className="font-semibold text-gray-900">{role ? 'Edit Role' : 'Create New Role'}</span>}
-      width="100%"
-      style={{ maxWidth: 500 }}
+      size="default"
       onClose={onClose}
       open={open}
-      styles={{ body: { paddingBottom: 24 } }}
+      styles={{ 
+        body: { paddingBottom: 24 },
+        wrapper: { width: '100%', maxWidth: 500 }
+      }}
       extra={
         <Space className="hidden sm:flex">
           <Button onClick={onClose}>Cancel</Button>

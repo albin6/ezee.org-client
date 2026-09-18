@@ -60,11 +60,13 @@ export const TeamDetailsPage: React.FC = () => {
             <Descriptions.Item label="Status">
               <Tag color={team.status === 'ACTIVE' ? 'success' : 'error'}>{team.status}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Description" span={2}>
+            <Descriptions.Item label="Description" span={{ xs: 1, sm: 2, md: 2 }}>
               <span className="text-gray-600">{team.description || 'No description provided'}</span>
             </Descriptions.Item>
             <Descriptions.Item label="Created At">{new Date(team.createdAt).toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="Updated At">{new Date(team.updatedAt).toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="Updated At" span={{ xs: 1, sm: 1, md: 2 }}>
+              {new Date(team.updatedAt).toLocaleString()}
+            </Descriptions.Item>
           </Descriptions>
         </div>
       )
