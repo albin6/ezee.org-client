@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin, Tooltip, Popover, Avatar } from 'antd';
+import { Card, Table, Tag, Button, Tabs, message, Input, Select, Popconfirm, Space, Pagination, Badge, Empty, Spin, Tooltip, Popover, Avatar, Segmented } from 'antd';
 import { 
   PlusOutlined, 
   FilterOutlined, 
@@ -11,7 +11,9 @@ import {
   SyncOutlined,
   CalendarOutlined,
   TeamOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  UnorderedListOutlined,
+  AppstoreOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { teamService } from '@/features/teams/api/team.service';
@@ -20,6 +22,7 @@ import { useTaskStore } from '../store/task.store';
 import { TaskFormModal } from '../components/TaskFormModal';
 import { LiveCountdown } from '../components/LiveCountdown';
 import { TaskMobileCard } from '../components/TaskMobileCard';
+import { TaskKanbanBoard } from '../components/TaskKanbanBoard';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,6 +56,14 @@ export const TaskListPage: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>(() => {
+    return (localStorage.getItem('task_view_mode') as 'table' | 'kanban') || 'table';
+  });
+
+  const handleViewModeChange = (mode: 'table' | 'kanban') => {
+    setViewMode(mode);
+    localStorage.setItem('task_view_mode', mode);
+  };
 
   const userTeamId = anyUser?.teamMembers?.[0]?.teamId;
   const [params, setParams] = useState<any>({ 
@@ -383,6 +394,8 @@ export const TaskListPage: React.FC = () => {
           (a: any) => (a.userId || a.user?.id) === currentUserId
         );
         const isAssignee = !!assigneeRecord;
+        const rejectedTime = record.rejectedAt ? new Date(record.rejectedAt).getTime() : 0;
+        const isWithin15MinRejection = rejectedTime > 0 && (Date.now() - rejectedTime) < 15 * 60 * 1000;
 
         let displayStatus = status;
         let isIndividualStatus = false;
@@ -391,28 +404,37 @@ export const TaskListPage: React.FC = () => {
           isIndividualStatus = true;
         }
 
+        const showAsRejectedForAssignor = isWithin15MinRejection && (isAssignor || isSuperAdmin);
+
         return (
           <div className="flex flex-col gap-1.5 pt-0.5 items-start">
-            <Tag color={STATUS_COLORS[displayStatus] || 'default'} className="m-0 font-medium">
-              {displayStatus}
-              {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
-                <span className="ml-1 text-xs text-gray-500 font-normal">(Group)</span>
+            <div className="flex items-center gap-1 flex-wrap">
+              <Tag color={showAsRejectedForAssignor ? 'red' : (STATUS_COLORS[displayStatus] || 'default')} className="m-0 font-medium">
+                {showAsRejectedForAssignor ? 'REJECTED' : displayStatus}
+                {record.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
+                  <span className="ml-1 text-xs text-gray-500 font-normal">(Group)</span>
+                )}
+                {isIndividualStatus && (
+                  <span className="ml-1 text-xs text-blue-600 font-normal">(Yours)</span>
+                )}
+              </Tag>
+              {isWithin15MinRejection && !showAsRejectedForAssignor && (
+                <Tag color="orange" className="m-0 text-[10px] font-medium">
+                  Rework
+                </Tag>
               )}
-              {isIndividualStatus && (
-                <span className="ml-1 text-xs text-blue-600 font-normal">(Yours)</span>
-              )}
-            </Tag>
+            </div>
 
-            {isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED') && (
+            {isAssignee && displayStatus === 'TODO' && (
               <Button
                 size="small"
                 type="primary"
                 loading={actionLoadingId === `${record.id}-IN_PROGRESS`}
                 disabled={!!actionLoadingId}
-                className={`text-xs ${displayStatus === 'REJECTED' ? 'bg-orange-600 hover:bg-orange-500' : ''}`}
+                className="text-xs"
                 onClick={() => handleStatusChange(record, 'IN_PROGRESS')}
               >
-                {displayStatus === 'REJECTED' ? 'Start Work Again' : 'Start Work'}
+                Start Work
               </Button>
             )}
 
@@ -523,16 +545,28 @@ export const TaskListPage: React.FC = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Task Management</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track, assign, and manage team workflows</p>
         </div>
-        {!isSuperAdmin && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreate}
-            className="w-full sm:w-auto h-9 font-medium shadow-xs"
-          >
-            Create Task
-          </Button>
-        )}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
+          <Segmented
+            value={viewMode}
+            onChange={(val) => handleViewModeChange(val as 'table' | 'kanban')}
+            options={[
+              { value: 'table', label: 'Table', icon: <UnorderedListOutlined /> },
+              { value: 'kanban', label: 'Kanban', icon: <AppstoreOutlined /> },
+            ]}
+            className="bg-gray-100 p-0.5 border border-gray-200/70"
+          />
+
+          {!isSuperAdmin && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleOpenCreate}
+              className="h-9 font-medium shadow-xs shrink-0"
+            >
+              Create Task
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters Section */}
@@ -561,12 +595,11 @@ export const TaskListPage: React.FC = () => {
             value={params.status || undefined}
             onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
             options={[
-              { value: 'TODO', label: 'TODO' },
-              { value: 'IN_PROGRESS', label: 'IN PROGRESS' },
-              { value: 'IN_REVIEW', label: 'IN REVIEW' },
-              { value: 'COMPLETED', label: 'COMPLETED' },
-              { value: 'VERIFIED', label: 'VERIFIED' },
-              { value: 'REJECTED', label: 'REJECTED' },
+              { value: 'TODO', label: 'To Do' },
+              { value: 'IN_PROGRESS', label: 'In Progress' },
+              { value: 'COMPLETED', label: 'Completed' },
+              { value: 'VERIFIED', label: 'Verified' },
+              { value: 'REJECTED', label: 'Rejected' },
             ]}
           />
 
@@ -657,12 +690,11 @@ export const TaskListPage: React.FC = () => {
                   value={params.status || undefined}
                   onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
                   options={[
-                    { value: 'TODO', label: 'TODO' },
-                    { value: 'IN_PROGRESS', label: 'IN PROGRESS' },
-                    { value: 'IN_REVIEW', label: 'IN REVIEW' },
-                    { value: 'COMPLETED', label: 'COMPLETED' },
-                    { value: 'VERIFIED', label: 'VERIFIED' },
-                    { value: 'REJECTED', label: 'REJECTED' },
+                    { value: 'TODO', label: 'To Do' },
+                    { value: 'IN_PROGRESS', label: 'In Progress' },
+                    { value: 'COMPLETED', label: 'Completed' },
+                    { value: 'VERIFIED', label: 'Verified' },
+                    { value: 'REJECTED', label: 'Rejected' },
                   ]}
                 />
               </div>
@@ -753,78 +785,113 @@ export const TaskListPage: React.FC = () => {
           />
         )}
 
-        {/* Desktop View: Full Table (md: and up) */}
-        <div className="hidden md:block [&_.ant-table-tbody_>_tr_>_td]:align-top [&_.ant-table-tbody_>_tr_>_td]:py-3.5">
-          <Table
-            dataSource={tasks}
-            columns={columns}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              current: params.page,
-              pageSize: params.limit,
-              total: total,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50'],
-            }}
-            onChange={(pagination: any, _filters: any, sorter: any) => {
-              setParams((prev: any) => ({
-                ...prev,
-                page: pagination.current,
-                limit: pagination.pageSize,
-                sortBy: sorter.field,
-                sortOrder: sorter.order === 'ascend' ? 'asc' : sorter.order === 'descend' ? 'desc' : undefined,
-              }));
-            }}
-          />
-        </div>
-
-        {/* Mobile View: Dedicated Mobile Cards (< md) */}
-        <div className="md:hidden">
-          {loading && (!tasks || tasks.length === 0) ? (
-            <div className="flex justify-center items-center py-12">
-              <Spin size="large" />
+        {viewMode === 'table' ? (
+          <>
+            {/* Desktop View: Full Table (md: and up) */}
+            <div className="hidden md:block [&_.ant-table-tbody_>_tr_>_td]:align-top [&_.ant-table-tbody_>_tr_>_td]:py-3.5">
+              <Table
+                dataSource={tasks}
+                columns={columns}
+                rowKey="id"
+                loading={loading}
+                pagination={{
+                  current: params.page,
+                  pageSize: params.limit,
+                  total: total,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50'],
+                }}
+                onChange={(pagination: any, _filters: any, sorter: any) => {
+                  setParams((prev: any) => ({
+                    ...prev,
+                    page: pagination.current,
+                    limit: pagination.pageSize,
+                    sortBy: sorter.field,
+                    sortOrder: sorter.order === 'ascend' ? 'asc' : sorter.order === 'descend' ? 'desc' : undefined,
+                  }));
+                }}
+              />
             </div>
-          ) : !tasks || tasks.length === 0 ? (
-            <div className="py-10">
-              <Empty description="No tasks found" />
-            </div>
-          ) : (
-            <div>
-              <div className="space-y-3">
-                {tasks.map((task: any) => (
-                  <TaskMobileCard
-                    key={task.id}
-                    task={task}
-                    currentUserId={currentUserId}
-                    isSuperAdmin={isSuperAdmin}
-                    actionLoadingId={actionLoadingId}
-                    onStatusChange={handleStatusChange}
-                    onEdit={handleOpenEdit}
-                    onDelete={handleDeleteTask}
-                  />
-                ))}
-              </div>
 
-              {/* Mobile Pagination */}
-              {total > params.limit && (
-                <div className="flex justify-center items-center mt-5 pt-3 border-t border-gray-100">
-                  <Pagination
-                    size="small"
-                    current={params.page}
-                    pageSize={params.limit}
-                    total={total}
-                    showSizeChanger={false}
-                    onChange={(page, pageSize) => {
-                      setParams((prev: any) => ({ ...prev, page, limit: pageSize }));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                  />
+            {/* Mobile View: Dedicated Mobile Cards (< md) */}
+            <div className="md:hidden">
+              {loading && (!tasks || tasks.length === 0) ? (
+                <div className="flex justify-center items-center py-12">
+                  <Spin size="large" />
+                </div>
+              ) : !tasks || tasks.length === 0 ? (
+                <div className="py-10">
+                  <Empty description="No tasks found" />
+                </div>
+              ) : (
+                <div>
+                  <div className="space-y-3">
+                    {tasks.map((task: any) => (
+                      <TaskMobileCard
+                        key={task.id}
+                        task={task}
+                        currentUserId={currentUserId}
+                        isSuperAdmin={isSuperAdmin}
+                        actionLoadingId={actionLoadingId}
+                        onStatusChange={handleStatusChange}
+                        onEdit={handleOpenEdit}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Mobile Pagination */}
+                  {total > params.limit && (
+                    <div className="flex justify-center items-center mt-5 pt-3 border-t border-gray-100">
+                      <Pagination
+                        size="small"
+                        current={params.page}
+                        pageSize={params.limit}
+                        total={total}
+                        showSizeChanger={false}
+                        onChange={(page, pageSize) => {
+                          setParams((prev: any) => ({ ...prev, page, limit: pageSize }));
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="pt-1">
+            <TaskKanbanBoard
+              tasks={tasks}
+              loading={loading}
+              currentUserId={currentUserId}
+              isSuperAdmin={isSuperAdmin}
+              actionLoadingId={actionLoadingId}
+              onStatusChange={handleStatusChange}
+              onEdit={handleOpenEdit}
+              onDelete={handleDeleteTask}
+            />
+
+            {total > tasks.length && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                <span>
+                  Showing {tasks.length} of {total} tasks
+                </span>
+                {params.limit < 50 && total > params.limit && (
+                  <Button
+                    size="small"
+                    type="link"
+                    className="p-0 text-blue-600 font-medium"
+                    onClick={() => setParams((prev: any) => ({ ...prev, limit: 50 }))}
+                  >
+                    Load up to 50 tasks on board
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Task Create / Edit Modal */}

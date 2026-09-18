@@ -68,6 +68,10 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
     isIndividualStatus = true;
   }
 
+  const rejectedTime = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
+  const isWithin15MinRejection = rejectedTime > 0 && (Date.now() - rejectedTime) < 15 * 60 * 1000;
+  const showAsRejectedForAssignor = isWithin15MinRejection && (isAssignor || isSuperAdmin);
+
   const completedAssigneesCount =
     task.completionType === 'INDIVIDUAL' && task.assignees
       ? task.assignees.filter(
@@ -77,7 +81,7 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
 
   const canEditOrDelete = isAssignor || isSuperAdmin;
   const hasActionButtons =
-    (isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED' || displayStatus === 'IN_PROGRESS')) ||
+    (isAssignee && (displayStatus === 'TODO' || displayStatus === 'IN_PROGRESS')) ||
     ((isAssignor || isSuperAdmin) && task.status === 'COMPLETED');
 
   return (
@@ -130,8 +134,8 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
           {task.priority}
         </Tag>
 
-        <Tag color={STATUS_COLORS[displayStatus] || 'default'} className="m-0 font-medium text-xs">
-          {displayStatus}
+        <Tag color={showAsRejectedForAssignor ? 'red' : (STATUS_COLORS[displayStatus] || 'default')} className="m-0 font-medium text-xs">
+          {showAsRejectedForAssignor ? 'REJECTED' : displayStatus}
           {task.completionType === 'INDIVIDUAL' && !isIndividualStatus && (
             <span className="ml-1 text-[11px] text-gray-500 font-normal">(Group)</span>
           )}
@@ -139,6 +143,11 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
             <span className="ml-1 text-[11px] text-blue-600 font-normal">(Yours)</span>
           )}
         </Tag>
+        {isWithin15MinRejection && !showAsRejectedForAssignor && (
+          <Tag color="orange" className="m-0 text-xs font-medium">
+            Rework Required
+          </Tag>
+        )}
 
         <Tag 
           color={task.completionType === 'INDIVIDUAL' ? 'purple' : 'geekblue'} 
@@ -269,22 +278,18 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
       {/* Action Buttons for Task Lifecycle */}
       {hasActionButtons && (
         <div className="pt-2.5 border-t border-gray-100 flex items-center gap-2">
-          {/* Start Work (TODO or REJECTED) */}
-          {isAssignee && (displayStatus === 'TODO' || displayStatus === 'REJECTED') && (
+          {/* Start Work (TODO) */}
+          {isAssignee && displayStatus === 'TODO' && (
             <Button
               type="primary"
               block
               size="middle"
               loading={actionLoadingId === `${task.id}-IN_PROGRESS`}
               disabled={!!actionLoadingId}
-              className={`h-9 font-medium ${
-                displayStatus === 'REJECTED' 
-                  ? 'bg-orange-600 hover:bg-orange-500' 
-                  : 'bg-blue-600 hover:bg-blue-500'
-              }`}
+              className="h-9 font-medium bg-blue-600 hover:bg-blue-500"
               onClick={() => onStatusChange(task, 'IN_PROGRESS')}
             >
-              {displayStatus === 'REJECTED' ? 'Start Work Again' : 'Start Work'}
+              Start Work
             </Button>
           )}
 

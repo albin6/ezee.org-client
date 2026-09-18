@@ -13,7 +13,10 @@ export interface Task {
   createdBy?: { id: string; name: string };
   recurrencePattern?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   assignees: any[];
+  rejectedAt?: string;
+  verifiedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export const taskApi = {
