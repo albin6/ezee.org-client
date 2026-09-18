@@ -5,10 +5,14 @@ export const usePermissions = () => {
 
   const hasPermission = (permission: string) => {
     // Super admins have all permissions
-    if (user?.type === 'super_admin') {
+    if (
+      user?.type === 'super_admin' ||
+      (user as any)?.role === 'Super Admin' ||
+      (user as any)?.role?.name === 'Super Admin'
+    ) {
       return true;
     }
-    // Future proofing: Check against a user.permissions array if added later
+    // Check against a user.permissions array
     return (user as any)?.permissions?.includes(permission) || false;
   };
 
