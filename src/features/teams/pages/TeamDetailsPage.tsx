@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Descriptions, Spin, Tag, message } from 'antd';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -11,6 +11,7 @@ import { TeamPermissionsManager } from '../components/TeamPermissionsManager';
 
 export const TeamDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,9 +41,16 @@ export const TeamDetailsPage: React.FC = () => {
       key: '1',
       label: 'Overview',
       children: (
-        <div>
-          <Descriptions title="Team Information" bordered>
-            <Descriptions.Item label="Name">{team.name}</Descriptions.Item>
+        <div className="overflow-x-auto">
+          <Descriptions 
+            title={<span className="text-base sm:text-lg font-medium text-gray-900">Team Information</span>} 
+            bordered
+            size="middle"
+            column={{ xs: 1, sm: 2, md: 3 }}
+          >
+            <Descriptions.Item label="Name">
+              <span className="font-semibold text-gray-800">{team.name}</span>
+            </Descriptions.Item>
             <Descriptions.Item label="Type">
               <Tag color={team.type === 'TOWER' ? 'purple' : 'blue'}>
                 {team.type === 'TOWER' ? 'Tower Level (Oversight)' : 'Operational Delivery'}
@@ -52,7 +60,9 @@ export const TeamDetailsPage: React.FC = () => {
             <Descriptions.Item label="Status">
               <Tag color={team.status === 'ACTIVE' ? 'success' : 'error'}>{team.status}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Description">{team.description || 'N/A'}</Descriptions.Item>
+            <Descriptions.Item label="Description" span={2}>
+              <span className="text-gray-600">{team.description || 'No description provided'}</span>
+            </Descriptions.Item>
             <Descriptions.Item label="Created At">{new Date(team.createdAt).toLocaleString()}</Descriptions.Item>
             <Descriptions.Item label="Updated At">{new Date(team.updatedAt).toLocaleString()}</Descriptions.Item>
           </Descriptions>
@@ -79,10 +89,16 @@ export const TeamDetailsPage: React.FC = () => {
   return (
     <PageContainer>
       <PageHeader 
-        title={`Team Details: ${team.name}`} 
+        title={`Team: ${team.name}`} 
+        onBack={() => navigate('/teams')}
       />
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <Tabs defaultActiveKey="1" items={items} destroyOnHidden={true} />
+      <div className="bg-white p-3.5 sm:p-6 rounded-xl shadow-sm overflow-hidden">
+        <Tabs 
+          defaultActiveKey="1" 
+          items={items} 
+          destroyOnHidden={true}
+          className="team-details-tabs"
+        />
       </div>
     </PageContainer>
   );
