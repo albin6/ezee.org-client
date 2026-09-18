@@ -41,7 +41,12 @@ export const RolesPage: React.FC = () => {
         description="Manage system access levels and granular permissions for users."
         extra={
           hasPermission('roles:write') && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={handleCreate}
+              className="w-full sm:w-auto h-10 sm:h-auto font-medium"
+            >
               Create Role
             </Button>
           )
