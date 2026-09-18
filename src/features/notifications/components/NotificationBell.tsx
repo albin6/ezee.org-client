@@ -93,12 +93,12 @@ export const NotificationBell: React.FC = () => {
       placement={screens.sm ? "bottomRight" : "bottom"}
       overlayStyle={screens.sm ? { maxWidth: 'calc(100vw - 32px)' } : { maxWidth: '100vw' }}
     >
-      <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]}>
+      <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]} className="flex items-center">
         <Button 
           type="text" 
           shape="circle" 
-          icon={<BellOutlined className="text-lg text-gray-600 hover:text-gray-900" />} 
-          className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 hover:bg-gray-100 transition-colors"
+          icon={<BellOutlined className="text-[17px] text-gray-600 hover:text-gray-900" />} 
+          className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors border-0"
           aria-label="Notifications"
         />
       </Badge>

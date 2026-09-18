@@ -459,11 +459,13 @@ export const AdminLayout: React.FC = () => {
               </div>
               <Button
                 type="text"
-                size="small"
-                icon={<LogoutOutlined className="text-gray-400 hover:text-red-400 text-sm" />}
+                danger
+                icon={<LogoutOutlined className="text-base" />}
                 onClick={handleLogout}
                 title="Log out"
-                className="hover:bg-gray-800 text-gray-400 flex items-center justify-center h-8 w-8"
+                className="hover:bg-red-950/40 text-red-400 hover:text-red-300 flex items-center justify-center h-8 w-8 shrink-0 rounded-lg"
+                style={{ color: '#f87171' }}
+                aria-label="Log out"
               />
             </div>
           ) : (
@@ -553,7 +555,10 @@ export const AdminLayout: React.FC = () => {
       </Drawer>
 
       <Layout className="bg-transparent flex flex-col h-[100dvh] overflow-hidden">
-        <Header className="h-14 sm:h-16 leading-normal px-3 sm:px-4 md:px-6 lg:px-8 flex justify-between items-center bg-white/95 backdrop-blur-xs border-b border-gray-200/80 shadow-2xs shrink-0 z-20">
+        <Header 
+          style={{ height: 64, lineHeight: 'normal' }}
+          className="px-4! sm:px-6! md:px-8! flex justify-between items-center bg-white/95 backdrop-blur-xs border-b border-gray-200/80 shadow-2xs shrink-0 z-20"
+        >
           {/* Left Side: Hamburger on Mobile/Tablet, Collapse Toggle on Desktop, Mobile Brand Pill, Contextual Title */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             {/* Mobile / Tablet Hamburger */}
@@ -605,27 +610,33 @@ export const AdminLayout: React.FC = () => {
           </div>
 
           {/* Right Side: Notification Bell & User Profile Dropdown */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
             <NotificationBell />
 
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow trigger={['click']}>
               <button 
                 type="button" 
-                className="flex items-center gap-2 py-1 px-1.5 sm:px-2 rounded-full sm:rounded-xl border border-transparent sm:border-gray-200/80 hover:bg-gray-50/90 active:bg-gray-100 transition-all cursor-pointer select-none focus:outline-hidden"
+                className="flex items-center gap-2 h-10 px-1.5 sm:pl-1.5 sm:pr-3 rounded-full border border-gray-200/90 bg-white hover:bg-gray-50/90 active:bg-gray-100 transition-all shadow-2xs cursor-pointer select-none focus:outline-hidden"
+                style={{ lineHeight: 1 }}
               >
-                <div className="relative shrink-0">
-                  <Avatar icon={<UserOutlined />} className="bg-purple-600 text-white font-medium" size={32} />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
+                  <Avatar 
+                    icon={<UserOutlined />} 
+                    size={32} 
+                    style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}
+                    className="shrink-0"
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full z-10" />
                 </div>
-                <div className="hidden sm:flex flex-col items-start min-w-0 text-left">
-                  <span className="text-xs font-semibold text-gray-900 leading-tight truncate max-w-[110px] md:max-w-[150px]">
+                <div className="hidden sm:flex flex-col items-start justify-center min-w-0 text-left gap-0.5">
+                  <span className="text-xs font-semibold text-gray-800 leading-none truncate max-w-[110px] md:max-w-[150px]">
                     {userName}
                   </span>
                   <span className="text-[10px] text-gray-500 font-medium leading-none">
                     {userRole}
                   </span>
                 </div>
-                <DownOutlined className="hidden sm:block text-[10px] text-gray-400 shrink-0 ml-0.5" />
+                <DownOutlined className="hidden sm:block text-[10px] text-gray-400 shrink-0 ml-0.5 self-center" />
               </button>
             </Dropdown>
           </div>
