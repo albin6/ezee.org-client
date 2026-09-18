@@ -100,36 +100,23 @@ export const AdminLayout: React.FC = () => {
 
   const userMenuItems = [
     {
-      key: 'header',
-      disabled: true,
-      className: 'cursor-default! opacity-100! pb-2 pt-1 border-b border-gray-100 mb-1',
-      label: (
-        <div className="flex flex-col gap-0.5 select-none py-0.5">
-          <span className="font-semibold text-gray-900 text-sm">{userName}</span>
-          {userEmail && <span className="text-xs text-gray-400 truncate max-w-[190px]">{userEmail}</span>}
-          <div className="mt-1">
-            <Tag color={userRole === 'Super Admin' ? 'purple' : isCoordinator ? 'cyan' : 'blue'} className="text-[10px] m-0 px-1.5 py-0 font-medium">
-              {userRole}
-            </Tag>
-          </div>
-        </div>
-      ),
-    },
-    {
       key: 'profile',
-      icon: <UserOutlined className="text-gray-500" />,
+      icon: <UserOutlined className="text-gray-500 text-base" />,
       label: <span className="text-sm font-medium text-gray-700">My Profile</span>,
       onClick: () => navigate('/profile'),
+      className: 'py-2 px-3',
     },
     {
       type: 'divider' as const,
+      className: 'my-1',
     },
     {
       key: 'logout',
-      icon: <LogoutOutlined className="text-red-500" />,
+      icon: <LogoutOutlined className="text-red-500 text-base" />,
       label: <span className="text-sm font-medium text-red-600">Log out</span>,
       danger: true,
       onClick: handleLogout,
+      className: 'py-2 px-3',
     },
   ];
 
@@ -613,7 +600,53 @@ export const AdminLayout: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
             <NotificationBell />
 
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow trigger={['click']}>
+            <Dropdown 
+              menu={{ items: userMenuItems }} 
+              placement="bottomRight" 
+              arrow 
+              trigger={['click']}
+              dropdownRender={(menu) => (
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[210px]">
+                  {/* User Profile Header Card */}
+                  <div className="px-3.5 py-3 bg-gray-50/90 border-b border-gray-100 flex items-center gap-3">
+                    <Avatar 
+                      icon={<UserOutlined />} 
+                      size={36} 
+                      style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}
+                      className="shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0 text-left">
+                      <span className="font-semibold text-gray-900 text-sm leading-snug truncate">
+                        {userName}
+                      </span>
+                      <div className="mt-1">
+                        <Tag 
+                          color={userRole === 'Super Admin' ? 'purple' : isCoordinator ? 'cyan' : 'blue'} 
+                          className="text-[10px] m-0 px-1.5 py-0 font-medium rounded leading-tight"
+                        >
+                          {userRole}
+                        </Tag>
+                      </div>
+                      {userEmail && (
+                        <span className="text-[10px] text-gray-400 truncate max-w-[130px] mt-0.5 leading-tight">
+                          {userEmail}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Items */}
+                  {React.isValidElement(menu) && React.cloneElement(menu as React.ReactElement<any>, {
+                    style: {
+                      boxShadow: 'none',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '4px',
+                    },
+                  })}
+                </div>
+              )}
+            >
               <button 
                 type="button" 
                 className="flex items-center gap-2 h-10 px-1.5 sm:pl-1.5 sm:pr-3 rounded-full border border-gray-200/90 bg-white hover:bg-gray-50/90 active:bg-gray-100 transition-all shadow-2xs cursor-pointer select-none focus:outline-hidden"
