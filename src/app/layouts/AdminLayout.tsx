@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Dropdown, Avatar, Button, Drawer, Tag, Tooltip } from 'antd';
+import { Layout, Menu, Dropdown, Avatar, Button, Drawer, Tooltip } from 'antd';
 import { 
   UserOutlined, 
   LogoutOutlined, 
@@ -95,7 +95,6 @@ export const AdminLayout: React.FC = () => {
   const userName = isCoordinator 
     ? anyUser?.name || 'Coordinator' 
     : (anyUser?.type === 'user' || anyUser?.email ? anyUser?.name || 'User' : anyUser?.identifier || 'Admin');
-  const userEmail = anyUser?.email || anyUser?.identifier || '';
   const userRole = anyUser?.role?.name || (isCoordinator ? 'Coordinator' : anyUser?.type === 'super_admin' ? 'Super Admin' : 'Member');
 
   const userMenuItems = [
@@ -615,23 +614,10 @@ export const AdminLayout: React.FC = () => {
                       style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}
                       className="shrink-0"
                     />
-                    <div className="flex flex-col min-w-0 text-left">
+                    <div className="flex flex-col min-w-0 text-left justify-center">
                       <span className="font-semibold text-gray-900 text-sm leading-snug truncate">
                         {userName}
                       </span>
-                      <div className="mt-1">
-                        <Tag 
-                          color={userRole === 'Super Admin' ? 'purple' : isCoordinator ? 'cyan' : 'blue'} 
-                          className="text-[10px] m-0 px-1.5 py-0 font-medium rounded leading-tight"
-                        >
-                          {userRole}
-                        </Tag>
-                      </div>
-                      {userEmail && (
-                        <span className="text-[10px] text-gray-400 truncate max-w-[130px] mt-0.5 leading-tight">
-                          {userEmail}
-                        </span>
-                      )}
                     </div>
                   </div>
 
