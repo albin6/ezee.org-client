@@ -111,11 +111,11 @@ export const AdminLayout: React.FC = () => {
     },
     {
       key: 'logout',
-      icon: <LogoutOutlined className="text-red-500 text-base" />,
-      label: <span className="text-sm font-medium text-red-600">Log out</span>,
+      icon: <LogoutOutlined className="text-base group-hover:text-white transition-colors" />,
+      label: <span className="text-sm font-medium group-hover:text-white transition-colors">Log out</span>,
       danger: true,
       onClick: handleLogout,
-      className: 'py-2 px-3',
+      className: 'py-2 px-3 group',
     },
   ];
 
@@ -605,12 +605,12 @@ export const AdminLayout: React.FC = () => {
               arrow 
               trigger={['click']}
               dropdownRender={(menu) => (
-                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[210px]">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-44">
                   {/* User Profile Header Card */}
-                  <div className="px-3.5 py-3 bg-gray-50/90 border-b border-gray-100 flex items-center gap-3">
+                  <div className="px-3 py-2.5 bg-gray-50/90 border-b border-gray-100 flex items-center gap-2.5">
                     <Avatar 
                       icon={<UserOutlined />} 
-                      size={36} 
+                      size={32} 
                       style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}
                       className="shrink-0"
                     />
