@@ -29,7 +29,7 @@ export const NotificationBell: React.FC = () => {
   };
 
   const content = (
-    <div className="flex flex-col w-[90vw] sm:w-87.5 max-h-[75vh] sm:max-h-100">
+    <div className="flex flex-col w-[88vw] sm:w-[360px] max-w-[400px] max-h-[75vh] sm:max-h-[420px]">
       <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100">
         <div className="flex justify-between items-center">
           <Text strong className="text-base">Notifications</Text>
@@ -38,7 +38,7 @@ export const NotificationBell: React.FC = () => {
             size="small"
             onClick={() => markAllAsRead()}
             disabled={unreadCount === 0}
-            className="px-0"
+            className="px-0 text-blue-600 font-medium"
           >
             Mark all as read
           </Button>
@@ -94,7 +94,13 @@ export const NotificationBell: React.FC = () => {
       overlayStyle={screens.sm ? { maxWidth: 'calc(100vw - 32px)' } : { maxWidth: '100vw' }}
     >
       <Badge count={unreadCount} overflowCount={99} offset={[-2, 2]}>
-        <Button type="text" shape="circle" icon={<BellOutlined className="text-lg" />} />
+        <Button 
+          type="text" 
+          shape="circle" 
+          icon={<BellOutlined className="text-lg text-gray-600 hover:text-gray-900" />} 
+          className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 hover:bg-gray-100 transition-colors"
+          aria-label="Notifications"
+        />
       </Badge>
     </Popover>
   );
