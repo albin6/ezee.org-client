@@ -188,12 +188,15 @@ export const TaskListPage: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (record: any, newStatus: string) => {
-    const actionKey = `${record.id}-${newStatus}`;
+  const handleStatusChange = async (record: any, newStatus: string, assigneeId?: string) => {
+    const actionKey = assigneeId ? `${record.id}-${assigneeId}-${newStatus}` : `${record.id}-${newStatus}`;
     if (actionLoadingId === actionKey) return;
     try {
       setActionLoadingId(actionKey);
-      await useTaskStore.getState().updateTask(record.id, { status: newStatus });
+      await useTaskStore.getState().updateTask(record.id, { 
+        status: newStatus,
+        ...(assigneeId ? { assigneeId } : {})
+      });
       message.success('Status updated');
       await fetchTasks({ ...params, filter: activeTab });
     } catch (error: any) {
@@ -429,10 +432,10 @@ export const TaskListPage: React.FC = () => {
               <Button
                 size="small"
                 type="primary"
-                loading={actionLoadingId === `${record.id}-IN_PROGRESS`}
+                loading={!!(actionLoadingId === `${record.id}-IN_PROGRESS` || (currentUserId && actionLoadingId === `${record.id}-${currentUserId}-IN_PROGRESS`))}
                 disabled={!!actionLoadingId}
                 className="text-xs"
-                onClick={() => handleStatusChange(record, 'IN_PROGRESS')}
+                onClick={() => handleStatusChange(record, 'IN_PROGRESS', record.completionType === 'INDIVIDUAL' ? currentUserId : undefined)}
               >
                 Start Work
               </Button>
@@ -442,10 +445,10 @@ export const TaskListPage: React.FC = () => {
               <Button
                 size="small"
                 type="primary"
-                loading={actionLoadingId === `${record.id}-COMPLETED`}
+                loading={!!(actionLoadingId === `${record.id}-COMPLETED` || (currentUserId && actionLoadingId === `${record.id}-${currentUserId}-COMPLETED`))}
                 disabled={!!actionLoadingId}
                 className="bg-blue-600 text-xs"
-                onClick={() => handleStatusChange(record, 'COMPLETED')}
+                onClick={() => handleStatusChange(record, 'COMPLETED', record.completionType === 'INDIVIDUAL' ? currentUserId : undefined)}
               >
                 Complete Task
               </Button>
@@ -865,6 +868,7 @@ export const TaskListPage: React.FC = () => {
             <TaskKanbanBoard
               tasks={tasks}
               loading={loading}
+              activeFilter={activeTab}
               currentUserId={currentUserId}
               isSuperAdmin={isSuperAdmin}
               actionLoadingId={actionLoadingId}

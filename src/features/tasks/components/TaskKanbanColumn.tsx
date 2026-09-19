@@ -13,7 +13,7 @@ interface TaskKanbanColumnProps {
   currentUserId?: string;
   isSuperAdmin?: boolean;
   actionLoadingId: string | null;
-  onStatusChange: (task: any, newStatus: string) => Promise<void>;
+  onStatusChange: (task: any, newStatus: string, assigneeId?: string) => Promise<void>;
   onEdit: (task: any) => void;
   onDelete: (taskId: string) => Promise<void>;
 }
@@ -75,10 +75,11 @@ export const TaskKanbanColumn: React.FC<TaskKanbanColumnProps> = ({
 
       {/* Cards Container with smooth vertical scrolling */}
       <div className="flex-1 p-2.5 overflow-y-auto space-y-2.5 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-        {tasks.map((task) => (
+        {tasks.map((taskItem) => (
           <TaskKanbanCard
-            key={task.id}
-            task={task}
+            key={taskItem.kanbanCardId || taskItem.id}
+            task={taskItem}
+            targetAssignee={taskItem.targetAssignee}
             currentUserId={currentUserId}
             isSuperAdmin={isSuperAdmin}
             actionLoadingId={actionLoadingId}

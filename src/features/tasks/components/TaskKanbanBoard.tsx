@@ -68,10 +68,11 @@ const KANBAN_COLUMNS: ColumnDef[] = [
 interface TaskKanbanBoardProps {
   tasks: any[];
   loading: boolean;
+  activeFilter?: string;
   currentUserId?: string;
   isSuperAdmin?: boolean;
   actionLoadingId: string | null;
-  onStatusChange: (task: any, newStatus: string) => Promise<void>;
+  onStatusChange: (task: any, newStatus: string, assigneeId?: string) => Promise<void>;
   onEdit: (task: any) => void;
   onDelete: (taskId: string) => Promise<void>;
 }
@@ -79,6 +80,7 @@ interface TaskKanbanBoardProps {
 export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
   tasks,
   loading,
+  activeFilter,
   currentUserId,
   isSuperAdmin = false,
   actionLoadingId,
@@ -113,8 +115,9 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
 
   const handleDragStart = (event: DragStartEvent) => {
     const task = event.active.data.current?.task;
+    const targetAssignee = event.active.data.current?.targetAssignee;
     if (task) {
-      setActiveTask(task);
+      setActiveTask({ ...task, targetAssignee });
     }
   };
 
@@ -125,16 +128,27 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
     if (!over) return;
 
     const task = active.data.current?.task;
+    const targetAssignee = active.data.current?.targetAssignee;
     const targetStatus = over.id as string;
 
     if (!task) return;
 
     const isAssignor = task.createdById === currentUserId;
     const isAssignorOrAdmin = isAssignor || isSuperAdmin;
-    const assigneeRecord = task.assignees?.find(
+    const assigneeRecord = targetAssignee || task.assignees?.find(
       (a: any) => (a.userId || a.user?.id) === currentUserId
     );
     const isAssignee = !!assigneeRecord;
+    const isIndividual = task.completionType === 'INDIVIDUAL';
+    const targetAssigneeId = isIndividual
+      ? (targetAssignee ? (targetAssignee.userId || targetAssignee.user?.id || targetAssignee.id) : (isAssignee ? currentUserId : undefined))
+      : undefined;
+
+    // Determine current card status
+    let currentCardStatus = task.status;
+    if (isIndividual && assigneeRecord?.status) {
+      currentCardStatus = assigneeRecord.status;
+    }
 
     // Helper to determine where the card was located visually
     const rejectedTime = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
@@ -147,7 +161,11 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
         return;
       }
       if (task.status !== 'COMPLETED') {
-        message.warning('Only completed tasks can be verified.');
+        if (isIndividual) {
+          message.warning('All assignees must complete their work before the task can be verified.');
+        } else {
+          message.warning('Only completed tasks can be verified.');
+        }
         return;
       }
       await onStatusChange(task, 'VERIFIED');
@@ -170,30 +188,38 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
     if (targetStatus === 'IN_PROGRESS') {
       if (isVisuallyRejected) {
         // Dragging out of Rejected into In Progress
-        await onStatusChange(task, 'IN_PROGRESS');
+        await onStatusChange(task, 'IN_PROGRESS', targetAssigneeId);
         return;
       }
-      if (task.status === 'TODO') {
-        if (!isAssignee && !isAssignorOrAdmin) {
-          message.warning('Only assignees or assignor can start a task.');
+      if (currentCardStatus === 'TODO') {
+        const canStart = (isIndividual && targetAssignee)
+          ? ((targetAssignee.userId || targetAssignee.user?.id) === currentUserId || isAssignorOrAdmin)
+          : (isAssignee || isAssignorOrAdmin);
+
+        if (!canStart) {
+          message.warning('Only the assigned user or assignor can start this task.');
           return;
         }
-        await onStatusChange(task, 'IN_PROGRESS');
+        await onStatusChange(task, 'IN_PROGRESS', targetAssigneeId);
         return;
       }
-      if (task.status === 'IN_PROGRESS') return;
+      if (currentCardStatus === 'IN_PROGRESS') return;
     }
 
     if (targetStatus === 'COMPLETED') {
-      if (task.status !== 'IN_PROGRESS') {
+      if (currentCardStatus !== 'IN_PROGRESS') {
         message.warning('Tasks must be In Progress before they can be completed.');
         return;
       }
-      if (!isAssignee && !isAssignorOrAdmin) {
-        message.warning('Only assignees or assignor can complete this task.');
+      const canComplete = (isIndividual && targetAssignee)
+        ? ((targetAssignee.userId || targetAssignee.user?.id) === currentUserId || isAssignorOrAdmin)
+        : (isAssignee || isAssignorOrAdmin);
+
+      if (!canComplete) {
+        message.warning('Only the assigned user or assignor can complete this task.');
         return;
       }
-      await onStatusChange(task, 'COMPLETED');
+      await onStatusChange(task, 'COMPLETED', targetAssigneeId);
       return;
     }
 
@@ -225,67 +251,134 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
   tasks.forEach((task) => {
     const isAssignor = task.createdById === currentUserId;
     const isAssignorOrAdmin = isAssignor || isSuperAdmin;
+    const isIndividual = task.completionType === 'INDIVIDUAL';
+    const assignees = task.assignees || [];
 
-    // 1. VERIFIED COLUMN (disappears after 24 hours)
+    const pushCard = (targetTask: any, colStatus: string) => {
+      if (tasksByStatus[colStatus]) {
+        tasksByStatus[colStatus].push(targetTask);
+      }
+    };
+
+    if (isIndividual && assignees.length > 0) {
+      if (activeFilter === 'assigned_to_me') {
+        // ASSIGNEE PERSPECTIVE:
+        // Current user only sees their own assignment card
+        const myRecord = assignees.find(
+          (a: any) => (a.userId || a.user?.id) === currentUserId
+        );
+        if (myRecord) {
+          const cardTask = {
+            ...task,
+            kanbanCardId: `${task.id}__${currentUserId}`,
+            targetAssignee: myRecord,
+          };
+
+          // 1. Check verified (24 hours)
+          if (task.status === 'VERIFIED') {
+            const verifiedTimestamp = task.verifiedAt 
+              ? new Date(task.verifiedAt).getTime() 
+              : new Date(task.updatedAt || task.createdAt).getTime();
+            if ((now - verifiedTimestamp) < 24 * 60 * 60 * 1000) {
+              pushCard(cardTask, 'VERIFIED');
+            }
+            return;
+          }
+
+          // 2. Check rejection window (15 mins)
+          const rejectedTimestamp = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
+          const isWithin15MinRejection = rejectedTimestamp > 0 && (now - rejectedTimestamp) < 15 * 60 * 1000;
+          if (isWithin15MinRejection || task.status === 'REJECTED') {
+            pushCard(cardTask, 'IN_PROGRESS');
+            return;
+          }
+
+          // 3. Status column
+          if (myRecord.status === 'COMPLETED') {
+            pushCard(cardTask, 'COMPLETED');
+          } else if (myRecord.status === 'IN_PROGRESS') {
+            pushCard(cardTask, 'IN_PROGRESS');
+          } else {
+            pushCard(cardTask, 'TODO');
+          }
+          return;
+        }
+      }
+
+      // ASSIGNOR / ADMIN PERSPECTIVE:
+      // Render distinct sub-cards per assignee across columns
+      assignees.forEach((assignee: any) => {
+        const assigneeUserId = assignee.userId || assignee.user?.id || assignee.id;
+        const subCardTask = {
+          ...task,
+          kanbanCardId: `${task.id}__${assigneeUserId}`,
+          targetAssignee: assignee,
+        };
+
+        // 1. Check verified (24 hours)
+        if (task.status === 'VERIFIED') {
+          const verifiedTimestamp = task.verifiedAt 
+            ? new Date(task.verifiedAt).getTime() 
+            : new Date(task.updatedAt || task.createdAt).getTime();
+          if ((now - verifiedTimestamp) < 24 * 60 * 60 * 1000) {
+            pushCard(subCardTask, 'VERIFIED');
+          }
+          return;
+        }
+
+        // 2. Check rejection window (15 mins)
+        const rejectedTimestamp = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
+        const isWithin15MinRejection = rejectedTimestamp > 0 && (now - rejectedTimestamp) < 15 * 60 * 1000;
+        if (isWithin15MinRejection || task.status === 'REJECTED') {
+          pushCard(subCardTask, 'REJECTED');
+          return;
+        }
+
+        // 3. Status column
+        if (assignee.status === 'COMPLETED') {
+          pushCard(subCardTask, 'COMPLETED');
+        } else if (assignee.status === 'IN_PROGRESS') {
+          pushCard(subCardTask, 'IN_PROGRESS');
+        } else {
+          pushCard(subCardTask, 'TODO');
+        }
+      });
+      return;
+    }
+
+    // SHARED TASK OR NO ASSIGNEES
+    const singleCardTask = {
+      ...task,
+      kanbanCardId: task.id,
+    };
+
     if (task.status === 'VERIFIED') {
       const verifiedTimestamp = task.verifiedAt 
         ? new Date(task.verifiedAt).getTime() 
         : new Date(task.updatedAt || task.createdAt).getTime();
-      
-      const isPast24Hours = (now - verifiedTimestamp) >= 24 * 60 * 60 * 1000;
-      if (!isPast24Hours) {
-        tasksByStatus.VERIFIED.push(task);
+      if ((now - verifiedTimestamp) < 24 * 60 * 60 * 1000) {
+        pushCard(singleCardTask, 'VERIFIED');
       }
       return;
     }
 
-    // Check individual assignee status if applicable
-    let effectiveStatus = task.status;
-    if (task.completionType === 'INDIVIDUAL') {
-      const myRecord = task.assignees?.find(
-        (a: any) => (a.userId || a.user?.id) === currentUserId
-      );
-      if (myRecord?.status) {
-        effectiveStatus = myRecord.status;
-      }
-    }
-
-    // 2. REJECTION 15-MINUTE VISIBILITY LOGIC
-    // Rejection sends task back to IN_PROGRESS.
-    // On assignor/admin side: appears in REJECTED column for 15 minutes.
-    // On assignee side: immediately appears in IN_PROGRESS column.
     const rejectedTimestamp = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
     const isWithin15MinRejection = rejectedTimestamp > 0 && (now - rejectedTimestamp) < 15 * 60 * 1000;
-
-    if (isWithin15MinRejection) {
+    if (isWithin15MinRejection || task.status === 'REJECTED') {
       if (isAssignorOrAdmin) {
-        // Assignor View: Show in Rejected column for 15 minutes
-        tasksByStatus.REJECTED.push(task);
-        return;
+        pushCard(singleCardTask, 'REJECTED');
       } else {
-        // Assignee View: Immediately returns to In Progress for rework
-        tasksByStatus.IN_PROGRESS.push(task);
-        return;
-      }
-    }
-
-    // 3. Fallback for legacy tasks explicitly saved with status REJECTED
-    if (task.status === 'REJECTED') {
-      if (isAssignorOrAdmin) {
-        tasksByStatus.REJECTED.push(task);
-      } else {
-        tasksByStatus.IN_PROGRESS.push(task);
+        pushCard(singleCardTask, 'IN_PROGRESS');
       }
       return;
     }
 
-    // 4. Standard workflow placement
-    if (effectiveStatus === 'COMPLETED' || task.status === 'COMPLETED') {
-      tasksByStatus.COMPLETED.push(task);
-    } else if (effectiveStatus === 'IN_PROGRESS' || task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW') {
-      tasksByStatus.IN_PROGRESS.push(task);
+    if (task.status === 'COMPLETED') {
+      pushCard(singleCardTask, 'COMPLETED');
+    } else if (task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW') {
+      pushCard(singleCardTask, 'IN_PROGRESS');
     } else {
-      tasksByStatus.TODO.push(task);
+      pushCard(singleCardTask, 'TODO');
     }
   });
 
@@ -324,6 +417,7 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
           <div className="w-[280px]">
             <TaskKanbanCard
               task={activeTask}
+              targetAssignee={activeTask.targetAssignee}
               currentUserId={currentUserId}
               isSuperAdmin={isSuperAdmin}
               actionLoadingId={null}

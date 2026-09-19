@@ -33,10 +33,11 @@ const STATUS_COLORS: Record<string, string> = {
 
 interface TaskKanbanCardProps {
   task: any;
+  targetAssignee?: any;
   currentUserId?: string;
   isSuperAdmin?: boolean;
   actionLoadingId: string | null;
-  onStatusChange: (task: any, newStatus: string) => Promise<void>;
+  onStatusChange: (task: any, newStatus: string, assigneeId?: string) => Promise<void>;
   onEdit: (task: any) => void;
   onDelete: (taskId: string) => Promise<void>;
   isOverlay?: boolean;
@@ -44,6 +45,7 @@ interface TaskKanbanCardProps {
 
 export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
   task,
+  targetAssignee,
   currentUserId,
   isSuperAdmin = false,
   actionLoadingId,
@@ -52,9 +54,11 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
   onDelete,
   isOverlay = false,
 }) => {
+  const cardId = task.kanbanCardId || (targetAssignee ? `${task.id}__${targetAssignee.userId || targetAssignee.user?.id || targetAssignee.id}` : task.id);
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-    data: { task },
+    id: cardId,
+    data: { task, targetAssignee, cardId },
     disabled: isOverlay,
   });
 
@@ -66,16 +70,26 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
 
   const isAssignor = task.createdById === currentUserId;
   const isAssignorOrAdmin = isAssignor || isSuperAdmin;
-  const assigneeRecord = task.assignees?.find(
+  const assigneeRecord = targetAssignee || task.assignees?.find(
     (a: any) => (a.userId || a.user?.id) === currentUserId
   );
   const isAssignee = !!assigneeRecord;
 
+  // Target assignee ID for individual tasks
+  const isIndividual = task.completionType === 'INDIVIDUAL';
+  const targetAssigneeId = isIndividual
+    ? (targetAssignee ? (targetAssignee.userId || targetAssignee.user?.id || targetAssignee.id) : (isAssignee ? currentUserId : undefined))
+    : undefined;
+
   // Determine effective display status
   let displayStatus = task.status;
-  if (task.completionType === 'INDIVIDUAL' && isAssignee) {
+  if (isIndividual && assigneeRecord?.status) {
     displayStatus = assigneeRecord.status;
   }
+
+  const isLoading = (status: string) => 
+    actionLoadingId === `${task.id}-${status}` || 
+    (targetAssigneeId && actionLoadingId === `${task.id}-${targetAssigneeId}-${status}`);
 
   // Rejection timing calculation (15-minute window)
   const rejectedTime = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
@@ -102,7 +116,7 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
 
   const assignees = task.assignees || [];
   const completedAssigneesCount =
-    task.completionType === 'INDIVIDUAL' && assignees.length > 0
+    isIndividual && assignees.length > 0
       ? assignees.filter((a: any) => a.status === 'COMPLETED' || a.status === 'VERIFIED').length
       : 0;
 
@@ -163,6 +177,24 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
             <span className="text-[10px] text-green-600">
               Disappears in {verifiedHoursRemaining}h {verifiedMinsRemaining}m
             </span>
+          </div>
+        )}
+
+        {/* Target Assignee Banner for Individual Task */}
+        {targetAssignee && (
+          <div className="mb-2 px-2.5 py-1 bg-purple-50/80 border border-purple-200/70 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Avatar size={18} className="bg-purple-200 text-purple-800 font-bold text-[9px] shrink-0">
+                {(targetAssignee.user?.name || 'U').charAt(0).toUpperCase()}
+              </Avatar>
+              <span className="text-[11px] font-semibold text-purple-900 truncate">
+                Assignee: {targetAssignee.user?.name || 'Assignee'}
+                {(targetAssignee.userId || targetAssignee.user?.id) === currentUserId && ' (You)'}
+              </span>
+            </div>
+            <Tag color={STATUS_COLORS[displayStatus] || 'default'} className="m-0 text-[9px] py-0 px-1.5 font-medium shrink-0">
+              {displayStatus}
+            </Tag>
           </div>
         )}
 
@@ -280,10 +312,16 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
               const isMe = (a.userId || a.user?.id) === currentUserId;
               const status = a.status || task.status;
               const name = a.user?.name || 'User';
+              const isCardTarget = targetAssignee && (a.userId || a.user?.id) === (targetAssignee.userId || targetAssignee.user?.id);
               return (
-                <div key={a.userId || a.id} className="flex items-center justify-between gap-1 text-xs">
+                <div 
+                  key={a.userId || a.id} 
+                  className={`flex items-center justify-between gap-1 text-xs px-1 py-0.5 rounded ${
+                    isCardTarget ? 'bg-purple-100/50 font-medium' : ''
+                  }`}
+                >
                   <div className="flex items-center gap-1 min-w-0">
-                    <Avatar size={18} className="bg-blue-100 text-blue-700 font-bold text-[9px] shrink-0">
+                    <Avatar size={18} className={`${isCardTarget ? 'bg-purple-200 text-purple-800' : 'bg-blue-100 text-blue-700'} font-bold text-[9px] shrink-0`}>
                       {name.charAt(0).toUpperCase()}
                     </Avatar>
                     <span className={`text-[11px] truncate max-w-[100px] ${isMe ? 'text-blue-700 font-semibold' : 'text-gray-700 font-medium'}`}>
@@ -351,41 +389,42 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
             onPointerDown={(e) => e.stopPropagation()}
           >
             {/* Assignee: Start Work from TODO */}
-            {isAssignee && displayStatus === 'TODO' && (
+            {((isIndividual && targetAssignee ? ((targetAssignee.userId || targetAssignee.user?.id) === currentUserId || isAssignorOrAdmin) : (isAssignee || isAssignorOrAdmin))) && displayStatus === 'TODO' && (
               <Button
                 size="small"
                 type="primary"
-                loading={actionLoadingId === `${task.id}-IN_PROGRESS`}
+                loading={isLoading('IN_PROGRESS')}
                 disabled={!!actionLoadingId}
                 className="w-full text-xs font-medium"
-                onClick={() => onStatusChange(task, 'IN_PROGRESS')}
+                onClick={() => onStatusChange(task, 'IN_PROGRESS', targetAssigneeId)}
               >
                 Start Work
               </Button>
             )}
 
             {/* Assignee: Complete Task when IN_PROGRESS */}
-            {isAssignee && (displayStatus === 'IN_PROGRESS' || (task.status === 'IN_PROGRESS' && task.completionType !== 'INDIVIDUAL')) && (
+            {((isIndividual && targetAssignee ? ((targetAssignee.userId || targetAssignee.user?.id) === currentUserId || isAssignorOrAdmin) : (isAssignee || isAssignorOrAdmin))) && displayStatus === 'IN_PROGRESS' && (
               <Button
                 size="small"
                 type="primary"
-                loading={actionLoadingId === `${task.id}-COMPLETED`}
+                loading={isLoading('COMPLETED')}
                 disabled={!!actionLoadingId}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-xs font-medium"
-                onClick={() => onStatusChange(task, 'COMPLETED')}
+                onClick={() => onStatusChange(task, 'COMPLETED', targetAssigneeId)}
               >
                 Complete Task
               </Button>
             )}
 
             {/* Assignor / Super Admin: Verify or Reject COMPLETED tasks */}
-            {isAssignorOrAdmin && task.status === 'COMPLETED' && (
+            {isAssignorOrAdmin && (displayStatus === 'COMPLETED' || task.status === 'COMPLETED') && (
               <div className="grid grid-cols-2 gap-1.5">
                 <Button
                   size="small"
                   type="primary"
-                  loading={actionLoadingId === `${task.id}-VERIFIED`}
-                  disabled={!!actionLoadingId}
+                  loading={isLoading('VERIFIED')}
+                  disabled={!!actionLoadingId || (isIndividual && task.status !== 'COMPLETED')}
+                  title={isIndividual && task.status !== 'COMPLETED' ? `Waiting for team (${completedAssigneesCount}/${assignees.length} completed)` : 'Verify task'}
                   className="bg-green-600 hover:bg-green-500 text-xs font-medium"
                   onClick={() => onStatusChange(task, 'VERIFIED')}
                 >
@@ -394,8 +433,9 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
                 <Button
                   size="small"
                   danger
-                  loading={actionLoadingId === `${task.id}-REJECTED`}
-                  disabled={!!actionLoadingId}
+                  loading={isLoading('REJECTED')}
+                  disabled={!!actionLoadingId || (isIndividual && task.status !== 'COMPLETED')}
+                  title={isIndividual && task.status !== 'COMPLETED' ? `Waiting for team (${completedAssigneesCount}/${assignees.length} completed)` : 'Reject task'}
                   className="text-xs font-medium"
                   onClick={() => onStatusChange(task, 'REJECTED')}
                 >
@@ -409,10 +449,10 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
               <Button
                 size="small"
                 type="default"
-                loading={actionLoadingId === `${task.id}-IN_PROGRESS`}
+                loading={isLoading('IN_PROGRESS')}
                 disabled={!!actionLoadingId}
                 className="w-full text-xs font-medium text-gray-700 hover:text-blue-600 mt-1"
-                onClick={() => onStatusChange(task, 'IN_PROGRESS')}
+                onClick={() => onStatusChange(task, 'IN_PROGRESS', targetAssigneeId)}
               >
                 Move to In Progress
               </Button>

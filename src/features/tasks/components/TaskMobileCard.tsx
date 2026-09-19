@@ -21,7 +21,7 @@ interface TaskMobileCardProps {
   currentUserId?: string;
   isSuperAdmin?: boolean;
   actionLoadingId: string | null;
-  onStatusChange: (task: any, newStatus: string) => Promise<void>;
+  onStatusChange: (task: any, newStatus: string, assigneeId?: string) => Promise<void>;
   onEdit: (task: any) => void;
   onDelete: (taskId: string) => Promise<void>;
 }
@@ -284,10 +284,10 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
               type="primary"
               block
               size="middle"
-              loading={actionLoadingId === `${task.id}-IN_PROGRESS`}
+              loading={!!(actionLoadingId === `${task.id}-IN_PROGRESS` || (currentUserId && actionLoadingId === `${task.id}-${currentUserId}-IN_PROGRESS`))}
               disabled={!!actionLoadingId}
               className="h-9 font-medium bg-blue-600 hover:bg-blue-500"
-              onClick={() => onStatusChange(task, 'IN_PROGRESS')}
+              onClick={() => onStatusChange(task, 'IN_PROGRESS', task.completionType === 'INDIVIDUAL' ? currentUserId : undefined)}
             >
               Start Work
             </Button>
@@ -299,10 +299,10 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
               type="primary"
               block
               size="middle"
-              loading={actionLoadingId === `${task.id}-COMPLETED`}
+              loading={!!(actionLoadingId === `${task.id}-COMPLETED` || (currentUserId && actionLoadingId === `${task.id}-${currentUserId}-COMPLETED`))}
               disabled={!!actionLoadingId}
               className="h-9 bg-blue-600 hover:bg-blue-500 font-medium"
-              onClick={() => onStatusChange(task, 'COMPLETED')}
+              onClick={() => onStatusChange(task, 'COMPLETED', task.completionType === 'INDIVIDUAL' ? currentUserId : undefined)}
             >
               Complete Task
             </Button>
