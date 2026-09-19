@@ -417,16 +417,15 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
             )}
 
             {/* Assignor / Super Admin: Verify or Reject COMPLETED tasks */}
-            {isAssignorOrAdmin && (displayStatus === 'COMPLETED' || task.status === 'COMPLETED') && (
+            {isAssignorOrAdmin && displayStatus === 'COMPLETED' && (
               <div className="grid grid-cols-2 gap-1.5">
                 <Button
                   size="small"
                   type="primary"
                   loading={isLoading('VERIFIED')}
-                  disabled={!!actionLoadingId || (isIndividual && task.status !== 'COMPLETED')}
-                  title={isIndividual && task.status !== 'COMPLETED' ? `Waiting for team (${completedAssigneesCount}/${assignees.length} completed)` : 'Verify task'}
+                  disabled={!!actionLoadingId}
                   className="bg-green-600 hover:bg-green-500 text-xs font-medium"
-                  onClick={() => onStatusChange(task, 'VERIFIED')}
+                  onClick={() => onStatusChange(task, 'VERIFIED', targetAssigneeId)}
                 >
                   Verify
                 </Button>
@@ -434,10 +433,9 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
                   size="small"
                   danger
                   loading={isLoading('REJECTED')}
-                  disabled={!!actionLoadingId || (isIndividual && task.status !== 'COMPLETED')}
-                  title={isIndividual && task.status !== 'COMPLETED' ? `Waiting for team (${completedAssigneesCount}/${assignees.length} completed)` : 'Reject task'}
+                  disabled={!!actionLoadingId}
                   className="text-xs font-medium"
-                  onClick={() => onStatusChange(task, 'REJECTED')}
+                  onClick={() => onStatusChange(task, 'REJECTED', targetAssigneeId)}
                 >
                   Reject
                 </Button>

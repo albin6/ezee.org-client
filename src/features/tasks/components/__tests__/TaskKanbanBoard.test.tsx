@@ -120,4 +120,53 @@ describe('TaskKanbanBoard - Per-Assignee Individual Task Cards', () => {
       bobId
     );
   });
+
+  it('allows assignor to verify an individual completed assignee card even if other assignees are still in progress/todo', () => {
+    const onStatusChange = vi.fn().mockResolvedValue(undefined);
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+
+    const taskWithOneCompleted = {
+      ...mockIndividualTask,
+      status: 'IN_PROGRESS', // Overall task still in progress because Bob is TODO
+      assignees: [
+        {
+          userId: aliceId,
+          user: { id: aliceId, name: 'Alice' },
+          status: 'COMPLETED',
+        },
+        {
+          userId: bobId,
+          user: { id: bobId, name: 'Bob' },
+          status: 'TODO',
+        },
+      ],
+    };
+
+    render(
+      <TaskKanbanBoard
+        tasks={[taskWithOneCompleted]}
+        loading={false}
+        activeFilter="assigned_by_me"
+        currentUserId={assignorId}
+        actionLoadingId={null}
+        onStatusChange={onStatusChange}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+
+    // Verify button should be present and enabled on Alice's Completed card
+    const verifyBtn = screen.getByText('Verify').closest('button')!;
+    expect(verifyBtn).toBeInTheDocument();
+    expect(verifyBtn).not.toBeDisabled();
+
+    fireEvent.click(verifyBtn);
+
+    expect(onStatusChange).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'task-indiv-1' }),
+      'VERIFIED',
+      aliceId
+    );
+  });
 });

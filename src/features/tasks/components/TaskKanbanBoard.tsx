@@ -160,15 +160,11 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
         message.warning('Only the task assignor or super admin can verify completed tasks.');
         return;
       }
-      if (task.status !== 'COMPLETED') {
-        if (isIndividual) {
-          message.warning('All assignees must complete their work before the task can be verified.');
-        } else {
-          message.warning('Only completed tasks can be verified.');
-        }
+      if (currentCardStatus !== 'COMPLETED') {
+        message.warning('Only completed tasks can be verified.');
         return;
       }
-      await onStatusChange(task, 'VERIFIED');
+      await onStatusChange(task, 'VERIFIED', targetAssigneeId);
       return;
     }
 
@@ -177,11 +173,11 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
         message.warning('Only the task assignor or super admin can reject a completed task.');
         return;
       }
-      if (task.status !== 'COMPLETED') {
+      if (currentCardStatus !== 'COMPLETED') {
         message.warning('Only completed tasks can be rejected for rework.');
         return;
       }
-      await onStatusChange(task, 'REJECTED');
+      await onStatusChange(task, 'REJECTED', targetAssigneeId);
       return;
     }
 
@@ -275,7 +271,7 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
           };
 
           // 1. Check verified (24 hours)
-          if (task.status === 'VERIFIED') {
+          if (myRecord.status === 'VERIFIED' || task.status === 'VERIFIED') {
             const verifiedTimestamp = task.verifiedAt 
               ? new Date(task.verifiedAt).getTime() 
               : new Date(task.updatedAt || task.createdAt).getTime();
@@ -288,7 +284,7 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
           // 2. Check rejection window (15 mins)
           const rejectedTimestamp = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
           const isWithin15MinRejection = rejectedTimestamp > 0 && (now - rejectedTimestamp) < 15 * 60 * 1000;
-          if (isWithin15MinRejection || task.status === 'REJECTED') {
+          if ((isWithin15MinRejection && myRecord.status === 'IN_PROGRESS') || task.status === 'REJECTED' || myRecord.status === 'REJECTED') {
             pushCard(cardTask, 'IN_PROGRESS');
             return;
           }
@@ -316,7 +312,7 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
         };
 
         // 1. Check verified (24 hours)
-        if (task.status === 'VERIFIED') {
+        if (assignee.status === 'VERIFIED' || task.status === 'VERIFIED') {
           const verifiedTimestamp = task.verifiedAt 
             ? new Date(task.verifiedAt).getTime() 
             : new Date(task.updatedAt || task.createdAt).getTime();
@@ -329,7 +325,7 @@ export const TaskKanbanBoard: React.FC<TaskKanbanBoardProps> = ({
         // 2. Check rejection window (15 mins)
         const rejectedTimestamp = task.rejectedAt ? new Date(task.rejectedAt).getTime() : 0;
         const isWithin15MinRejection = rejectedTimestamp > 0 && (now - rejectedTimestamp) < 15 * 60 * 1000;
-        if (isWithin15MinRejection || task.status === 'REJECTED') {
+        if ((isWithin15MinRejection && assignee.status === 'IN_PROGRESS') || task.status === 'REJECTED' || assignee.status === 'REJECTED') {
           pushCard(subCardTask, 'REJECTED');
           return;
         }
