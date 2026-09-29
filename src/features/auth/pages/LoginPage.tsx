@@ -3,7 +3,7 @@ import { Card, Form, Input, Button, Alert, Typography, Tabs } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { adminLoginSchema } from '../schemas/auth.schema';
 import { authService } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
@@ -138,7 +138,16 @@ export const LoginPage: React.FC = () => {
             />
           </Form.Item>
 
-          <Form.Item className="mt-8 mb-0">
+          <div className="flex justify-end -mt-3 mb-5">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-medium text-purple-600 hover:text-purple-700 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <Form.Item className="mt-2 mb-0">
             <Button
               type="primary"
               htmlType="submit"
