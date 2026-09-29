@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Tag, Input, Select, DatePicker, Avatar, Modal, Tooltip, Pagination, Empty, Badge } from 'antd';
-import { PlusOutlined, FilterOutlined, WarningOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -79,14 +79,15 @@ export const TicketListPage: React.FC = () => {
   const { hasPermission } = usePermissions();
 
   const isSuperAdmin = (user as any)?.role?.name === 'Super Admin' || (user as any)?.type === 'super_admin';
+  const [searchMode, setSearchMode] = useState<'semantic' | 'keyword'>('semantic');
   const [params, setParams] = useState<any>({ page: 1, limit: 12, search: '', status: '' });
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchTickets(params);
-  }, [params, fetchTickets]);
+    fetchTickets({ ...params, searchMode });
+  }, [params, searchMode, fetchTickets]);
 
   useEffect(() => {
     teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
@@ -285,9 +286,9 @@ export const TicketListPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 flex items-center gap-2">
               <Input.Search
-                placeholder="Search by title, description or ID..."
+                placeholder={searchMode === 'semantic' ? "Semantic search: describe an issue, concept, or symptom..." : "Search by title, description or ID..."}
                 onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
                 onChange={(e) => {
                   if (!e.target.value && params.search) {
@@ -297,15 +298,23 @@ export const TicketListPage: React.FC = () => {
                 className="w-full"
                 allowClear
               />
+              <Tooltip title={searchMode === 'semantic' ? 'Semantic search matches concepts, intent, and meaning across title and description. Click to toggle keyword match.' : 'Keyword search looks for exact word stems. Click to toggle AI semantic search.'}>
+                <Button
+                  onClick={() => setSearchMode(prev => prev === 'semantic' ? 'keyword' : 'semantic')}
+                  className={searchMode === 'semantic' ? 'bg-purple-50 text-purple-700 border-purple-300 font-medium hover:!border-purple-500 hover:!text-purple-800 shrink-0 flex items-center gap-1.5' : 'text-gray-600 hover:!text-purple-600 shrink-0 flex items-center gap-1.5'}
+                >
+                  <span>{searchMode === 'semantic' ? '✨ Semantic AI' : '🔍 Keyword'}</span>
+                </Button>
+              </Tooltip>
             </div>
           </div>
           <FilterControls />
         </div>
 
         {/* Mobile Search Bar */}
-        <div className="md:hidden mb-4">
+        <div className="md:hidden mb-4 flex items-center gap-2">
           <Input.Search
-            placeholder="Search tickets..."
+            placeholder={searchMode === 'semantic' ? "Semantic AI search..." : "Search tickets..."}
             onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
             onChange={(e) => {
               if (!e.target.value && params.search) {
@@ -316,6 +325,14 @@ export const TicketListPage: React.FC = () => {
             size="large"
             allowClear
           />
+          <Button
+            size="large"
+            onClick={() => setSearchMode(prev => prev === 'semantic' ? 'keyword' : 'semantic')}
+            className={searchMode === 'semantic' ? 'bg-purple-50 text-purple-700 border-purple-300 font-medium shrink-0' : 'text-gray-500 shrink-0'}
+            title={searchMode === 'semantic' ? 'Semantic Search is ON' : 'Keyword Search is ON'}
+          >
+            {searchMode === 'semantic' ? '✨ AI' : '🔍'}
+          </Button>
         </div>
 
         {/* Responsive Tiles Grid */}
@@ -376,10 +393,13 @@ export const TicketListPage: React.FC = () => {
                             </Tag>
                           </Tooltip>
                         )}
-                        {slaStatus === 'approaching' && (
-                          <Tooltip title="SLA Deadline Approaching">
-                            <Tag color="warning" icon={<WarningOutlined />} className="!m-0 text-[10px] rounded-md">
-                              RISK
+                        {ticket.similarityScore !== undefined && ticket.similarityScore !== null && (
+                          <Tooltip title={`Semantic relevance match: ${Math.round(ticket.similarityScore * 100)}%`}>
+                            <Tag
+                              color={ticket.similarityScore >= 0.8 ? 'green' : ticket.similarityScore >= 0.65 ? 'blue' : 'purple'}
+                              className="!m-0 text-[10px] font-semibold rounded-md"
+                            >
+                              ✨ {Math.round(ticket.similarityScore * 100)}%
                             </Tag>
                           </Tooltip>
                         )}

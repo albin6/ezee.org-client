@@ -29,6 +29,7 @@ export interface Ticket {
     reactions?: any[] 
   }[];
   version: number;
+  similarityScore?: number;
 }
 
 export interface MentionUser {
