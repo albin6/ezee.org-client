@@ -74,18 +74,22 @@ export const teamService = {
     const response = await apiClient.get(`/teams/${teamId}/roles`);
     return response.data.data;
   },
-  createTeamRole: async (teamId: string, data: { name: string; description?: string; permissions: string[] }): Promise<any> => {
+  getRoleHierarchyTree: async (teamId: string): Promise<any[]> => {
+    const response = await apiClient.get(`/teams/${teamId}/roles/hierarchy/tree`);
+    return response.data.data;
+  },
+  createTeamRole: async (teamId: string, data: { name: string; description?: string; permissions: string[]; parentRoleIds?: string[] }): Promise<any> => {
     const response = await apiClient.post(`/teams/${teamId}/roles`, data);
     return response.data.data;
   },
-  updateTeamRole: async (teamId: string, roleId: string, data: { name?: string; description?: string; permissions?: string[] }): Promise<any> => {
+  updateTeamRole: async (teamId: string, roleId: string, data: { name?: string; description?: string; permissions?: string[]; parentRoleIds?: string[] }): Promise<any> => {
     const response = await apiClient.patch(`/teams/${teamId}/roles/${roleId}`, data);
     return response.data.data;
   },
   deleteTeamRole: async (teamId: string, roleId: string): Promise<void> => {
     await apiClient.delete(`/teams/${teamId}/roles/${roleId}`);
   },
-  updateRoleHierarchy: async (teamId: string, hierarchy: { id: string; level: number }[]): Promise<void> => {
+  updateRoleHierarchy: async (teamId: string, hierarchy: { id: string; level?: number; parentRoleIds?: string[] }[]): Promise<void> => {
     await apiClient.put(`/teams/${teamId}/roles/hierarchy`, hierarchy);
   },
 

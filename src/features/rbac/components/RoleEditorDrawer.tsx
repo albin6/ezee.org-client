@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Drawer, Form, Input, Button, Checkbox, Space, message, Divider } from 'antd';
+import { Drawer, Form, Input, Button, Checkbox, Space, message, Divider, Select } from 'antd';
 import type { Role, Permission } from '../api/rbac.service';
 import { useRbacStore } from '../store/rbac.store';
 
@@ -11,7 +11,7 @@ interface RoleEditorDrawerProps {
 
 export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClose, role }) => {
   const [form] = Form.useForm();
-  const { createRole, updateRole, assignPermissions, permissions, isLoading } = useRbacStore();
+  const { createRole, updateRole, assignPermissions, permissions, roles, isLoading } = useRbacStore();
 
   useEffect(() => {
     if (open) {
@@ -19,9 +19,10 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
         form.setFieldsValue({
           name: role.name,
           description: role.description,
+          parentRoleIds: role.parentRoleIds || [],
           // Convert array of permission names back to array of IDs if needed
           permissionIds: role.permissions
-            .map(pName => permissions.find(p => p.name === pName)?.id)
+            .map((pName) => permissions.find((p) => p.name === pName)?.id)
             .filter(Boolean),
         });
       } else {
@@ -39,25 +40,38 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
     return acc;
   }, {} as Record<string, Permission[]>);
 
+  const availableParentRoles = roles.filter((r) => !role || r.id !== role.id);
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      const parentRoleIds = values.parentRoleIds || [];
 
       if (role) {
-        await updateRole(role.id, { name: values.name, description: values.description });
+        await updateRole(role.id, {
+          name: values.name,
+          description: values.description,
+          parentRoleIds,
+        });
         if (values.permissionIds) {
           await assignPermissions(role.id, values.permissionIds);
         }
         message.success('Role updated successfully');
       } else {
-        const newRole = await createRole({ name: values.name, description: values.description });
+        const newRole = await createRole({
+          name: values.name,
+          description: values.description,
+          parentRoleIds,
+        });
         if (values.permissionIds && values.permissionIds.length > 0) {
           await assignPermissions(newRole.id, values.permissionIds);
         }
         message.success('Role created successfully');
       }
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to save role';
+      message.error(errorMsg);
       console.error('Validation or Submission failed', error);
     }
   };
@@ -68,9 +82,9 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
       size="default"
       onClose={onClose}
       open={open}
-      styles={{ 
+      styles={{
         body: { paddingBottom: 24 },
-        wrapper: { width: '100%', maxWidth: 500 }
+        wrapper: { width: '100%', maxWidth: 520 },
       }}
       extra={
         <Space className="hidden sm:flex">
@@ -85,10 +99,10 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
           <Button onClick={onClose} className="w-full sm:w-auto h-10 sm:h-9">
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
-            type="primary" 
-            loading={isLoading} 
+          <Button
+            onClick={handleSubmit}
+            type="primary"
+            loading={isLoading}
             className="w-full sm:w-auto h-10 sm:h-9 font-medium"
           >
             {role ? 'Update Role' : 'Create Role'}
@@ -102,22 +116,46 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
           label={<span className="font-medium text-gray-700">Role Name</span>}
           rules={[{ required: true, message: 'Please enter role name' }]}
         >
-          <Input 
-            size="large" 
-            placeholder="e.g. Manager" 
-            disabled={role?.name.toLowerCase() === 'admin'} 
+          <Input
+            size="large"
+            placeholder="e.g. Manager"
+            disabled={role?.name.toLowerCase() === 'admin'}
           />
         </Form.Item>
-        
+
         <Form.Item
           name="description"
           label={<span className="font-medium text-gray-700">Description</span>}
         >
-          <Input.TextArea rows={3} placeholder="Describe the responsibilities of this role" />
+          <Input.TextArea rows={2} placeholder="Describe the responsibilities of this role" />
+        </Form.Item>
+
+        <Form.Item
+          name="parentRoleIds"
+          label={
+            <div className="flex flex-col">
+              <span className="font-medium text-gray-700">Parent Role(s) / Inherits From</span>
+              <span className="text-[11px] text-gray-400 font-normal">
+                Subordinate to the selected roles. Authority level is automatically derived from the hierarchy.
+              </span>
+            </div>
+          }
+        >
+          <Select
+            mode="multiple"
+            placeholder="Select parent role(s) (optional for root roles)"
+            size="large"
+            allowClear
+            optionFilterProp="label"
+            options={availableParentRoles.map((r) => ({
+              value: r.id,
+              label: `${r.name} (Level ${r.level ?? 0})`,
+            }))}
+          />
         </Form.Item>
 
         <Divider className="my-4" />
-        
+
         <div className="mb-3">
           <h3 className="text-base font-semibold text-gray-900 m-0">Permissions</h3>
           <p className="text-xs text-gray-500 m-0">Select granular system permissions to attach to this role.</p>
@@ -138,48 +176,35 @@ export const RoleEditorDrawer: React.FC<RoleEditorDrawerProps> = ({ open, onClos
                         size="small"
                         onClick={() => {
                           const currentSelected: string[] = form.getFieldValue('permissionIds') || [];
-                          const moduleIds = modulePerms.map(p => p.id);
-                          const combined = Array.from(new Set([...currentSelected, ...moduleIds]));
-                          form.setFieldsValue({ permissionIds: combined });
+                          const modulePermIds = modulePerms.map((p) => p.id);
+                          const newSelected = Array.from(new Set([...currentSelected, ...modulePermIds]));
+                          form.setFieldsValue({ permissionIds: newSelected });
                         }}
-                        className="p-0 h-auto text-xs text-blue-600 hover:text-blue-800"
+                        className="text-xs text-blue-600 p-0 h-auto"
                       >
-                        Select all
+                        All
                       </Button>
-                      <span className="text-gray-300 text-xs">|</span>
+                      <span className="text-gray-300">|</span>
                       <Button
                         type="link"
                         size="small"
                         onClick={() => {
                           const currentSelected: string[] = form.getFieldValue('permissionIds') || [];
-                          const moduleIds = new Set(modulePerms.map(p => p.id));
-                          form.setFieldsValue({ permissionIds: currentSelected.filter(id => !moduleIds.has(id)) });
+                          const modulePermIds = modulePerms.map((p) => p.id);
+                          const newSelected = currentSelected.filter((id) => !modulePermIds.includes(id));
+                          form.setFieldsValue({ permissionIds: newSelected });
                         }}
-                        className="p-0 h-auto text-xs text-gray-500 hover:text-gray-700"
+                        className="text-xs text-gray-500 p-0 h-auto"
                       >
-                        Clear
+                        None
                       </Button>
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-1 gap-2">
-                    {modulePerms.map(perm => (
-                      <label
-                        key={perm.id}
-                        className="p-2.5 rounded-lg border border-gray-100 bg-white hover:bg-gray-50 flex items-start gap-2.5 cursor-pointer transition-colors shadow-2xs select-none"
-                      >
-                        <Checkbox value={perm.id} className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs sm:text-sm font-medium text-gray-800 leading-snug break-words">
-                            {perm.name}
-                          </div>
-                          {perm.description && (
-                            <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">
-                              {perm.description}
-                            </div>
-                          )}
-                        </div>
-                      </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {modulePerms.map((perm) => (
+                      <Checkbox key={perm.id} value={perm.id} className="text-xs text-gray-600">
+                        {perm.name}
+                      </Checkbox>
                     ))}
                   </div>
                 </div>

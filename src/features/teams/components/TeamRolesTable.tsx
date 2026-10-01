@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Select, Empty, Spin, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, MenuOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Modal, Form, Input, message, Popconfirm, Select, Empty, Spin, Tag, Segmented } from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  MenuOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  UnorderedListOutlined,
+  ApartmentOutlined,
+} from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -9,6 +18,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { teamService } from '../api/team.service';
 import { rbacService } from '@/features/rbac/api/rbac.service';
+import { RoleHierarchyView } from '@/features/rbac/components/RoleHierarchyView';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 
 interface TeamRolesTableProps {
@@ -48,7 +58,8 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
   const [teamPermNames, setTeamPermNames] = useState<string[]>([]);
   const [allPerms, setAllPerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [viewMode, setViewMode] = useState<'table' | 'hierarchy'>('table');
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<any | null>(null);
   const [form] = Form.useForm();
@@ -56,7 +67,7 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 1 },
-    })
+    }),
   );
 
   const onDragEnd = async ({ active, over }: DragEndEvent) => {
@@ -64,7 +75,7 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       const activeIndex = roles.findIndex((i) => i.id === active.id);
       const overIndex = roles.findIndex((i) => i.id === over?.id);
       const newRoles = arrayMove(roles, activeIndex, overIndex);
-      
+
       setRoles(newRoles);
       try {
         const hierarchy = newRoles.map((role, index) => ({ id: role.id, level: index }));
@@ -97,9 +108,9 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       const [rolesRes, teamPermsRes, allPermsRes] = await Promise.all([
         teamService.getTeamRoles(teamId),
         teamService.getTeamPermissions(teamId),
-        rbacService.getPermissions()
+        rbacService.getPermissions(),
       ]);
-      
+
       setRoles(rolesRes);
       setTeamPermNames(teamPermsRes);
       setAllPerms(allPermsRes);
@@ -117,7 +128,11 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
   const handleOpenModal = async (role?: any) => {
     if (role) {
       setEditingRole(role);
-      form.setFieldsValue({ ...role, permissions: role.permissions || [] }); 
+      form.setFieldsValue({
+        ...role,
+        parentRoleIds: role.parentRoleIds || [],
+        permissions: role.permissions || [],
+      });
     } else {
       setEditingRole(null);
       form.resetFields();
@@ -143,7 +158,8 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       handleCloseModal();
       fetchData();
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Failed to save role');
+      const errMsg = error.response?.data?.message || error.message || 'Failed to save role';
+      message.error(errMsg);
     }
   };
 
@@ -157,6 +173,19 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
     }
   };
 
+  const handleUpdateHierarchyGraph = async (nodes: any[]) => {
+    try {
+      await teamService.updateRoleHierarchy(teamId, nodes);
+      await fetchData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update hierarchy';
+      message.error(msg);
+      throw err;
+    }
+  };
+
+  const availableParentRoles = roles.filter((r) => !editingRole || r.id !== editingRole.id);
+
   const columns: ColumnsType<any> = [
     {
       key: 'sort',
@@ -164,25 +193,53 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       render: () => <MenuOutlined style={{ cursor: 'grab', color: '#999' }} />,
     },
     {
-      title: 'Name (Highest Authority Top)',
+      title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, _, index: number) => (
+      render: (text: string, record: any) => (
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-900">{text}</span>
-          {index === 0 && (
+          {record.level === 0 && (
             <Tag color="gold" className="text-[10px] leading-tight">
-              Highest Authority
+              Root Authority
             </Tag>
           )}
         </div>
-      )
+      ),
+    },
+    {
+      title: 'Tier Level',
+      key: 'level',
+      width: 100,
+      render: (_: any, record: any) => (
+        <Tag color="cyan">Level {record.level ?? 0}</Tag>
+      ),
+    },
+    {
+      title: 'Inherits From',
+      key: 'parents',
+      render: (_: any, record: any) => {
+        const parents = (record.parentRoleIds || [])
+          .map((pId: string) => roles.find((r) => r.id === pId)?.name)
+          .filter(Boolean);
+        return parents.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {parents.map((pName: string, i: number) => (
+              <Tag key={i} color="blue" className="text-[11px] m-0">
+                {pName}
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <span className="text-gray-400 text-xs">None (Root)</span>
+        );
+      },
     },
     {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      render: (desc: string) => <span className="text-gray-600">{desc || '-'}</span>
+      render: (desc: string) => <span className="text-gray-600">{desc || '-'}</span>,
     },
     {
       title: 'Actions',
@@ -190,7 +247,12 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       render: (_: any, record: any) => (
         <Space>
           {hasPermission('teams:write') && (
-            <Button type="text" icon={<EditOutlined />} onClick={() => handleOpenModal(record)} onPointerDown={(e) => e.stopPropagation()} />
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenModal(record)}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
           )}
           {hasPermission('teams:write') && (
             <Popconfirm
@@ -200,17 +262,22 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
               cancelText="No"
               okButtonProps={{ danger: true }}
             >
-              <Button type="text" danger icon={<DeleteOutlined />} onPointerDown={(e) => e.stopPropagation()} />
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onPointerDown={(e) => e.stopPropagation()}
+              />
             </Popconfirm>
           )}
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   const availablePermOptions = allPerms
-    .filter(p => teamPermNames.includes(p.name))
-    .map(p => ({ label: `${p.module}: ${p.description || p.name}`, value: p.name }));
+    .filter((p) => teamPermNames.includes(p.name))
+    .map((p) => ({ label: `${p.module}: ${p.description || p.name}`, value: p.name }));
 
   return (
     <div>
@@ -218,153 +285,141 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
       <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
         <div>
           <h3 className="text-base sm:text-lg font-medium m-0 text-gray-900">Team Roles</h3>
-          <p className="text-xs text-gray-500 m-0 hidden sm:block">Drag roles to reorder authority hierarchy.</p>
+          <p className="text-xs text-gray-500 m-0 hidden sm:block">
+            Configure team roles and dynamic authority hierarchy.
+          </p>
         </div>
-        {hasPermission('teams:write') && (
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={() => handleOpenModal()}
-            className="w-full sm:w-auto h-10 sm:h-auto font-medium"
-          >
-            Add Role
-          </Button>
-        )}
-      </div>
-
-      {/* Desktop DnD Table */}
-      <div className="hidden md:block">
-        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
-          <SortableContext
-            items={roles.map((i) => i.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <Table 
-              scroll={{ x: 'max-content' }}
-              components={{
-                body: {
-                  row: Row,
-                },
-              }}
-              columns={columns} 
-              dataSource={roles} 
-              rowKey="id" 
-              loading={loading}
-              pagination={false}
-            />
-          </SortableContext>
-        </DndContext>
-      </div>
-
-      {/* Mobile Role Cards with Up/Down Hierarchy Controls */}
-      <div className="md:hidden space-y-3">
-        {loading ? (
-          <div className="py-12 flex justify-center"><Spin /></div>
-        ) : roles.length === 0 ? (
-          <div className="p-8 text-center bg-gray-50 rounded-xl">
-            <Empty description="No roles found" />
-          </div>
-        ) : (
-          roles.map((role, index) => (
-            <div 
-              key={role.id}
-              className="bg-gray-50/70 border border-gray-100 rounded-xl p-3.5 space-y-2.5 shadow-sm"
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <Segmented
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'table' | 'hierarchy')}
+            options={[
+              { label: 'Role List', value: 'table', icon: <UnorderedListOutlined /> },
+              { label: 'Hierarchy Tree', value: 'hierarchy', icon: <ApartmentOutlined /> },
+            ]}
+            className="p-1 bg-gray-100 rounded-xl"
+          />
+          {hasPermission('teams:write') && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenModal()}
+              className="w-full sm:w-auto h-10 sm:h-auto font-medium"
             >
-              {/* Card Header: Hierarchy Pill & Name */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-gray-200 text-gray-800">
-                      #{index + 1}
-                    </span>
-                    {index === 0 ? (
-                      <Tag color="gold" className="text-[10px] m-0 font-medium">
-                        Highest Authority
-                      </Tag>
-                    ) : (
-                      <span className="text-xs text-gray-400">Authority Rank</span>
-                    )}
-                  </div>
-                  <h4 className="font-semibold text-gray-900 text-sm truncate">
-                    {role.name}
-                  </h4>
-                </div>
-
-                {/* Mobile Reorder Controls */}
-                {hasPermission('teams:write') && (
-                  <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-2xs overflow-hidden">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<ArrowUpOutlined />}
-                      disabled={index === 0}
-                      onClick={() => handleMoveRole(index, 'up')}
-                      className="h-8 w-8 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300"
-                    />
-                    <div className="w-[1px] h-5 bg-gray-200" />
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<ArrowDownOutlined />}
-                      disabled={index === roles.length - 1}
-                      onClick={() => handleMoveRole(index, 'down')}
-                      className="h-8 w-8 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              {role.description && (
-                <p className="text-xs text-gray-600 m-0 line-clamp-2">
-                  {role.description}
-                </p>
-              )}
-
-              {/* Footer Actions */}
-              {hasPermission('teams:write') && (
-                <div className="border-t border-gray-200/60 pt-2 flex items-center justify-end gap-1">
-                  <Button 
-                    type="text" 
-                    icon={<EditOutlined />} 
-                    onClick={() => handleOpenModal(role)} 
-                    className="text-gray-600 h-9 px-3 text-xs flex items-center gap-1"
-                  >
-                    Edit
-                  </Button>
-                  <Popconfirm
-                    title="Delete this role?"
-                    onConfirm={() => handleDelete(role.id)}
-                    okText="Yes"
-                    cancelText="No"
-                    okButtonProps={{ danger: true }}
-                  >
-                    <Button 
-                      type="text" 
-                      danger 
-                      icon={<DeleteOutlined />} 
-                      className="h-9 px-3 text-xs flex items-center gap-1"
-                    >
-                      Delete
-                    </Button>
-                  </Popconfirm>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+              Add Role
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Role Create / Edit Modal */}
+      {viewMode === 'table' ? (
+        <>
+          {/* Desktop DnD Table */}
+          <div className="hidden md:block">
+            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+              <SortableContext items={roles.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                <Table
+                  scroll={{ x: 'max-content' }}
+                  components={{
+                    body: {
+                      row: Row,
+                    },
+                  }}
+                  columns={columns}
+                  dataSource={roles}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={false}
+                />
+              </SortableContext>
+            </DndContext>
+          </div>
+
+          {/* Mobile Role Cards with Up/Down Hierarchy Controls */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="py-8 text-center bg-white rounded-xl border border-gray-100">
+                <Spin />
+              </div>
+            ) : roles.length === 0 ? (
+              <div className="py-8 text-center bg-white rounded-xl border border-gray-100">
+                <Empty description="No team roles created yet" />
+              </div>
+            ) : (
+              roles.map((role, idx) => (
+                <div
+                  key={role.id}
+                  className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs flex flex-col gap-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 text-sm">{role.name}</span>
+                      <Tag color="cyan" className="text-[10px]">
+                        L{role.level ?? 0}
+                      </Tag>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {hasPermission('teams:write') && (
+                        <>
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<ArrowUpOutlined />}
+                            disabled={idx === 0}
+                            onClick={() => handleMoveRole(idx, 'up')}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<ArrowDownOutlined />}
+                            disabled={idx === roles.length - 1}
+                            onClick={() => handleMoveRole(idx, 'down')}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<EditOutlined />}
+                            onClick={() => handleOpenModal(role)}
+                          />
+                          <Popconfirm
+                            title="Delete this role?"
+                            onConfirm={() => handleDelete(role.id)}
+                            okText="Yes"
+                            cancelText="No"
+                            okButtonProps={{ danger: true }}
+                          >
+                            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {role.description && <p className="text-xs text-gray-500 m-0">{role.description}</p>}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <RoleHierarchyView
+          roles={roles}
+          isLoading={loading}
+          onEditRole={handleOpenModal}
+          onUpdateHierarchy={handleUpdateHierarchyGraph}
+          requiredPermission="teams:write"
+          scopeLabel="Team"
+        />
+      )}
+
+      {/* Role Creation / Edit Modal */}
       <Modal
-        title={editingRole ? 'Edit Role' : 'Create Role'}
+        title={editingRole ? 'Edit Team Role' : 'Create Team Role'}
         open={isModalVisible}
         onCancel={handleCloseModal}
         footer={null}
-        width="100%"
-        style={{ maxWidth: 520 }}
+        destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit} className="pt-2">
           <Form.Item
             name="name"
             label="Role Name"
@@ -372,9 +427,32 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
           >
             <Input size="large" placeholder="e.g. Team Lead" />
           </Form.Item>
-          
+
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={2} placeholder="Short role description..." />
+          </Form.Item>
+
+          <Form.Item
+            name="parentRoleIds"
+            label={
+              <div className="flex flex-col">
+                <span className="font-medium text-gray-700">Parent Role(s) / Inherits From</span>
+                <span className="text-[11px] text-gray-400 font-normal">
+                  Subordinate to selected roles within this team.
+                </span>
+              </div>
+            }
+          >
+            <Select
+              mode="multiple"
+              placeholder="Select parent role(s)"
+              size="large"
+              allowClear
+              options={availableParentRoles.map((r) => ({
+                value: r.id,
+                label: `${r.name} (Level ${r.level ?? 0})`,
+              }))}
+            />
           </Form.Item>
 
           <Form.Item
@@ -383,14 +461,16 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
             rules={[{ required: true, message: 'Please select at least one permission' }]}
             extra={
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 mt-1.5">
-                <span className="text-gray-500 text-xs">Only permissions assigned to this team are available.</span>
+                <span className="text-gray-500 text-xs">
+                  Only permissions assigned to this team are available.
+                </span>
                 {!editingRole && (
                   <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    <Button 
-                      type="link" 
-                      size="small" 
+                    <Button
+                      type="link"
+                      size="small"
                       onClick={() => {
-                        const allValues = availablePermOptions.map(p => p.value);
+                        const allValues = availablePermOptions.map((p) => p.value);
                         form.setFieldsValue({ permissions: allValues });
                       }}
                       className="p-0 h-auto text-xs"
@@ -398,9 +478,9 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
                       Select All
                     </Button>
                     <span className="text-gray-300 text-xs">|</span>
-                    <Button 
-                      type="link" 
-                      size="small" 
+                    <Button
+                      type="link"
+                      size="small"
                       onClick={() => {
                         form.setFieldsValue({ permissions: [] });
                       }}
@@ -413,8 +493,8 @@ export const TeamRolesTable: React.FC<TeamRolesTableProps> = ({ teamId }) => {
               </div>
             }
           >
-            <Select 
-              mode="multiple" 
+            <Select
+              mode="multiple"
               placeholder="Select permissions"
               options={availablePermOptions}
               size="large"

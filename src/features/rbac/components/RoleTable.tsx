@@ -82,19 +82,47 @@ export const RoleTable: React.FC<RoleTableProps> = ({ roles, isLoading, onEdit, 
       render: () => <MenuOutlined style={{ cursor: 'grab', color: '#999' }} />,
     },
     {
-      title: 'Role Name (Highest Authority Top)',
+      title: 'Role Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, _: unknown, index: number) => (
+      render: (text: string, record: Role, index: number) => (
         <div className="flex items-center gap-2">
           <strong className="text-gray-800 capitalize">{text}</strong>
-          {index === 0 && (
+          {(record.level === 0 || index === 0) && (
             <Tag color="gold" className="text-[10px] leading-tight m-0">
-              Highest Authority
+              Root Authority
             </Tag>
           )}
         </div>
       ),
+    },
+    {
+      title: 'Tier Level',
+      key: 'level',
+      width: 100,
+      render: (_: unknown, record: Role) => (
+        <Tag color="cyan">Level {record.level ?? 0}</Tag>
+      ),
+    },
+    {
+      title: 'Inherits From',
+      key: 'parents',
+      render: (_: unknown, record: Role) => {
+        const parents = (record.parentRoleIds || [])
+          .map((pId) => roles.find((r) => r.id === pId)?.name)
+          .filter(Boolean);
+        return parents.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {parents.map((pName, i) => (
+              <Tag key={i} color="blue" className="text-[11px] m-0">
+                {pName}
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <span className="text-gray-400 text-xs">None (Root)</span>
+        );
+      },
     },
     {
       title: 'Description',
