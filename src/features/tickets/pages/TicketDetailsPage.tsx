@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Popconfirm, message as antMessage } from 'antd';
+import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
 import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -369,11 +369,15 @@ export const TicketDetailsPage: React.FC = () => {
 
   const handleStatusChange = async (value: string) => {
     if (!id) return;
+    const isClosing = value === 'CLOSED';
     Modal.confirm({
-      title: 'Confirm Status Change',
-      content: `Are you sure you want to change the ticket status to ${value}?`,
-      okText: 'Yes',
-      cancelText: 'No',
+      title: isClosing ? 'Close Ticket Permanently?' : 'Confirm Status Change',
+      content: isClosing
+        ? 'Are you sure you want to close this ticket permanently? It cannot be reopened.'
+        : `Are you sure you want to change the ticket status to ${value}?`,
+      okText: isClosing ? 'Yes, Close' : 'Yes',
+      okButtonProps: isClosing ? { danger: true } : undefined,
+      cancelText: 'Cancel',
       onOk: async () => {
         try {
           await updateStatus(id, value, ticket?.version);
@@ -595,15 +599,7 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
           <Space>
             <Button onClick={() => handleStatusChange('REOPENED')}>Reopen Ticket</Button>
-            <Popconfirm
-              title="Close Permanently"
-              description="Are you sure you want to close this ticket permanently? It cannot be reopened."
-              onConfirm={() => handleStatusChange('CLOSED')}
-              okText="Yes, Close"
-              cancelText="Cancel"
-            >
-              <Button type="primary">Close Permanently</Button>
-            </Popconfirm>
+            <Button type="primary" onClick={() => handleStatusChange('CLOSED')}>Close Permanently</Button>
           </Space>
         </div>
       )}

@@ -129,4 +129,126 @@ describe('ChatTicketCreator Component', () => {
       expect(screen.getAllByText(/Ops Team/i).length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it('directly starts 6-second undo buffer on Send click without any confirmation modal', async () => {
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    const textarea = screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i);
+
+    fireEvent.change(textarea, {
+      target: {
+        value: 'Urgent server issue\nServer CPU at 100%\n@Alice Dev'
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTitle(/Send Ticket \(Enter\)/i)).toBeInTheDocument();
+    });
+
+    // Click Send Button
+    const sendBtn = screen.getByTitle(/Send Ticket \(Enter\)/i);
+    fireEvent.click(sendBtn);
+
+    // Should NOT show any confirmation modal
+    expect(screen.queryByText(/Create Ticket Now\?/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/You pressed Enter to create this ticket/i)).not.toBeInTheDocument();
+
+    // Directly shows the 6-second undo banner with Countdown, Undo, and Send Now
+    await waitFor(() => {
+      expect(screen.getByText(/Creating Ticket in 6s\.\.\./i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Undo \(Cancel\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Send Now/i })).toBeInTheDocument();
+    });
+  });
+
+  it('cancels sending when Undo (Cancel) button is clicked', async () => {
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    const textarea = screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i);
+
+    fireEvent.change(textarea, {
+      target: {
+        value: 'Urgent server issue\nServer CPU at 100%\n@Alice Dev'
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTitle(/Send Ticket \(Enter\)/i)).toBeInTheDocument();
+    });
+
+    // Trigger send
+    const sendBtn = screen.getByTitle(/Send Ticket \(Enter\)/i);
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Creating Ticket in 6s\.\.\./i)).toBeInTheDocument();
+    });
+
+    // Click Undo
+    const undoBtn = screen.getByRole('button', { name: /Undo \(Cancel\)/i });
+    fireEvent.click(undoBtn);
+
+    // Buffer should be cancelled and input restored
+    await waitFor(() => {
+      expect(screen.queryByText(/Creating Ticket in/i)).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i)).toBeInTheDocument();
+    });
+  });
+
+  it('immediately creates ticket when Send Now is clicked', async () => {
+    vi.mocked(ticketService.createTicket).mockResolvedValue({ data: { id: 'ticket-999' } } as any);
+
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    const textarea = screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i);
+
+    fireEvent.change(textarea, {
+      target: {
+        value: 'Urgent server issue\nServer CPU at 100%\n@Alice Dev'
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTitle(/Send Ticket \(Enter\)/i)).toBeInTheDocument();
+    });
+
+    // Trigger send
+    const sendBtn = screen.getByTitle(/Send Ticket \(Enter\)/i);
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Now/i })).toBeInTheDocument();
+    });
+
+    // Click Send Now
+    const sendNowBtn = screen.getByRole('button', { name: /Send Now/i });
+    fireEvent.click(sendNowBtn);
+
+    await waitFor(() => {
+      expect(ticketService.createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Urgent server issue',
+          description: expect.stringContaining('Server CPU at 100%'),
+        })
+      );
+    });
+  });
 });

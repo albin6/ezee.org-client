@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Avatar, Tag, Popover, Image, Modal, Progress, message } from 'antd';
+import { Button, Avatar, Tag, Popover, Image, Progress, message } from 'antd';
 import { 
   ArrowLeftOutlined, 
   SendOutlined, 
@@ -16,7 +16,6 @@ import {
   UndoOutlined, 
   ThunderboltOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
   TeamOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
@@ -27,7 +26,7 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import { teamService } from '@/features/teams/api/team.service';
 
 const DRAFT_STORAGE_KEY = 'ticket_composer_draft_v1';
-const ENTER_CONFIRM_KEY = 'ticket_enter_confirm_count';
+const TOTAL_UNDO_SECONDS = 6;
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export const ChatTicketCreator: React.FC = () => {
@@ -55,14 +54,11 @@ export const ChatTicketCreator: React.FC = () => {
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
 
-  // Undo countdown buffer state
+  // Undo countdown buffer state (6 seconds)
   const [isUndoPending, setIsUndoPending] = useState(false);
-  const [undoCountdown, setUndoCountdown] = useState(10);
+  const [undoCountdown, setUndoCountdown] = useState(TOTAL_UNDO_SECONDS);
   const undoTimerRef = useRef<any>(null);
   const pendingPayloadRef = useRef<any>(null);
-
-  // Enter confirmation onboarding state
-  const [showEnterModal, setShowEnterModal] = useState(false);
 
   // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -333,7 +329,7 @@ export const ChatTicketCreator: React.FC = () => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Trigger Send action with Validation & Onboarding Check
+  // Trigger Send action with Validation
   const triggerSend = () => {
     if (isRecording || isPaused) {
       message.warning('Please stop audio recording before sending');
@@ -352,21 +348,13 @@ export const ChatTicketCreator: React.FC = () => {
       return;
     }
 
-    // Check first-time enter confirmation onboarding (alert 2-3 times)
-    const confirmCount = parseInt(localStorage.getItem(ENTER_CONFIRM_KEY) || '0', 10);
-    if (confirmCount < 3) {
-      setShowEnterModal(true);
-      return;
-    }
-
     startUndoBuffer();
   };
 
-  // Start 10-Second Undo Buffer
+  // Start 6-Second Undo Buffer
   const startUndoBuffer = () => {
-    setShowEnterModal(false);
     setIsUndoPending(true);
-    setUndoCountdown(10);
+    setUndoCountdown(TOTAL_UNDO_SECONDS);
 
     // Save pending payload
     pendingPayloadRef.current = {
@@ -396,12 +384,12 @@ export const ChatTicketCreator: React.FC = () => {
   const cancelUndoBuffer = () => {
     if (undoTimerRef.current) clearInterval(undoTimerRef.current);
     setIsUndoPending(false);
-    setUndoCountdown(10);
+    setUndoCountdown(TOTAL_UNDO_SECONDS);
     message.info('Sending cancelled. Your message has been preserved.');
     textareaRef.current?.focus();
   };
 
-  // Finalize Ticket Creation (after 10s or when "Send Now" clicked)
+  // Finalize Ticket Creation (after 6s or when "Send Now" clicked)
   const finalizeTicketCreation = async () => {
     if (undoTimerRef.current) clearInterval(undoTimerRef.current);
     setIsUndoPending(false);
@@ -484,13 +472,6 @@ export const ChatTicketCreator: React.FC = () => {
       e.preventDefault();
       triggerSend();
     }
-  };
-
-  // Confirm onboarding modal action
-  const handleConfirmOnboardingSend = () => {
-    const confirmCount = parseInt(localStorage.getItem(ENTER_CONFIRM_KEY) || '0', 10);
-    localStorage.setItem(ENTER_CONFIRM_KEY, (confirmCount + 1).toString());
-    startUndoBuffer();
   };
 
   return (
@@ -681,14 +662,14 @@ export const ChatTicketCreator: React.FC = () => {
         </div>
       )}
 
-      {/* 4. Active Undo Banner (10s buffer) */}
+      {/* 4. Active Undo Banner (6s buffer) */}
       {isUndoPending && (
         <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between gap-4 z-30 shadow-2xl border-t border-gray-800 animate-slideUp">
           <div className="flex items-center gap-3">
             <div className="relative w-8 h-8 flex items-center justify-center">
               <Progress 
                 type="circle" 
-                percent={(undoCountdown / 10) * 100} 
+                percent={(undoCountdown / TOTAL_UNDO_SECONDS) * 100} 
                 size={32} 
                 strokeColor="#10b981" 
                 format={() => <span className="text-xs text-white font-bold">{undoCountdown}</span>} 
@@ -843,38 +824,6 @@ export const ChatTicketCreator: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* 6. First-Time Enter Confirmation Modal */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2 text-blue-600">
-            <ExclamationCircleOutlined /> Create Ticket Now?
-          </div>
-        }
-        open={showEnterModal}
-        onCancel={() => setShowEnterModal(false)}
-        footer={[
-          <Button key="back" onClick={() => setShowEnterModal(false)}>
-            Keep Editing (Shift+Enter for new line)
-          </Button>,
-          <Button key="submit" type="primary" onClick={handleConfirmOnboardingSend} className="bg-emerald-600">
-            Send Ticket Now
-          </Button>,
-        ]}
-      >
-        <div className="space-y-3 py-2 text-sm text-gray-700">
-          <p>
-            You pressed <strong>Enter</strong> to create this ticket.
-          </p>
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800 space-y-1">
-            <div>• <strong>Enter:</strong> Creates the ticket immediately.</div>
-            <div>• <strong>Shift + Enter:</strong> Inserts a new line for multi-line descriptions.</div>
-          </div>
-          <p className="text-xs text-gray-500">
-            (We will only show this reminder the first 2-3 times to help you get used to the shortcuts!)
-          </p>
-        </div>
-      </Modal>
 
     </div>
   );
