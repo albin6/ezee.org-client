@@ -41,9 +41,9 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
       const res = await teamService.getTeamMembers(teamId, { page, limit, search });
       setMembers(res.data);
       setPagination({ 
-        current: res.meta.page, 
-        pageSize: res.meta.limit,
-        total: res.meta.total || res.data.length
+        current: res.meta?.page || page, 
+        pageSize: res.meta?.limit || limit,
+        total: res.meta?.total ?? res.data.length
       });
     } catch (error) {
       message.error('Failed to fetch team members');
@@ -225,7 +225,14 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
           dataSource={members} 
           rowKey="id" 
           loading={loading}
-          pagination={pagination}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50'],
+            showTotal: (total) => `Total ${total} members`,
+          }}
           onChange={handleTableChange}
         />
       </div>
