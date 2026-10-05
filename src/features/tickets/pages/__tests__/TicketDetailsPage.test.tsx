@@ -33,6 +33,7 @@ vi.mock('@/shared/services/socket.service', () => ({
 
 describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
   const mockUpdateStatus = vi.fn().mockResolvedValue(undefined);
+  const mockAddMessage = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     Object.defineProperty(window, 'matchMedia', {
@@ -69,7 +70,7 @@ describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
         id: 'ticket-res-1',
         title: 'Resolved Database Latency',
         description: 'Fixed slow queries',
-        status: 'RESOLVED',
+        status: 'OPEN',
         priority: 'MEDIUM',
         createdById: 'creator-user-id',
         createdBy: { id: 'creator-user-id', name: 'Creator User', email: 'creator@example.com' },
@@ -83,6 +84,7 @@ describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
       error: null,
       fetchTicket: vi.fn().mockResolvedValue(undefined),
       updateStatus: mockUpdateStatus,
+      addMessage: mockAddMessage,
       joinTicketRoom: vi.fn(),
       leaveTicketRoom: vi.fn(),
       handleNewMessage: vi.fn(),
@@ -91,6 +93,13 @@ describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
   });
 
   it('triggers only a single confirmation modal when Close Permanently is clicked', async () => {
+    useTicketStore.setState({
+      currentTicket: {
+        ...useTicketStore.getState().currentTicket,
+        status: 'RESOLVED',
+      } as any,
+    });
+
     const modalConfirmSpy = vi.spyOn(Modal, 'confirm');
 
     render(
@@ -121,5 +130,62 @@ describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
         okText: 'Yes, Close',
       })
     );
+  });
+
+  it('renders message textarea with 24px initial height and automatically focuses it', async () => {
+    render(
+      <MemoryRouter initialEntries={['/tickets/ticket-res-1']}>
+        <Routes>
+          <Route path="/tickets/:id" element={<TicketDetailsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const textarea = await screen.findByPlaceholderText(/Type a message or @name to mention\/assign\.\.\./i) as HTMLTextAreaElement;
+    expect(textarea).toBeInTheDocument();
+    expect(textarea.rows).toBe(1);
+    expect(textarea.className).toContain('h-[24px]');
+    expect(textarea.className).toContain('min-h-[24px]');
+    expect(textarea.style.height).toBe('24px');
+    expect(textarea.style.minHeight).toBe('24px');
+
+    // Auto-focus check
+    await waitFor(() => {
+      expect(document.activeElement).toBe(textarea);
+    });
+  });
+
+  it('refocuses the message textarea after sending a message', async () => {
+    render(
+      <MemoryRouter initialEntries={['/tickets/ticket-res-1']}>
+        <Routes>
+          <Route path="/tickets/:id" element={<TicketDetailsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const textarea = await screen.findByPlaceholderText(/Type a message or @name to mention\/assign\.\.\./i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Working on this issue now' } });
+
+    // Send button appears when message is typed
+    const sendBtn = screen.getByRole('button', { name: /send/i });
+    expect(sendBtn).toBeInTheDocument();
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        'ticket-res-1',
+        'Working on this issue now',
+        undefined,
+        undefined,
+        undefined,
+        []
+      );
+    });
+
+    // Auto-refocus check after send
+    await waitFor(() => {
+      expect(document.activeElement).toBe(textarea);
+    });
   });
 });

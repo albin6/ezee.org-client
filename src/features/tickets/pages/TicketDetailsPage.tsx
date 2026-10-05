@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Input, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
+import { Card, Tag, Button, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
 import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
@@ -51,8 +51,63 @@ export const TicketDetailsPage: React.FC = () => {
   const [isAddingAssignee, setIsAddingAssignee] = useState(false);
 
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const justSelectedMentionRef = useRef(false);
+
+  // Helper to automatically focus the message input field
+  const focusInput = useCallback(() => {
+    const rawArea = textareaRef.current;
+    if (rawArea) {
+      rawArea.focus();
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  }, []);
+
+  // WhatsApp-like auto-resizing: compact 24px initial height, smoothly expands as content grows up to 140px
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const minHeight = 24;
+    const maxHeight = 140;
+
+    const currentVal = textarea.value;
+
+    // When there is no user content, lock strictly to initial height (24px)
+    // so placeholder text wrapping doesn't artificially stretch the empty input
+    if (!currentVal) {
+      textarea.style.height = `${minHeight}px`;
+      textarea.style.overflowY = 'hidden';
+      return;
+    }
+
+    // Reset height temporarily to compute accurate scrollHeight of user content
+    textarea.style.height = 'auto';
+
+    const scrollHeight = textarea.scrollHeight;
+    const targetHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+
+    textarea.style.height = `${targetHeight}px`;
+    textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [message, adjustTextareaHeight]);
+
+  useEffect(() => {
+    window.addEventListener('resize', adjustTextareaHeight);
+    return () => window.removeEventListener('resize', adjustTextareaHeight);
+  }, [adjustTextareaHeight]);
+
+  // Auto-focus input on page load / ticket load
+  useEffect(() => {
+    if (!loading && ticket) {
+      focusInput();
+    }
+  }, [loading, ticket?.id, focusInput]);
 
   // Pre-load mentionable users on mount
   useEffect(() => {
@@ -199,6 +254,7 @@ export const TicketDetailsPage: React.FC = () => {
           setMessage('');
           setMentionDropdownOpen(false);
           setMentionQuery(null);
+          focusInput();
           return;
         }
 
@@ -214,6 +270,7 @@ export const TicketDetailsPage: React.FC = () => {
             setMessage('');
             setMentionDropdownOpen(false);
             setMentionQuery(null);
+            focusInput();
           }
           return;
         } else {
@@ -221,6 +278,7 @@ export const TicketDetailsPage: React.FC = () => {
           setMessage('');
           setMentionDropdownOpen(false);
           setMentionQuery(null);
+          focusInput();
           return;
         }
       } else {
@@ -228,6 +286,7 @@ export const TicketDetailsPage: React.FC = () => {
         setMessage('');
         setMentionDropdownOpen(false);
         setMentionQuery(null);
+        focusInput();
         return;
       }
     }
@@ -269,6 +328,7 @@ export const TicketDetailsPage: React.FC = () => {
       setIsUploadingAttachments(false);
     } finally {
       setIsSending(false);
+      focusInput();
     }
   };
 
@@ -346,6 +406,7 @@ export const TicketDetailsPage: React.FC = () => {
     setAudioPreviewUrl(null);
     setRecordingDuration(0);
     audioChunksRef.current = [];
+    focusInput();
   };
 
   const formatDuration = (seconds: number) => {
@@ -361,10 +422,12 @@ export const TicketDetailsPage: React.FC = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    focusInput();
   };
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+    focusInput();
   };
 
   const handleStatusChange = async (value: string) => {
@@ -448,7 +511,7 @@ export const TicketDetailsPage: React.FC = () => {
     }, 300);
 
     const isPart = isParticipant(selectedUser.id);
-    const rawArea = textareaRef.current?.resizableTextArea?.textArea || textareaRef.current;
+    const rawArea = textareaRef.current;
     const cursorPos = rawArea?.selectionStart ?? message.length;
     const textBeforeCursor = message.slice(0, cursorPos);
     const textAfterCursor = message.slice(cursorPos);
@@ -546,6 +609,15 @@ export const TicketDetailsPage: React.FC = () => {
         setMentionQuery(null);
         return;
       }
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (justSelectedMentionRef.current) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
@@ -770,7 +842,10 @@ export const TicketDetailsPage: React.FC = () => {
                             </Popover>
                             <button 
                               className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm"
-                              onClick={() => setReplyingTo({ id: msg.id, name: isMe ? 'You' : msg.user.name, content: msg.content })}
+                              onClick={() => {
+                                setReplyingTo({ id: msg.id, name: isMe ? 'You' : msg.user.name, content: msg.content });
+                                focusInput();
+                              }}
                               title="Reply"
                             >
                               <EnterOutlined />
@@ -815,7 +890,7 @@ export const TicketDetailsPage: React.FC = () => {
                       <span className="font-semibold text-[#128c7e] text-[12px]">{replyingTo.name}</span>
                       <span className="text-gray-600 truncate text-[13px]">{replyingTo.content.substring(0, 60)}{replyingTo.content.length > 60 ? '...' : ''}</span>
                     </div>
-                    <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setReplyingTo(null)} className="text-gray-500 hover:text-gray-700" />
+                    <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => { setReplyingTo(null); focusInput(); }} className="text-gray-500 hover:text-gray-700" />
                   </div>
                 )}
                 
@@ -920,14 +995,31 @@ export const TicketDetailsPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 w-full">
-                    <div className="flex items-center gap-1">
+                  {/* Composer Controls */}
+                  <div className="flex items-end gap-2 w-full">
+                    {/* Action buttons: Emoji, Attach */}
+                    <div className="flex items-center gap-1 mb-1">
                       <Popover 
-                        content={<EmojiPicker onEmojiClick={(e) => setMessage(prev => prev + e.emoji)} height={350} width={300} />}
+                        content={
+                          <EmojiPicker 
+                            onEmojiClick={(e) => {
+                              setMessage(prev => prev + e.emoji);
+                              focusInput();
+                            }} 
+                            height={350} 
+                            width={300} 
+                          />
+                        }
                         trigger="click"
                         placement="topLeft"
                       >
-                        <Button type="text" shape="circle" icon={<SmileOutlined className="text-gray-500 text-xl" />} className="flex-shrink-0 w-10 h-10 hover:bg-gray-200" disabled={isSending} />
+                        <Button 
+                          type="text" 
+                          shape="circle" 
+                          icon={<SmileOutlined className="text-gray-500 text-xl" />} 
+                          className="flex-shrink-0 w-10 h-10 hover:bg-gray-200" 
+                          disabled={isSending} 
+                        />
                       </Popover>
                       <input 
                         type="file" 
@@ -947,9 +1039,10 @@ export const TicketDetailsPage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="flex-1 bg-white rounded-3xl min-h-[44px] flex items-center px-4 overflow-hidden border border-gray-300 focus-within:border-[#128c7e] transition-colors">
+                    {/* Auto-growing Textarea Capsule */}
+                    <div className="flex-1 bg-white rounded-2xl border border-gray-300 focus-within:border-[#128c7e] shadow-sm px-3.5 py-2 transition-all">
                       {isRecording || audioBlob ? (
-                        <div className="flex items-center gap-3 w-full justify-between py-1">
+                        <div className="flex items-center gap-3 w-full justify-between py-0.5">
                           <div className="flex items-center gap-3">
                             {audioBlob && audioPreviewUrl ? (
                               <audio controls src={audioPreviewUrl} className="h-8 max-w-[180px]" />
@@ -969,50 +1062,31 @@ export const TicketDetailsPage: React.FC = () => {
                           <Button type="text" shape="circle" size="small" icon={<DeleteOutlined className="text-gray-400 hover:text-red-500" />} onClick={cancelRecording} />
                         </div>
                       ) : (
-                        <Input.TextArea
+                        <textarea
                           ref={textareaRef}
-                          variant="borderless"
                           rows={1}
-                          autoSize={{ minRows: 1, maxRows: 5 }}
                           placeholder="Type a message or @name to mention/assign..."
                           value={message}
-                          onChange={handleTextChange}
-                          onKeyDown={handleKeyDown}
-                          onPressEnter={(e) => {
-                            if (justSelectedMentionRef.current) {
-                              e.preventDefault();
-                              return;
-                            }
-                            if (mentionDropdownOpen && filteredMentionUsers.length > 0) {
-                              e.preventDefault();
-                              justSelectedMentionRef.current = true;
-                              setTimeout(() => {
-                                justSelectedMentionRef.current = false;
-                              }, 300);
-                              const targetUser = filteredMentionUsers[highlightedMentionIndex] || filteredMentionUsers[0];
-                              if (targetUser) {
-                                handleSelectMentionUser(targetUser);
-                              }
-                              return;
-                            }
-                            if (!e.shiftKey) {
-                              e.preventDefault();
-                              handleSendMessage();
-                            }
+                          onChange={(e) => {
+                            handleTextChange(e);
+                            adjustTextareaHeight();
                           }}
+                          onKeyDown={handleKeyDown}
                           disabled={isSending || isAddingAssignee}
-                          className="resize-none !px-0 !py-2.5 text-[15px] leading-relaxed bg-transparent"
+                          className="w-full resize-none outline-none text-sm text-gray-800 bg-transparent h-[24px] min-h-[24px] max-h-36 leading-6 placeholder:truncate"
+                          style={{ height: '24px', minHeight: '24px' }}
                         />
                       )}
                     </div>
 
-                    <div className="flex items-center flex-shrink-0">
+                    {/* Audio Record & Send Buttons */}
+                    <div className="flex items-center gap-1 mb-1 flex-shrink-0">
                       {message.trim() || audioBlob || attachments.length > 0 ? (
                         <Button 
                           type="primary" 
                           shape="circle" 
                           icon={<SendOutlined />} 
-                          className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0 ml-1"
+                          className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0"
                           onClick={handleSendMessage} 
                           loading={isSending || isUploadingAttachments} 
                         />
@@ -1021,7 +1095,7 @@ export const TicketDetailsPage: React.FC = () => {
                           type="primary" 
                           shape="circle" 
                           icon={<AudioOutlined className="text-xl" />} 
-                          className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0 ml-1"
+                          className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0"
                           onClick={startRecording} 
                           disabled={isSending || isUploadingAttachments} 
                           title="Record voice message" 
