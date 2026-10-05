@@ -324,12 +324,40 @@ export const ChatTicketCreator: React.FC = () => {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused')) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      clearInterval(recordTimerRef.current);
+  const stopAndSendRecording = async () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+
+    clearInterval(recordTimerRef.current);
+    setIsRecording(false);
+    setIsPaused(false);
+
+    const blob: Blob = await new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder) return resolve(new Blob([]));
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: recorder.mimeType || 'audio/webm' 
+        });
+        recorder.stream.getTracks().forEach(track => track.stop());
+        resolve(audioBlob);
+      };
+
+      recorder.stop();
+    });
+
+    if (blob && blob.size > 0) {
+      setAudioBlob(blob);
+      setAudioPreviewUrl(URL.createObjectURL(blob));
+
+      // MANDATORY RULE: Must mention at least 1 assignee
+      if (taggedAssignees.length === 0) {
+        message.warning('Voice note recorded. Please tag at least one assignee with @ to create the ticket');
+        textareaRef.current?.focus();
+        return;
+      }
+
+      startUndoBuffer(blob);
     }
   };
 
@@ -369,7 +397,7 @@ export const ChatTicketCreator: React.FC = () => {
   // Trigger Send action with Validation
   const triggerSend = () => {
     if (isRecording || isPaused) {
-      message.warning('Please stop audio recording before sending');
+      stopAndSendRecording();
       return;
     }
 
@@ -389,18 +417,26 @@ export const ChatTicketCreator: React.FC = () => {
   };
 
   // Start 6-Second Undo Buffer
-  const startUndoBuffer = () => {
+  const startUndoBuffer = (overrideBlob?: Blob) => {
     setIsUndoPending(true);
     setUndoCountdown(TOTAL_UNDO_SECONDS);
 
+    const activeBlob = overrideBlob || audioBlob;
+    let finalTitle = parsedTicket.title;
+    if (!finalTitle && activeBlob) {
+      const creatorName = (authUser as any)?.name || 'User';
+      const assigneeNames = taggedAssignees.map(a => a.name).join(', ') || 'Assignee';
+      finalTitle = `Ticket by ${creatorName} to ${assigneeNames}`;
+    }
+
     // Save pending payload
     pendingPayloadRef.current = {
-      title: parsedTicket.title,
+      title: finalTitle,
       description: parsedTicket.description,
       teamId: inferredTeam?.id,
       assignees: taggedAssignees.map(a => a.id),
       rawText: content.trim(),
-      audioBlob,
+      audioBlob: activeBlob,
       attachments: [...attachments],
     };
 
@@ -742,26 +778,6 @@ export const ChatTicketCreator: React.FC = () => {
       {!isUndoPending && (
         <div className="bg-[#f0f2f5] p-3 border-t border-gray-300 z-20 flex flex-col gap-2">
           
-          {/* Active Audio Recording Bar */}
-          {(isRecording || isPaused) && (
-            <div className="flex items-center justify-between bg-red-50 text-red-600 px-4 py-2 rounded-xl border border-red-200">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full bg-red-500 ${isRecording ? 'animate-ping' : ''}`} />
-                <span className="font-mono font-bold text-sm">{formatDuration(recordingDuration)}</span>
-                <span className="text-xs text-red-500">Recording Voice Note</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {isPaused ? (
-                  <Button type="text" shape="circle" icon={<PlayCircleOutlined className="text-xl text-green-600" />} onClick={resumeRecording} />
-                ) : (
-                  <Button type="text" shape="circle" icon={<PauseCircleOutlined className="text-xl text-orange-500" />} onClick={pauseRecording} />
-                )}
-                <Button type="text" shape="circle" icon={<StopOutlined className="text-xl text-red-600" />} onClick={stopRecording} />
-                <Button type="text" shape="circle" icon={<DeleteOutlined className="text-lg text-gray-400 hover:text-red-500" />} onClick={cancelRecording} />
-              </div>
-            </div>
-          )}
-
           {/* Composer Controls */}
           <div className="flex items-end gap-2 w-full">
             
@@ -783,7 +799,7 @@ export const ChatTicketCreator: React.FC = () => {
                   shape="circle" 
                   icon={<SmileOutlined className="text-gray-500 text-xl" />} 
                   className="w-10 h-10 hover:bg-gray-200" 
-                  disabled={isUploading}
+                  disabled={isUploading || isRecording || isPaused}
                 />
               </Popover>
 
@@ -799,37 +815,97 @@ export const ChatTicketCreator: React.FC = () => {
                 shape="circle" 
                 icon={<PaperClipOutlined className="text-gray-500 text-xl" />} 
                 onClick={() => fileInputRef.current?.click()} 
-                disabled={isUploading}
-                title="Attach files"
+                disabled={isUploading || isRecording || isPaused}
+                title="Attach files" 
                 className="w-10 h-10 hover:bg-gray-200"
               />
             </div>
 
-            {/* Auto-growing Textarea */}
+            {/* Auto-growing Textarea or Active Voice Recording Bar */}
             <div className="flex-1 bg-white rounded-2xl border border-gray-300 focus-within:border-[#128c7e] shadow-sm px-3.5 py-2 transition-all">
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                placeholder="Type title on line 1, description below, @name to assign..."
-                value={content}
-                onChange={handleTextChange}
-                onKeyDown={handleKeyDown}
-                disabled={isUploading || isRecording || isPaused}
-                className="w-full resize-none outline-none text-sm text-gray-800 bg-transparent h-[24px] min-h-[24px] max-h-36 leading-6 placeholder:truncate"
-                style={{ height: '24px', minHeight: '24px' }}
-              />
+              {isRecording || isPaused ? (
+                <div className="flex items-center gap-2.5 w-full justify-between py-0.5">
+                  {/* Status Indicator & Live Timer */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div 
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        isPaused ? 'bg-amber-500' : 'bg-red-500 animate-ping'
+                      }`} 
+                    />
+                    <span className="font-mono text-sm font-semibold text-gray-800">
+                      {formatDuration(recordingDuration)}
+                    </span>
+                    <span className={`text-xs font-medium truncate ${isPaused ? 'text-amber-600' : 'text-red-500'}`}>
+                      {isPaused ? 'Paused' : 'Recording...'}
+                    </span>
+                  </div>
+
+                  {/* Action buttons: Pause/Resume and Stop/Cancel */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Pause/Resume Button */}
+                    <Button
+                      type="text"
+                      shape="circle"
+                      size="small"
+                      icon={
+                        isPaused ? (
+                          <PlayCircleOutlined className="text-xl text-emerald-600 hover:text-emerald-700" />
+                        ) : (
+                          <PauseCircleOutlined className="text-xl text-amber-500 hover:text-amber-600" />
+                        )
+                      }
+                      onClick={isPaused ? resumeRecording : pauseRecording}
+                      title={isPaused ? 'Resume recording' : 'Pause recording'}
+                      className="flex items-center justify-center hover:bg-gray-100"
+                    />
+
+                    {/* Stop Button: cancels/discards recording without sending */}
+                    <Button
+                      type="text"
+                      shape="circle"
+                      size="small"
+                      icon={<StopOutlined className="text-lg text-red-500 hover:text-red-700" />}
+                      onClick={cancelRecording}
+                      title="Stop & cancel recording (discard)"
+                      className="flex items-center justify-center hover:bg-red-50"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  placeholder="Type title on line 1, description below, @name to assign..."
+                  value={content}
+                  onChange={handleTextChange}
+                  onKeyDown={handleKeyDown}
+                  disabled={isUploading}
+                  className="w-full resize-none outline-none text-sm text-gray-800 bg-transparent h-[24px] min-h-[24px] max-h-36 leading-6 placeholder:truncate"
+                  style={{ height: '24px', minHeight: '24px' }}
+                />
+              )}
             </div>
 
             {/* Audio Record & Send Buttons */}
-            <div className="flex items-center gap-1 mb-1">
-              {content.trim() || audioBlob || attachments.length > 0 ? (
+            <div className="flex items-center gap-1 mb-1 flex-shrink-0">
+              {isRecording || isPaused ? (
                 <Button 
                   type="primary" 
                   shape="circle" 
                   icon={<SendOutlined />} 
-                  onClick={triggerSend}
+                  onClick={stopAndSendRecording}
                   loading={isUploading}
-                  className={`w-11 h-11 border-none flex items-center justify-center shadow-md ${
+                  className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0 animate-pulse"
+                  title="Stop recording and send voice message"
+                />
+              ) : content.trim() || audioBlob || attachments.length > 0 ? (
+                <Button 
+                  type="primary" 
+                  shape="circle" 
+                  icon={<SendOutlined />} 
+                  onClick={() => triggerSend()}
+                  loading={isUploading}
+                  className={`w-11 h-11 border-none flex items-center justify-center shadow-md flex-shrink-0 ${
                     taggedAssignees.length > 0 ? 'bg-[#00a884] hover:bg-[#008f6f]' : 'bg-gray-400 cursor-not-allowed'
                   }`}
                   title={taggedAssignees.length === 0 ? 'Tag at least one assignee with @' : 'Send Ticket (Enter)'}
@@ -840,9 +916,9 @@ export const ChatTicketCreator: React.FC = () => {
                   shape="circle" 
                   icon={<AudioOutlined className="text-xl" />} 
                   onClick={startRecording}
-                  disabled={isUploading || isRecording || isPaused}
-                  className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md"
-                  title="Record Voice Note"
+                  disabled={isUploading}
+                  className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0"
+                  title="Click to start recording"
                 />
               )}
             </div>

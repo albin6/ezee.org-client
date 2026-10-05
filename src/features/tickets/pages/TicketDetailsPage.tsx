@@ -380,12 +380,55 @@ export const TicketDetailsPage: React.FC = () => {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused')) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      clearInterval(timerRef.current);
+  const stopAndSendRecording = async () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+
+    clearInterval(timerRef.current);
+    setIsRecording(false);
+    setIsPaused(false);
+
+    const blob: Blob = await new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder) return resolve(new Blob([]));
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: recorder.mimeType || 'audio/webm' 
+        });
+        recorder.stream.getTracks().forEach(track => track.stop());
+        resolve(audioBlob);
+      };
+
+      recorder.stop();
+    });
+
+    if (blob && blob.size > 0 && id) {
+      setIsSending(true);
+      try {
+        const { url } = await ticketService.uploadAudio(blob);
+        const finalMessage = message.trim() || '🎤 Voice Message';
+        let finalAttachments: any[] = [];
+        if (attachments.length > 0) {
+          setIsUploadingAttachments(true);
+          finalAttachments = await Promise.all(attachments.map(f => ticketService.uploadAttachment(f)));
+          setIsUploadingAttachments(false);
+        }
+        await addMessage(id, finalMessage, undefined, replyingTo?.id, url, finalAttachments);
+        setMessage('');
+        setReplyingTo(null);
+        setAttachments([]);
+        setAudioBlob(null);
+        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+        setAudioPreviewUrl(null);
+        setRecordingDuration(0);
+        audioChunksRef.current = [];
+      } catch (err: any) {
+        console.error('Failed to send voice message:', err);
+        antMessage.error(err?.message || 'Failed to send voice message');
+      } finally {
+        setIsSending(false);
+        focusInput();
+      }
     }
   };
 
@@ -1039,27 +1082,67 @@ export const TicketDetailsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Auto-growing Textarea Capsule */}
+                    {/* Auto-growing Textarea Capsule or Active Voice Recording Bar */}
                     <div className="flex-1 bg-white rounded-2xl border border-gray-300 focus-within:border-[#128c7e] shadow-sm px-3.5 py-2 transition-all">
-                      {isRecording || audioBlob ? (
-                        <div className="flex items-center gap-3 w-full justify-between py-0.5">
-                          <div className="flex items-center gap-3">
-                            {audioBlob && audioPreviewUrl ? (
-                              <audio controls src={audioPreviewUrl} className="h-8 max-w-[180px]" />
-                            ) : (
-                              <>
-                                <div className={`w-2.5 h-2.5 rounded-full ${isPaused ? 'bg-orange-400' : 'bg-red-500 animate-pulse'}`}></div>
-                                <span className="text-gray-700 font-mono text-[15px]">{formatDuration(recordingDuration)}</span>
-                                {isPaused ? (
-                                  <Button type="text" shape="circle" size="small" icon={<PlayCircleOutlined className="text-green-600" />} onClick={resumeRecording} />
-                                ) : (
-                                  <Button type="text" shape="circle" size="small" icon={<PauseCircleOutlined className="text-orange-500" />} onClick={pauseRecording} />
-                                )}
-                                <Button type="text" shape="circle" size="small" icon={<StopOutlined className="text-red-500" />} onClick={stopRecording} />
-                              </>
-                            )}
+                      {isRecording || isPaused ? (
+                        <div className="flex items-center gap-2.5 w-full justify-between py-0.5">
+                          {/* Recording/Paused State Indicator & Timer */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div 
+                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                isPaused ? 'bg-amber-500' : 'bg-red-500 animate-ping'
+                              }`} 
+                            />
+                            <span className="font-mono text-sm font-semibold text-gray-800">
+                              {formatDuration(recordingDuration)}
+                            </span>
+                            <span className={`text-xs font-medium truncate ${isPaused ? 'text-amber-600' : 'text-red-500'}`}>
+                              {isPaused ? 'Paused' : 'Recording...'}
+                            </span>
                           </div>
-                          <Button type="text" shape="circle" size="small" icon={<DeleteOutlined className="text-gray-400 hover:text-red-500" />} onClick={cancelRecording} />
+
+                          {/* Control Buttons: Pause/Resume and Stop/Cancel */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Pause/Resume Button */}
+                            <Button
+                              type="text"
+                              shape="circle"
+                              size="small"
+                              icon={
+                                isPaused ? (
+                                  <PlayCircleOutlined className="text-xl text-emerald-600 hover:text-emerald-700" />
+                                ) : (
+                                  <PauseCircleOutlined className="text-xl text-amber-500 hover:text-amber-600" />
+                                )
+                              }
+                              onClick={isPaused ? resumeRecording : pauseRecording}
+                              title={isPaused ? 'Resume recording' : 'Pause recording'}
+                              className="flex items-center justify-center hover:bg-gray-100"
+                            />
+
+                            {/* Stop Button: cancels/discards recording without sending */}
+                            <Button
+                              type="text"
+                              shape="circle"
+                              size="small"
+                              icon={<StopOutlined className="text-lg text-red-500 hover:text-red-700" />}
+                              onClick={cancelRecording}
+                              title="Stop & cancel recording (discard)"
+                              className="flex items-center justify-center hover:bg-red-50"
+                            />
+                          </div>
+                        </div>
+                      ) : audioBlob ? (
+                        <div className="flex items-center gap-2 w-full justify-between py-0.5">
+                          <audio controls src={audioPreviewUrl!} className="h-7 max-w-[200px]" />
+                          <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<DeleteOutlined className="text-gray-400 hover:text-red-500" />}
+                            onClick={cancelRecording}
+                            title="Discard audio"
+                          />
                         </div>
                       ) : (
                         <textarea
@@ -1079,9 +1162,19 @@ export const TicketDetailsPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Audio Record & Send Buttons */}
+                    {/* Microphone / Send Button (Click mic to record, click same button while recording to send) */}
                     <div className="flex items-center gap-1 mb-1 flex-shrink-0">
-                      {message.trim() || audioBlob || attachments.length > 0 ? (
+                      {isRecording || isPaused ? (
+                        <Button 
+                          type="primary" 
+                          shape="circle" 
+                          icon={<SendOutlined />} 
+                          className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0 animate-pulse"
+                          onClick={stopAndSendRecording} 
+                          loading={isSending} 
+                          title="Stop recording and send voice message" 
+                        />
+                      ) : message.trim() || audioBlob || attachments.length > 0 ? (
                         <Button 
                           type="primary" 
                           shape="circle" 
@@ -1089,6 +1182,7 @@ export const TicketDetailsPage: React.FC = () => {
                           className="w-11 h-11 bg-[#00a884] hover:bg-[#008f6f] border-none flex items-center justify-center shadow-md flex-shrink-0"
                           onClick={handleSendMessage} 
                           loading={isSending || isUploadingAttachments} 
+                          title="Send message (Enter)"
                         />
                       ) : (
                         <Button 

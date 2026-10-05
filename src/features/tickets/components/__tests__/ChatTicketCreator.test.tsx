@@ -269,4 +269,77 @@ describe('ChatTicketCreator Component', () => {
     expect(textarea.style.height).toBe('24px');
     expect(textarea.style.minHeight).toBe('24px');
   });
+
+  it('manages voice recording buttons across idle, recording, and paused states', async () => {
+    const mockTracks = [{ stop: vi.fn() }];
+    const mockStream = { getTracks: () => mockTracks };
+    class MockMediaRecorder {
+      state = 'inactive';
+      start = vi.fn().mockImplementation(() => { this.state = 'recording'; });
+      pause = vi.fn().mockImplementation(() => { this.state = 'paused'; });
+      resume = vi.fn().mockImplementation(() => { this.state = 'recording'; });
+      stop = vi.fn().mockImplementation(() => { 
+        this.state = 'inactive';
+        if (this.onstop) this.onstop();
+      });
+      mimeType = 'audio/webm';
+      stream = mockStream;
+      onstop: any = null;
+      ondataavailable: any = null;
+    }
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      configurable: true,
+    });
+    window.MediaRecorder = MockMediaRecorder as any;
+
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    // 1. Idle state: mic button is rendered
+    const micButton = screen.getByTitle(/Click to start recording/i);
+    expect(micButton).toBeInTheDocument();
+
+    // 2. Click mic to start recording
+    fireEvent.click(micButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Recording\.\.\./i)).toBeInTheDocument();
+    });
+
+    // Same button transforms into Send button
+    expect(screen.getByTitle(/Stop recording and send/i)).toBeInTheDocument();
+
+    // Pause button and Stop/Cancel button are rendered
+    const pauseButton = screen.getByTitle(/Pause recording/i);
+    const stopButton = screen.getByTitle(/Stop & cancel recording \(discard\)/i);
+    expect(pauseButton).toBeInTheDocument();
+    expect(stopButton).toBeInTheDocument();
+
+    // 3. Click Pause button: transitions to Paused state
+    fireEvent.click(pauseButton);
+    await waitFor(() => {
+      expect(screen.getByText(/Paused/i)).toBeInTheDocument();
+    });
+    const resumeButton = screen.getByTitle(/Resume recording/i);
+    expect(resumeButton).toBeInTheDocument();
+
+    // 4. Click Resume button: transitions back to Recording state
+    fireEvent.click(resumeButton);
+    await waitFor(() => {
+      expect(screen.getByText(/Recording\.\.\./i)).toBeInTheDocument();
+    });
+
+    // 5. Click Stop/Cancel button: stops recording and discards without sending
+    fireEvent.click(stopButton);
+    await waitFor(() => {
+      expect(screen.getByTitle(/Click to start recording/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Recording\.\.\./i)).not.toBeInTheDocument();
+    });
+  });
 });
