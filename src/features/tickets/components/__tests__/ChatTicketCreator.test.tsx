@@ -251,4 +251,22 @@ describe('ChatTicketCreator Component', () => {
       );
     });
   });
+
+  it('renders textarea with 24px initial height and auto-growing capacity', async () => {
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    const textarea = screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i) as HTMLTextAreaElement;
+    expect(textarea).toBeInTheDocument();
+    expect(textarea.rows).toBe(1);
+    expect(textarea.className).toContain('h-[24px]');
+    expect(textarea.className).toContain('min-h-[24px]');
+    expect(textarea.style.height).toBe('24px');
+    expect(textarea.style.minHeight).toBe('24px');
+  });
 });

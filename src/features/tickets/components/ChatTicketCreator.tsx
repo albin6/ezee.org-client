@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Avatar, Tag, Popover, Image, Progress, message } from 'antd';
 import { 
@@ -236,6 +236,43 @@ export const ChatTicketCreator: React.FC = () => {
       }, 50);
     }
   };
+
+  // WhatsApp-like auto-resizing: compact 24px initial height, smoothly expands as content grows up to 140px
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const minHeight = 24;
+    const maxHeight = 140;
+
+    const currentVal = textarea.value;
+
+    // When there is no user content, lock strictly to initial height (24px)
+    // so placeholder text wrapping doesn't artificially stretch the empty input
+    if (!currentVal) {
+      textarea.style.height = `${minHeight}px`;
+      textarea.style.overflowY = 'hidden';
+      return;
+    }
+
+    // Reset height temporarily to compute accurate scrollHeight of user content
+    textarea.style.height = 'auto';
+
+    const scrollHeight = textarea.scrollHeight;
+    const targetHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+
+    textarea.style.height = `${targetHeight}px`;
+    textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [content, adjustTextareaHeight]);
+
+  useEffect(() => {
+    window.addEventListener('resize', adjustTextareaHeight);
+    return () => window.removeEventListener('resize', adjustTextareaHeight);
+  }, [adjustTextareaHeight]);
 
   // Audio Recording Handlers
   const startRecording = async () => {
@@ -778,8 +815,8 @@ export const ChatTicketCreator: React.FC = () => {
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}
                 disabled={isUploading || isRecording || isPaused}
-                className="w-full resize-none outline-none text-sm text-gray-800 bg-transparent max-h-36 overflow-y-auto leading-relaxed"
-                style={{ minHeight: '38px' }}
+                className="w-full resize-none outline-none text-sm text-gray-800 bg-transparent h-[24px] min-h-[24px] max-h-36 leading-6 placeholder:truncate"
+                style={{ height: '24px', minHeight: '24px' }}
               />
             </div>
 
@@ -812,7 +849,7 @@ export const ChatTicketCreator: React.FC = () => {
           </div>
 
           {/* Footer Helper Text */}
-          <div className="flex justify-between items-center px-1 text-[11px] text-gray-500">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 px-1 text-[11px] text-gray-500">
             <span className="flex items-center gap-1">
               <InfoCircleOutlined /> Press <strong>Enter</strong> to send • <strong>Shift + Enter</strong> for new line
             </span>
