@@ -19,13 +19,15 @@ import {
   MessageOutlined, 
   FileDoneOutlined, 
   AimOutlined, 
-  RadarChartOutlined 
+  RadarChartOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { useNotificationStore } from '@/features/notifications/store/notification.store';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
+import { usePWAStore } from '@/shared/stores/pwa.store';
 
 const { Header, Content, Sider } = Layout;
 
@@ -70,6 +72,7 @@ export const AdminLayout: React.FC = () => {
   const location = useLocation();
 
   const routeMeta = getRouteMeta(location.pathname);
+  const { isStandalone, promptInstall } = usePWAStore();
 
   const handleLogout = () => {
     logout();
@@ -105,6 +108,15 @@ export const AdminLayout: React.FC = () => {
       onClick: () => navigate('/profile'),
       className: 'py-2 px-3',
     },
+    ...(!isStandalone ? [
+      {
+        key: 'install-app',
+        icon: <DownloadOutlined className="text-purple-600 text-base" />,
+        label: <span className="text-sm font-medium text-purple-700">Install App</span>,
+        onClick: promptInstall,
+        className: 'py-2 px-3',
+      }
+    ] : []),
     {
       type: 'divider' as const,
       className: 'my-1',

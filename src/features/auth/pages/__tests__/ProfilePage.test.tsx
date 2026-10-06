@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ProfilePage } from '../ProfilePage';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../store/auth.store';
+import { usePWAStore } from '@/shared/stores/pwa.store';
 
 vi.mock('../../services/auth.service', () => ({
   authService: {
@@ -141,6 +142,49 @@ describe('ProfilePage - Reset Password Flow', () => {
       });
       // Should reset back to Step 1
       expect(screen.getByPlaceholderText(/enter your current password/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders Application & Device section with Install App button when not in standalone mode', async () => {
+    const mockPromptInstall = vi.fn();
+    usePWAStore.setState({
+      isStandalone: false,
+      promptInstall: mockPromptInstall,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application & Device')).toBeInTheDocument();
+      expect(screen.getByText('Web Browser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /install app/i })).toBeInTheDocument();
+    });
+
+    const installBtn = screen.getByRole('button', { name: /install app/i });
+    await userEvent.click(installBtn);
+
+    expect(mockPromptInstall).toHaveBeenCalled();
+  });
+
+  it('renders Installed tag and hides Install App button when app is running in standalone mode', async () => {
+    usePWAStore.setState({
+      isStandalone: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application & Device')).toBeInTheDocument();
+      expect(screen.getByText('Installed')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /install app/i })).not.toBeInTheDocument();
     });
   });
 });

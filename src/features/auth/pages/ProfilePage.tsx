@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Descriptions, Spin, Alert, Tag, message, Form, Input, Button, Typography, Space } from 'antd';
-import { LockOutlined, CheckCircleOutlined, SafetyOutlined, KeyOutlined } from '@ant-design/icons';
+import { LockOutlined, CheckCircleOutlined, SafetyOutlined, KeyOutlined, AppstoreAddOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authService } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
+import { usePWAStore } from '@/shared/stores/pwa.store';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { verifyCurrentPasswordSchema, profileSetNewPasswordSchema } from '../schemas/auth.schema';
@@ -16,6 +17,7 @@ export const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, setUser } = useAuthStore();
+  const { isStandalone, promptInstall } = usePWAStore();
 
   // Password reset state in profile
   const [currentPasswordVerified, setCurrentPasswordVerified] = useState(false);
@@ -180,6 +182,57 @@ export const ProfilePage: React.FC = () => {
             </Tag>
           </Descriptions.Item>
         </Descriptions>
+      </Card>
+
+      {/* App Installation Status Card */}
+      <Card
+        title={
+          <div className="flex items-center space-x-2">
+            <AppstoreAddOutlined className="text-purple-600 text-lg" />
+            <span className="font-semibold text-gray-800">Application & Device</span>
+          </div>
+        }
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-xs tracking-wider shrink-0 mt-0.5 select-none ring-1 ring-black/5">
+              EZ
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900 text-base leading-tight">
+                  Ezee Org Platform
+                </span>
+                {isStandalone ? (
+                  <Tag color="success" className="px-2.5 py-0.5 rounded-full font-medium">
+                    <CheckCircleOutlined className="mr-1" /> Installed
+                  </Tag>
+                ) : (
+                  <Tag color="purple" className="px-2.5 py-0.5 rounded-full font-medium">
+                    Web Browser
+                  </Tag>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1 max-w-xl leading-relaxed">
+                {isStandalone
+                  ? 'The application is installed and running in native standalone mode on this device.'
+                  : 'Install Ezee Org as a desktop or mobile application for instant launch, offline readiness, and a distraction-free full-screen workspace.'}
+              </p>
+            </div>
+          </div>
+
+          {!isStandalone && (
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              size="large"
+              onClick={promptInstall}
+              className="bg-purple-600 hover:bg-purple-700 font-medium shrink-0 self-start sm:self-center"
+            >
+              Install App
+            </Button>
+          )}
+        </div>
       </Card>
 
       {/* Reset Password Card */}
