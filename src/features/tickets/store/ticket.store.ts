@@ -26,10 +26,15 @@ interface TicketState {
   addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
   addAssignee: (ticketId: string, userId: string) => Promise<any>;
+  editMessage: (ticketId: string, messageId: string, content: string) => Promise<any>;
+  deleteMessage: (ticketId: string, messageId: string, type: 'me' | 'everyone') => Promise<any>;
   joinTicketRoom: (ticketId: string) => void;
   leaveTicketRoom: (ticketId: string) => void;
   handleNewMessage: (message: any) => void;
   handleReactionUpdated: (data: { messageId: string, message: any }) => void;
+  handleMessageEdited: (message: any) => void;
+  handleMessageDeletedForEveryone: (data: { messageId: string; ticketId: string; message?: any }) => void;
+  handleMessageDeletedForMe: (data: { messageId: string; ticketId: string }) => void;
 }
 
 export const useTicketStore = create<TicketState>((set, get) => ({
@@ -123,6 +128,41 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     }
   },
 
+  editMessage: async (ticketId: string, messageId: string, content: string) => {
+    try {
+      const res = await ticketService.editMessage(ticketId, messageId, content);
+      if (res && res.data) {
+        get().handleMessageEdited(res.data);
+      }
+      return res?.data;
+    } catch (error: any) {
+      console.error('Failed to edit message', error);
+      throw error;
+    }
+  },
+
+  deleteMessage: async (ticketId: string, messageId: string, type: 'me' | 'everyone') => {
+    try {
+      const res = await ticketService.deleteMessage(ticketId, messageId, type);
+      if (type === 'everyone') {
+        get().handleMessageDeletedForEveryone({
+          messageId,
+          ticketId,
+          message: res?.data?.message,
+        });
+      } else {
+        get().handleMessageDeletedForMe({
+          messageId,
+          ticketId,
+        });
+      }
+      return res?.data;
+    } catch (error: any) {
+      console.error('Failed to delete message', error);
+      throw error;
+    }
+  },
+
   joinTicketRoom: (ticketId: string) => {
     const socket = socketService.connect();
     
@@ -159,6 +199,9 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     socket.off('REACTION_UPDATED');
     socket.off('TICKET_UPDATED');
     socket.off('AI_INSIGHTS_GENERATED');
+    socket.off('MESSAGE_EDITED');
+    socket.off('MESSAGE_DELETED_FOR_EVERYONE');
+    socket.off('MESSAGE_DELETED_FOR_ME');
 
     socket.on('NEW_MESSAGE', (message: any) => {
       get().handleNewMessage(message);
@@ -191,6 +234,18 @@ export const useTicketStore = create<TicketState>((set, get) => ({
         });
       }
     });
+
+    socket.on('MESSAGE_EDITED', (message: any) => {
+      get().handleMessageEdited(message);
+    });
+
+    socket.on('MESSAGE_DELETED_FOR_EVERYONE', (data: any) => {
+      get().handleMessageDeletedForEveryone(data);
+    });
+
+    socket.on('MESSAGE_DELETED_FOR_ME', (data: any) => {
+      get().handleMessageDeletedForMe(data);
+    });
   },
 
   leaveTicketRoom: (ticketId: string) => {
@@ -201,6 +256,9 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       socket.off('REACTION_UPDATED');
       socket.off('TICKET_UPDATED');
       socket.off('AI_INSIGHTS_GENERATED');
+      socket.off('MESSAGE_EDITED');
+      socket.off('MESSAGE_DELETED_FOR_EVERYONE');
+      socket.off('MESSAGE_DELETED_FOR_ME');
     }
   },
 
@@ -228,6 +286,56 @@ export const useTicketStore = create<TicketState>((set, get) => ({
         ...ct,
         messages: ct.messages?.map(m => (m.id === messageId ? message : m))
       }
+    });
+  },
+
+  handleMessageEdited: (updatedMessage: any) => {
+    const ct = get().currentTicket;
+    if (!ct || ct.id !== updatedMessage.ticketId) return;
+
+    set({
+      currentTicket: {
+        ...ct,
+        messages: ct.messages?.map((m) =>
+          m.id === updatedMessage.id ? { ...m, ...updatedMessage } : m
+        ),
+      },
+    });
+  },
+
+  handleMessageDeletedForEveryone: ({ messageId, ticketId, message }: { messageId: string, ticketId: string, message?: any }) => {
+    const ct = get().currentTicket;
+    if (!ct || ct.id !== ticketId) return;
+
+    set({
+      currentTicket: {
+        ...ct,
+        messages: ct.messages?.map((m) => {
+          if (m.id === messageId) {
+            return {
+              ...m,
+              ...(message || {}),
+              isDeleted: true,
+              content: 'This message was deleted',
+              audioUrl: undefined,
+              attachments: [],
+            };
+          }
+          return m;
+        }),
+      },
+    });
+  },
+
+  handleMessageDeletedForMe: ({ messageId, ticketId }: { messageId: string, ticketId: string }) => {
+    const ct = get().currentTicket;
+    if (!ct || ct.id !== ticketId) return;
+
+    set({
+      currentTicket: {
+        ...ct,
+        messages: ct.messages?.filter((m) => m.id !== messageId),
+      },
     });
   }
 }));

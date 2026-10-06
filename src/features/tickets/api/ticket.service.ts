@@ -12,6 +12,9 @@ export interface Ticket {
   updatedAt: string;
   resolvedAt?: string;
   closedAt?: string;
+  inProgressAt?: string;
+  lastEscalatedAt?: string;
+  escalationLevel?: number;
   aiSummary?: string;
   aiConfidence?: number;
   createdBy?: { id: string; name: string; email: string };
@@ -26,7 +29,12 @@ export interface Ticket {
     isSystem: boolean; 
     user: { id: string; name: string }; 
     replyTo?: any; 
-    reactions?: any[] 
+    reactions?: any[];
+    isEdited?: boolean;
+    editedAt?: string;
+    isDeleted?: boolean;
+    deletedAt?: string;
+    deletedForUsers?: string[];
   }[];
   version: number;
   similarityScore?: number;
@@ -119,6 +127,19 @@ export const ticketService = {
 
   addAssignee: async (ticketId: string, userId: string) => {
     const { data } = await apiClient.post(`/tickets/${ticketId}/assignees`, { userId });
+    return data;
+  },
+
+  editMessage: async (ticketId: string, messageId: string, content: string) => {
+    const { data } = await apiClient.patch(`/tickets/${ticketId}/messages/${messageId}`, { content });
+    return data;
+  },
+
+  deleteMessage: async (ticketId: string, messageId: string, type: 'me' | 'everyone') => {
+    const { data } = await apiClient.delete(`/tickets/${ticketId}/messages/${messageId}`, {
+      data: { type },
+      params: { type },
+    });
     return data;
   }
 };

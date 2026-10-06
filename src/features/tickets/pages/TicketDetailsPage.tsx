@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
-import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
+import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, EditOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService, type MentionUser } from '../api/ticket.service';
@@ -35,13 +35,95 @@ const AIInsightsPanel = React.memo(({ summary, confidence }: { summary: string; 
 export const TicketDetailsPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentTicket: ticket, loading, fetchTicket, addMessage, updateStatus, joinTicketRoom, leaveTicketRoom, toggleReaction, addAssignee } = useTicketStore();
+  const { currentTicket: ticket, loading, fetchTicket, addMessage, updateStatus, joinTicketRoom, leaveTicketRoom, toggleReaction, addAssignee, editMessage, deleteMessage } = useTicketStore();
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
   const [message, setMessage] = useState('');
   const [showResolvePrompt, setShowResolvePrompt] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string, name: string, content: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
+
+  // Message Edit & Delete State
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [deletingMessage, setDeletingMessage] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+
+  // 10-second tick interval to dynamically refresh 7-minute eligibility
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isWithin7Minutes = useCallback((createdAt: string) => {
+    if (!createdAt) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    return currentTime - createdAtMs <= 7 * 60 * 1000;
+  }, [currentTime]);
+
+  const handleStartEdit = (msg: any) => {
+    if (!isWithin7Minutes(msg.createdAt)) {
+      antMessage.warning('The 7-minute window to edit this message has expired.');
+      return;
+    }
+    setEditingMessageId(msg.id);
+    setEditingContent(msg.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingContent('');
+  };
+
+  const handleSaveEdit = async (msgId: string, createdAt: string) => {
+    if (!id) return;
+    if (!editingContent.trim()) {
+      antMessage.warning('Message content cannot be empty.');
+      return;
+    }
+    if (!isWithin7Minutes(createdAt)) {
+      antMessage.error('The 7-minute window to edit this message has expired.');
+      setEditingMessageId(null);
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      await editMessage(id, msgId, editingContent.trim());
+      antMessage.success('Message updated');
+      setEditingMessageId(null);
+      setEditingContent('');
+    } catch (err: any) {
+      antMessage.error(err.response?.data?.message || err.message || 'Failed to edit message');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async (type: 'me' | 'everyone') => {
+    if (!id || !deletingMessage) return;
+
+    if (!isWithin7Minutes(deletingMessage.createdAt)) {
+      antMessage.error('The 7-minute window to delete this message has expired.');
+      setDeletingMessage(null);
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      await deleteMessage(id, deletingMessage.id, type);
+      antMessage.success(type === 'everyone' ? 'Message deleted for everyone' : 'Message deleted for you');
+      setDeletingMessage(null);
+    } catch (err: any) {
+      antMessage.error(err.response?.data?.message || err.message || 'Failed to delete message');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Mention & Assignee Autocomplete State
   const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
@@ -789,112 +871,176 @@ export const TicketDetailsPage: React.FC = () => {
                               }}
                             >
                               <span className={`font-semibold text-[11px] mb-0.5 ${isMe ? 'text-[#128c7e]' : 'text-blue-500'}`}>{msg.replyTo.user.name}</span>
-                              <span className="opacity-80 text-gray-600 truncate">{msg.replyTo.content.substring(0, 60)}{msg.replyTo.content.length > 60 ? '...' : ''}</span>
+                              <span className="opacity-80 text-gray-600 truncate">{msg.replyTo.isDeleted ? 'This message was deleted' : msg.replyTo.content.substring(0, 60)}{!msg.replyTo.isDeleted && msg.replyTo.content.length > 60 ? '...' : ''}</span>
                             </div>
                           )}
 
-                          <div className="flex flex-col">
-                            <span className="whitespace-pre-wrap break-words text-[15px] leading-snug">{msg.content}</span>
-                            {msg.audioUrl && (
-                              <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
-                                <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />
-                              </div>
-                            )}
-                            {msg.attachments && msg.attachments.length > 0 && (
-                              <div className="mt-1.5 flex flex-col gap-1">
-                                {msg.attachments.map((att: any) => {
-                                  const isImage = att.fileType.startsWith('image/');
-                                  const isVideo = att.fileType.startsWith('video/');
-                                  
-                                  if (isImage) {
-                                    return (
-                                      <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
-                                        <Image src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
-                                      </div>
-                                    );
-                                  }
-                                  
-                                  if (isVideo) {
-                                    return (
-                                      <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
-                                        <video src={att.fileUrl} controls className="w-full h-auto bg-black" />
-                                      </div>
-                                    );
-                                  }
-
-                                  return (
-                                    <div 
-                                      key={att.id} 
-                                      onClick={() => setPreviewFile({ url: att.fileUrl, name: att.fileName, type: att.fileType })}
-                                      className="flex items-center gap-3 p-2 rounded-lg bg-black/5 border border-black/10 text-sm max-w-[250px] sm:max-w-[300px] cursor-pointer hover:bg-black/10 transition-colors"
-                                    >
-                                      <div className="bg-red-400 text-white rounded p-1.5 flex items-center justify-center">
-                                        <FileOutlined className="text-lg" />
-                                      </div>
-                                      <div className="flex flex-col overflow-hidden flex-1">
-                                        <span className="truncate max-w-full font-medium leading-tight text-gray-700">{att.fileName}</span>
-                                        <span className="text-[10px] text-gray-500 leading-tight">{(att.fileSize / 1024).toFixed(1)} KB • {att.fileType.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                                      </div>
-                                      <DownloadOutlined className="flex-shrink-0 text-gray-400" />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Timestamp and status */}
-                            <div className="flex justify-end items-center gap-1 mt-0.5 ml-4 float-right pt-1">
-                              <span className="text-[10px] text-gray-500 leading-none">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              {isMe && <span className="text-[12px] text-gray-400 leading-none">✓</span>}
+                          {msg.isDeleted ? (
+                            <div className="flex items-center gap-1.5 py-1 text-gray-500 italic text-sm">
+                              <StopOutlined className="text-gray-400 text-xs" />
+                              <span>This message was deleted</span>
                             </div>
+                          ) : editingMessageId === msg.id ? (
+                            <div className="flex flex-col gap-2 w-full min-w-[200px] sm:min-w-[260px] my-1">
+                              <textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="w-full text-sm p-2 border border-blue-400 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none bg-white text-gray-800"
+                                rows={Math.min(6, Math.max(2, editingContent.split('\n').length))}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSaveEdit(msg.id, msg.createdAt);
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    handleCancelEdit();
+                                  }
+                                }}
+                              />
+                              <div className="flex justify-end items-center gap-1.5">
+                                <Button size="small" onClick={handleCancelEdit} disabled={isSavingEdit}>
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  onClick={() => handleSaveEdit(msg.id, msg.createdAt)}
+                                  loading={isSavingEdit}
+                                  disabled={!editingContent.trim()}
+                                  className="bg-[#128c7e] hover:bg-[#075e54]"
+                                >
+                                  Save
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="whitespace-pre-wrap break-words text-[15px] leading-snug">{msg.content}</span>
+                              {msg.audioUrl && (
+                                <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
+                                  <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />
+                                </div>
+                              )}
+                              {msg.attachments && msg.attachments.length > 0 && (
+                                <div className="mt-1.5 flex flex-col gap-1">
+                                  {msg.attachments.map((att: any) => {
+                                    const isImage = att.fileType.startsWith('image/');
+                                    const isVideo = att.fileType.startsWith('video/');
+                                    
+                                    if (isImage) {
+                                      return (
+                                        <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
+                                          <Image src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    if (isVideo) {
+                                      return (
+                                        <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
+                                          <video src={att.fileUrl} controls className="w-full h-auto bg-black" />
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div 
+                                        key={att.id} 
+                                        onClick={() => setPreviewFile({ url: att.fileUrl, name: att.fileName, type: att.fileType })}
+                                        className="flex items-center gap-3 p-2 rounded-lg bg-black/5 border border-black/10 text-sm max-w-[250px] sm:max-w-[300px] cursor-pointer hover:bg-black/10 transition-colors"
+                                      >
+                                        <div className="bg-red-400 text-white rounded p-1.5 flex items-center justify-center">
+                                          <FileOutlined className="text-lg" />
+                                        </div>
+                                        <div className="flex flex-col overflow-hidden flex-1">
+                                          <span className="truncate max-w-full font-medium leading-tight text-gray-700">{att.fileName}</span>
+                                          <span className="text-[10px] text-gray-500 leading-tight">{(att.fileSize / 1024).toFixed(1)} KB • {att.fileType.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                                        </div>
+                                        <DownloadOutlined className="flex-shrink-0 text-gray-400" />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Timestamp and status */}
+                          <div className="flex justify-end items-center gap-1 mt-0.5 ml-4 float-right pt-1">
+                            {msg.isEdited && !msg.isDeleted && (
+                              <span className="text-[10px] text-gray-400 italic mr-0.5">edited</span>
+                            )}
+                            <span className="text-[10px] text-gray-500 leading-none">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            {isMe && !msg.isDeleted && <span className="text-[12px] text-gray-400 leading-none">✓</span>}
                           </div>
                         </div>
                         
                         {/* Reactions and action menu */}
-                        <div className={`flex gap-1 mt-0.5 items-center ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          {groupedReactions && Object.entries(groupedReactions).map(([emoji, reacts]: [string, any]) => (
-                            <button 
-                              key={emoji}
-                              className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer flex items-center gap-1 ${reacts.some((r: any) => r.userId === authUserId) ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
-                              onClick={() => id && toggleReaction(id, msg.id, emoji)}
-                            >
-                              <span>{emoji}</span> <span>{reacts.length}</span>
-                            </button>
-                          ))}
-                          
-                          <div className="flex items-center gap-1">
-                            <Popover 
-                              content={
-                                <EmojiPicker 
-                                  onEmojiClick={(e) => {
-                                    if (id) toggleReaction(id, msg.id, e.emoji);
-                                    setOpenReactionPopoverId(null);
-                                  }} 
-                                  height={350} 
-                                  width={300} 
-                                />
-                              }
-                              trigger="click"
-                              placement={isMe ? "bottomRight" : "bottomLeft"}
-                              open={openReactionPopoverId === msg.id}
-                              onOpenChange={(open) => setOpenReactionPopoverId(open ? msg.id : null)}
-                            >
-                              <button className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm">
-                                <SmileOutlined />
+                        {!msg.isDeleted && (
+                          <div className={`flex gap-1 mt-0.5 items-center ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            {groupedReactions && Object.entries(groupedReactions).map(([emoji, reacts]: [string, any]) => (
+                              <button 
+                                key={emoji}
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer flex items-center gap-1 ${reacts.some((r: any) => r.userId === authUserId) ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
+                                onClick={() => id && toggleReaction(id, msg.id, emoji)}
+                              >
+                                <span>{emoji}</span> <span>{reacts.length}</span>
                               </button>
-                            </Popover>
-                            <button 
-                              className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm"
-                              onClick={() => {
-                                setReplyingTo({ id: msg.id, name: isMe ? 'You' : msg.user.name, content: msg.content });
-                                focusInput();
-                              }}
-                              title="Reply"
-                            >
-                              <EnterOutlined />
-                            </button>
+                            ))}
+                            
+                            <div className="flex items-center gap-1">
+                              <Popover 
+                                content={
+                                  <EmojiPicker 
+                                    onEmojiClick={(e) => {
+                                      if (id) toggleReaction(id, msg.id, e.emoji);
+                                      setOpenReactionPopoverId(null);
+                                    }} 
+                                    height={350} 
+                                    width={300} 
+                                  />
+                                }
+                                trigger="click"
+                                placement={isMe ? "bottomRight" : "bottomLeft"}
+                                open={openReactionPopoverId === msg.id}
+                                onOpenChange={(open) => setOpenReactionPopoverId(open ? msg.id : null)}
+                              >
+                                <button className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm">
+                                  <SmileOutlined />
+                                </button>
+                              </Popover>
+                              <button 
+                                className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center shadow-sm"
+                                onClick={() => {
+                                  setReplyingTo({ id: msg.id, name: isMe ? 'You' : msg.user.name, content: msg.content });
+                                  focusInput();
+                                }}
+                                title="Reply"
+                              >
+                                <EnterOutlined />
+                              </button>
+                              {isMe && ticket.status !== 'CLOSED' && isWithin7Minutes(msg.createdAt) && (
+                                <>
+                                  <button 
+                                    className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-blue-50 text-gray-500 hover:text-blue-600 cursor-pointer flex items-center justify-center shadow-sm transition-colors"
+                                    onClick={() => handleStartEdit(msg)}
+                                    title="Edit message"
+                                  >
+                                    <EditOutlined />
+                                  </button>
+                                  <button 
+                                    className="text-[10px] w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-red-50 text-gray-500 hover:text-red-600 cursor-pointer flex items-center justify-center shadow-sm transition-colors"
+                                    onClick={() => setDeletingMessage(msg)}
+                                    title="Delete message"
+                                  >
+                                    <DeleteOutlined />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                       </div>
                     </div>
@@ -1341,6 +1487,60 @@ export const TicketDetailsPage: React.FC = () => {
         ) : (
           <iframe src={previewFile?.url} className="w-full h-full border-none" title={previewFile?.name} />
         )}
+      </Modal>
+
+      {/* Delete Message Confirmation Modal */}
+      <Modal
+        open={!!deletingMessage}
+        onCancel={() => !isDeleting && setDeletingMessage(null)}
+        footer={null}
+        title="Delete Message?"
+        centered
+        width={400}
+      >
+        <div className="py-2 flex flex-col gap-4">
+          <p className="text-gray-600 text-sm mb-1">
+            Are you sure you want to delete this message? You can delete it for yourself or for everyone in this conversation.
+          </p>
+
+          <div className="flex flex-col gap-2.5">
+            <Button
+              danger
+              type="primary"
+              block
+              loading={isDeleting}
+              onClick={() => handleConfirmDelete('everyone')}
+              className="font-medium"
+            >
+              Delete for Everyone
+            </Button>
+            <div className="text-[11px] text-gray-500 text-center -mt-1 mb-1">
+              Removes the message for all participants in this ticket.
+            </div>
+
+            <Button
+              block
+              loading={isDeleting}
+              onClick={() => handleConfirmDelete('me')}
+              className="font-medium"
+            >
+              Delete for Me
+            </Button>
+            <div className="text-[11px] text-gray-500 text-center -mt-1 mb-1">
+              Removes the message from your view only.
+            </div>
+
+            <Button
+              type="text"
+              block
+              disabled={isDeleting}
+              onClick={() => setDeletingMessage(null)}
+              className="mt-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Drawer
