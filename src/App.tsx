@@ -2,6 +2,7 @@ import { RouterProvider } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp } from 'antd';
 import { router } from '@/app/router';
 import { PWAInstallPrompt } from '@/shared/components/PWAInstallPrompt';
+import { VersionUpdatePrompt } from '@/shared/components/VersionUpdatePrompt';
 import { useEffect } from 'react';
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
       <AntdApp>
         <RouterProvider router={router} />
         <PWAInstallPrompt />
+        <VersionUpdatePrompt />
       </AntdApp>
     </ConfigProvider>
   );
