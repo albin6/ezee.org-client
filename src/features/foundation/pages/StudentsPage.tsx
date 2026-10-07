@@ -37,7 +37,7 @@ export const StudentsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
 
   const [evaluationModalVisible, setEvaluationModalVisible] = useState(false);
-  const [selectedStudentForEval] = useState<any>(null);
+  const [selectedStudentForEval, setSelectedStudentForEval] = useState<any>(null);
 
   const [examsModalVisible, setExamsModalVisible] = useState(false);
   const [selectedStudentForExams, setSelectedStudentForExams] = useState<any>(null);
@@ -201,6 +201,14 @@ export const StudentsPage: React.FC = () => {
       key: 'actions',
       render: (_: any, record: Student) => {
         const items: MenuProps['items'] = [
+          {
+            key: 'evaluations',
+            label: '10-Day Evaluations',
+            onClick: () => {
+              setSelectedStudentForEval(record);
+              setEvaluationModalVisible(true);
+            }
+          },
           {
             key: 'exams',
             label: 'View Exams',

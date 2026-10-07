@@ -21,9 +21,11 @@ export const EditResultModal: React.FC<EditResultModalProps> = ({
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
+      const threadId = result.thread?.id || result.threadId;
+      const studentId = result.student?.id || result.studentId;
       await foundationService.updateMarks(
-        result.thread.id,
-        result.student.id,
+        threadId,
+        studentId,
         {
           theoryMarks: values.theoryMarks,
           practicalMarks: values.practicalMarks,

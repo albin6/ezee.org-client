@@ -56,7 +56,7 @@ export const ResultDetailsModal: React.FC<ResultDetailsModalProps> = ({
         title={
           <div className="flex flex-col sm:flex-row justify-between sm:items-center pr-8 gap-2">
             <span>Exam Result Details</span>
-            {hasPermission('foundation_results:write') && data && (
+            {(hasPermission('foundation_marks:write') || hasPermission('foundation_results:write')) && data && (
               <Button icon={<EditOutlined />} onClick={() => setIsEditModalVisible(true)} size={isMobile ? "small" : "middle"}>
                 Edit Marks
               </Button>

@@ -243,20 +243,20 @@ export const foundationService = {
   // Evaluations
   getEvaluationsByStudent: async (studentId: string) => {
     const res = await apiClient.get(`/foundation/evaluations/student/${studentId}`);
-    return res.data;
+    return res.data?.data ?? res.data;
   },
   getEvaluationsByBatch: async (batchId: string, dayNumber?: number) => {
     const params = dayNumber ? { dayNumber } : {};
     const res = await apiClient.get(`/foundation/evaluations/batch/${batchId}`, { params });
-    return res.data;
+    return res.data?.data ?? res.data;
   },
   submitEvaluation: async (data: any) => {
     const res = await apiClient.post('/foundation/evaluations', data);
-    return res.data;
+    return res.data?.data ?? res.data;
   },
   updateEvaluation: async (id: string, data: any) => {
     const res = await apiClient.patch(`/foundation/evaluations/${id}`, data);
-    return res.data;
+    return res.data?.data ?? res.data;
   },
 
   // Exams

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Statistic, List, Avatar } from 'antd';
 import { BookOutlined, TeamOutlined, CalendarOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -6,6 +7,7 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { foundationService, type Thread } from '@/features/foundation/api/foundation.service';
 
 export const CoordinatorDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -74,10 +76,13 @@ export const CoordinatorDashboard: React.FC = () => {
               loading={loading}
               dataSource={threads.slice(0, 5)}
               renderItem={(thread) => (
-                <List.Item>
+                <List.Item
+                  className="cursor-pointer hover:bg-gray-50 transition-colors px-3 py-2 rounded"
+                  onClick={() => navigate(`/foundation/threads/${thread.id}`)}
+                >
                   <List.Item.Meta
                     avatar={<Avatar icon={<BookOutlined />} className="bg-blue-100 text-blue-600" />}
-                    title={thread.title}
+                    title={<span className="text-purple-700 font-medium hover:underline">{thread.title}</span>}
                     description={`Batch: ${thread.batch?.name || 'N/A'} | Status: ${thread.status}`}
                   />
                 </List.Item>
@@ -92,10 +97,13 @@ export const CoordinatorDashboard: React.FC = () => {
               loading={loading}
               dataSource={threads.filter(t => t.status === 'OPEN').slice(0, 5)}
               renderItem={(thread) => (
-                <List.Item>
+                <List.Item
+                  className="cursor-pointer hover:bg-gray-50 transition-colors px-3 py-2 rounded"
+                  onClick={() => navigate(`/foundation/threads/${thread.id}`)}
+                >
                   <List.Item.Meta
                     avatar={<Avatar icon={<VideoCameraOutlined />} className="bg-purple-100 text-purple-600" />}
-                    title={thread.title}
+                    title={<span className="text-purple-700 font-medium hover:underline">{thread.title}</span>}
                     description={`Exam Type: ${thread.examType}`}
                   />
                 </List.Item>

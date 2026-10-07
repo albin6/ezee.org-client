@@ -53,11 +53,11 @@ export const CoordinatorLoginPage: React.FC = () => {
         >
           <Form.Item
             name="phone"
-            rules={[{ required: true, message: 'Please input your phone number!' }]}
+            rules={[{ required: true, message: 'Please input your Student Number or Phone!' }]}
           >
             <Input 
               prefix={<PhoneOutlined className="text-gray-400" />} 
-              placeholder="Phone Number" 
+              placeholder="Student Number / Phone" 
             />
           </Form.Item>
 

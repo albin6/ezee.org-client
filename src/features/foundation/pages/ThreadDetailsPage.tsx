@@ -332,9 +332,17 @@ export const ThreadDetailsPage: React.FC = () => {
     if (!selectedThread) return;
     setScheduleLoading(true);
     try {
+      let combinedDateTime = dayjs(values.date);
+      if (values.startTime) {
+        combinedDateTime = combinedDateTime
+          .hour(values.startTime.hour())
+          .minute(values.startTime.minute())
+          .second(0)
+          .millisecond(0);
+      }
       await foundationService.scheduleExams(
         selectedThread.id,
-        values.date.toISOString(),
+        combinedDateTime.toISOString(),
         values.intervalMinutes
       );
       message.success('Exams scheduled successfully');
@@ -673,6 +681,7 @@ export const ThreadDetailsPage: React.FC = () => {
 
                                 scheduleForm.setFieldsValue({
                                   date: defaultDate,
+                                  startTime: dayjs().hour(10).minute(0),
                                   intervalMinutes: 35
                                 });
                                 setIsScheduleModalVisible(true);

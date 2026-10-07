@@ -15,7 +15,7 @@ export const EvaluationsModal: React.FC<EvaluationsModalProps> = ({ visible, stu
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [form] = Form.useForm();
   const { hasPermission } = usePermissions();
-  const canWrite = hasPermission('foundation_evaluation:write');
+  const canWrite = hasPermission('foundation_marks:write') || hasPermission('foundation_evaluation:write');
 
   useEffect(() => {
     if (visible && student) {
@@ -27,7 +27,8 @@ export const EvaluationsModal: React.FC<EvaluationsModalProps> = ({ visible, stu
     setLoading(true);
     try {
       const data = await foundationService.getEvaluationsByStudent(student.id);
-      setEvaluations(data);
+      const list = Array.isArray(data) ? data : (data?.data && Array.isArray(data.data) ? data.data : []);
+      setEvaluations(list);
     } catch (error) {
       message.error('Failed to load evaluations');
     } finally {
@@ -38,7 +39,8 @@ export const EvaluationsModal: React.FC<EvaluationsModalProps> = ({ visible, stu
   const handleSave = async (dayNumber: number) => {
     try {
       const values = await form.validateFields();
-      const existing = evaluations.find(e => e.dayNumber === dayNumber);
+      const evaluationsList = Array.isArray(evaluations) ? evaluations : [];
+      const existing = evaluationsList.find(e => e.dayNumber === dayNumber);
       
       if (existing) {
         await foundationService.updateEvaluation(existing.id, {
@@ -64,8 +66,9 @@ export const EvaluationsModal: React.FC<EvaluationsModalProps> = ({ visible, stu
   };
 
   // Generate 10 days
+  const evaluationsList = Array.isArray(evaluations) ? evaluations : [];
   const days = Array.from({ length: 10 }, (_, i) => i + 1).map(dayNumber => {
-    const record = evaluations.find(e => e.dayNumber === dayNumber);
+    const record = evaluationsList.find(e => e.dayNumber === dayNumber);
     return {
       dayNumber,
       status: record?.status || 'PENDING',

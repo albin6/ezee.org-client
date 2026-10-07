@@ -15,7 +15,7 @@ export const ExamsModal: React.FC<ExamsModalProps> = ({ visible, student, onClos
   const [editingExamType, setEditingExamType] = useState<string | null>(null);
   const [form] = Form.useForm();
   const { hasPermission } = usePermissions();
-  const canWrite = hasPermission('foundation_exam:write');
+  const canWrite = hasPermission('foundation_marks:write') || hasPermission('foundation_exam:write');
 
   useEffect(() => {
     if (visible && student) {

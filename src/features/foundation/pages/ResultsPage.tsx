@@ -197,8 +197,8 @@ export const ResultsPage: React.FC = () => {
                 <Card 
                   title={record.student?.name || 'Unknown Student'}
                   extra={
-                    <Tag color={record.status === 'PASS' ? 'green' : 'red'}>
-                      {record.status}
+                    <Tag color={['PASS', 'PASSED'].includes(record.status || record.resultStatus) ? 'green' : 'red'}>
+                      {record.status || record.resultStatus}
                     </Tag>
                   }
                   actions={[
@@ -207,9 +207,12 @@ export const ResultsPage: React.FC = () => {
                     </Button>
                   ]}
                 >
-                  <p className="text-gray-500 mb-1">Batch: {record.thread?.batch?.name || 'Unknown'}</p>
+                  <p className="text-gray-500 mb-1">Batch: {record.batch?.name || record.thread?.batch?.name || 'Unknown'}</p>
                   <p className="text-gray-500 mb-1">Exam: {record.examType}</p>
-                  <p className="text-gray-500 mb-1">Score: {record.finalScore} / {record.totalMaxMarks}</p>
+                  <p className="text-gray-500 mb-1">
+                    Score: {record.finalScore ?? ((record.theoryMarks ?? 0) + (record.practicalMarks ?? 0))} / {record.totalMaxMarks || 20}
+                    <span className="text-xs text-gray-400 ml-1">(T: {record.theoryMarks ?? 0}, P: {record.practicalMarks ?? 0})</span>
+                  </p>
                   <p className="text-gray-400 text-sm">{dayjs(record.createdAt).format('MMM D, YYYY')}</p>
                 </Card>
               </List.Item>
