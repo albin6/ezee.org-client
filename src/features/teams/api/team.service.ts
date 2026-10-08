@@ -98,12 +98,20 @@ export const teamService = {
     const response = await apiClient.get(`/teams/${teamId}/members`, { params });
     return response.data; // Includes .data and .meta
   },
-  addTeamMember: async (teamId: string, data: { name: string; email: string; designation: string; roleId: string; password?: string }): Promise<any> => {
+  addTeamMember: async (teamId: string, data: { name: string; email: string; designation: string; roleId: string; password?: string; reportingOfficerId?: string | null }): Promise<any> => {
     const response = await apiClient.post(`/teams/${teamId}/members`, data);
     return response.data.data;
   },
-  updateMemberRole: async (teamId: string, userId: string, roleId: string): Promise<any> => {
-    const response = await apiClient.patch(`/teams/${teamId}/members/${userId}/role`, { roleId });
+  updateMemberRole: async (teamId: string, userId: string, roleId: string, reportingOfficerId?: string | null): Promise<any> => {
+    const response = await apiClient.patch(`/teams/${teamId}/members/${userId}/role`, { roleId, reportingOfficerId });
+    return response.data.data;
+  },
+  updateMemberReportingOfficer: async (teamId: string, userId: string, reportingOfficerId: string | null): Promise<any> => {
+    const response = await apiClient.patch(`/teams/${teamId}/members/${userId}/reporting-officer`, { reportingOfficerId });
+    return response.data.data;
+  },
+  getEligibleReportingOfficers: async (teamId: string, params?: { roleId?: string; userId?: string }): Promise<any[]> => {
+    const response = await apiClient.get(`/teams/${teamId}/members/eligible-reporting-officers`, { params });
     return response.data.data;
   },
   removeTeamMember: async (teamId: string, userId: string): Promise<void> => {

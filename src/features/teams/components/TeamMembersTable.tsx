@@ -25,6 +25,8 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
   
   const [isExistingUserMode, setIsExistingUserMode] = useState(false);
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
+  const [eligibleReportingOfficers, setEligibleReportingOfficers] = useState<any[]>([]);
+  const [loadingOfficers, setLoadingOfficers] = useState(false);
 
   const fetchGlobalUsers = async () => {
     try {
@@ -61,6 +63,23 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
     }
   };
 
+  const fetchEligibleOfficers = async (roleId?: string, userId?: string) => {
+    if (!roleId) {
+      setEligibleReportingOfficers([]);
+      return;
+    }
+    try {
+      setLoadingOfficers(true);
+      const officers = await teamService.getEligibleReportingOfficers(teamId, { roleId, userId });
+      setEligibleReportingOfficers(officers || []);
+    } catch (error) {
+      console.error('Failed to fetch eligible reporting officers', error);
+      setEligibleReportingOfficers([]);
+    } finally {
+      setLoadingOfficers(false);
+    }
+  };
+
   useEffect(() => {
     fetchMembers(1);
     fetchRoles();
@@ -71,15 +90,25 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
     fetchMembers(newPagination.current, newPagination.pageSize);
   };
 
+  const handleRoleChange = (roleId: string) => {
+    form.setFieldsValue({ reportingOfficerId: undefined });
+    fetchEligibleOfficers(roleId, editingMember?.userId);
+  };
+
   const handleOpenModal = (member?: any) => {
     if (member) {
       setEditingMember(member);
-      form.setFieldsValue({ roleId: member.roleId });
+      form.setFieldsValue({ 
+        roleId: member.roleId,
+        reportingOfficerId: member.reportingOfficerId || undefined
+      });
       setIsExistingUserMode(false);
+      fetchEligibleOfficers(member.roleId, member.userId);
     } else {
       setEditingMember(null);
       form.resetFields();
       setIsExistingUserMode(true);
+      setEligibleReportingOfficers([]);
     }
     setIsModalVisible(true);
   };
@@ -88,15 +117,24 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
     setIsModalVisible(false);
     setEditingMember(null);
     form.resetFields();
+    setEligibleReportingOfficers([]);
   };
 
   const handleSubmit = async (values: any) => {
     try {
       if (editingMember) {
-        await teamService.updateMemberRole(teamId, editingMember.userId, values.roleId);
-        message.success('Member role updated successfully');
+        await teamService.updateMemberRole(
+          teamId,
+          editingMember.userId,
+          values.roleId,
+          values.reportingOfficerId ?? null
+        );
+        message.success('Member updated successfully');
       } else {
-        await teamService.addTeamMember(teamId, values);
+        await teamService.addTeamMember(teamId, {
+          ...values,
+          reportingOfficerId: values.reportingOfficerId ?? null,
+        });
         message.success('Member added successfully');
       }
       handleCloseModal();
@@ -151,6 +189,19 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
       title: 'Role',
       dataIndex: ['role', 'name'],
       key: 'role',
+    },
+    {
+      title: 'Reporting Officer',
+      dataIndex: 'reportingOfficer',
+      key: 'reportingOfficer',
+      render: (officer: any) => officer ? (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-800">{officer.name}</span>
+          <span className="text-xs text-gray-500">{officer.designation || officer.email}</span>
+        </div>
+      ) : (
+        <span className="text-gray-400 italic">None</span>
+      ),
     },
     {
       title: 'Status',
@@ -274,10 +325,13 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
                 </Tag>
               </div>
 
-              {/* Badges: Role and Designation */}
+              {/* Badges: Role, Reporting Officer, and Designation */}
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                   Role: {record.role?.name || 'No Role'}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                  Reports to: {record.reportingOfficer?.name || 'None'}
                 </span>
                 {record.user?.designation && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
@@ -376,9 +430,34 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
                 label="Role"
                 rules={[{ required: true, message: 'Please select a role' }]}
               >
-                <Select placeholder="Select a team role" size="large">
+                <Select 
+                  placeholder="Select a team role" 
+                  size="large"
+                  onChange={handleRoleChange}
+                >
                   {roles.map(r => (
                     <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item
+                name="reportingOfficerId"
+                label="Reporting Officer"
+                tooltip="Must be an active team member with higher role priority (lower level number)"
+              >
+                <Select
+                  placeholder={loadingOfficers ? 'Loading eligible officers...' : 'Select reporting officer (Optional)'}
+                  loading={loadingOfficers}
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                  size="large"
+                  notFoundContent={loadingOfficers ? <Spin size="small" /> : 'No higher-priority officers available in team'}
+                >
+                  {eligibleReportingOfficers.map(officer => (
+                    <Select.Option key={officer.id} value={officer.id}>
+                      {officer.name} ({officer.roleName} - {officer.designation || officer.email})
+                    </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -463,9 +542,35 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
                 label="Role"
                 rules={[{ required: true, message: 'Please select a role' }]}
               >
-                <Select placeholder="Select a team role" size="large">
+                <Select 
+                  placeholder="Select a team role" 
+                  size="large"
+                  onChange={handleRoleChange}
+                >
                   {roles.map(r => (
                     <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="reportingOfficerId"
+                label="Reporting Officer"
+                tooltip="Must be an active team member with higher role priority (lower level number)"
+              >
+                <Select
+                  placeholder={loadingOfficers ? 'Loading eligible officers...' : 'Select reporting officer (Optional)'}
+                  loading={loadingOfficers}
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                  size="large"
+                  notFoundContent={loadingOfficers ? <Spin size="small" /> : 'No higher-priority officers available in team'}
+                >
+                  {eligibleReportingOfficers.map(officer => (
+                    <Select.Option key={officer.id} value={officer.id}>
+                      {officer.name} ({officer.roleName} - {officer.designation || officer.email})
+                    </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -478,7 +583,7 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
                 Cancel
               </Button>
               <Button type="primary" htmlType="submit" className="w-full sm:w-auto h-10 sm:h-9 font-medium">
-                {editingMember ? 'Update Role' : 'Add Member'}
+                {editingMember ? 'Update Member' : 'Add Member'}
               </Button>
             </div>
           </Form.Item>
@@ -509,6 +614,13 @@ export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({ teamId }) =>
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Team Role">{viewingMember.role?.name}</Descriptions.Item>
+            <Descriptions.Item label="Reporting Officer">
+              {viewingMember.reportingOfficer ? (
+                <span>{viewingMember.reportingOfficer.name} ({viewingMember.reportingOfficer.designation || viewingMember.reportingOfficer.email})</span>
+              ) : (
+                <span className="text-gray-400 italic">None (Top-level or Unassigned)</span>
+              )}
+            </Descriptions.Item>
             <Descriptions.Item label="Membership Status">
               <Tag color={viewingMember.status === 'ACTIVE' ? 'green' : 'red'}>
                 {viewingMember.status}
