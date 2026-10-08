@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Tag, Input, Select, DatePicker, Avatar, Modal, Tooltip, Pagination, Empty, Badge } from 'antd';
 import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTicketStore } from '../store/ticket.store';
@@ -72,22 +73,188 @@ const STATUS_CONFIG: Record<string, {
   },
 };
 
+const TICKET_FILTERS_STORAGE_KEY = 'tickets_filters_persistence';
+
 export const TicketListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { tickets, loading, total, fetchTickets } = useTicketStore();
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
 
   const isSuperAdmin = (user as any)?.role?.name === 'Super Admin' || (user as any)?.type === 'super_admin';
-  const [searchMode, setSearchMode] = useState<'semantic' | 'keyword'>('semantic');
-  const [params, setParams] = useState<any>({ page: 1, limit: 12, search: '', status: '' });
+
+  const [searchMode, setSearchMode] = useState<'semantic' | 'keyword'>(() => {
+    if (searchParams.has('searchMode')) {
+      return (searchParams.get('searchMode') as 'semantic' | 'keyword') || 'semantic';
+    }
+    try {
+      const saved = sessionStorage.getItem(TICKET_FILTERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.searchMode) return parsed.searchMode;
+      }
+    } catch {}
+    return 'semantic';
+  });
+
+  const [params, setParams] = useState<any>(() => {
+    const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
+    if (hasAnyUrlParam) {
+      return {
+        page: searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1,
+        limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 12,
+        search: searchParams.get('search') || '',
+        status: searchParams.get('status') || undefined,
+        priority: searchParams.get('priority') || undefined,
+        teamId: searchParams.get('teamId') || undefined,
+        createdById: searchParams.get('createdById') || undefined,
+        assigneeId: searchParams.get('assigneeId') || undefined,
+        dateFrom: searchParams.get('dateFrom') || undefined,
+        dateTo: searchParams.get('dateTo') || undefined,
+        sortBy: searchParams.get('sortBy') || undefined,
+        sortOrder: searchParams.get('sortOrder') || undefined,
+        myTickets: searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true,
+      };
+    }
+
+    try {
+      const saved = sessionStorage.getItem(TICKET_FILTERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          page: parsed.page || 1,
+          limit: parsed.limit || 12,
+          search: parsed.search || '',
+          status: parsed.status || undefined,
+          priority: parsed.priority || undefined,
+          teamId: parsed.teamId || undefined,
+          createdById: parsed.createdById || undefined,
+          assigneeId: parsed.assigneeId || undefined,
+          dateFrom: parsed.dateFrom || undefined,
+          dateTo: parsed.dateTo || undefined,
+          sortBy: parsed.sortBy || undefined,
+          sortOrder: parsed.sortOrder || undefined,
+          myTickets: parsed.myTickets !== undefined ? parsed.myTickets : true,
+        };
+      }
+    } catch {}
+
+    return {
+      page: 1,
+      limit: 12,
+      search: '',
+      status: undefined,
+      priority: undefined,
+      teamId: undefined,
+      createdById: undefined,
+      assigneeId: undefined,
+      dateFrom: undefined,
+      dateTo: undefined,
+      sortBy: undefined,
+      sortOrder: undefined,
+      myTickets: true,
+    };
+  });
+
+  const [searchInput, setSearchInput] = useState<string>(() => params.search || '');
+
+  useEffect(() => {
+    setSearchInput(params.search || '');
+  }, [params.search]);
+
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTickets({ ...params, searchMode });
+
+    const newSp = new URLSearchParams();
+    newSp.set('myTickets', params.myTickets ? 'true' : 'false');
+    if (params.search) newSp.set('search', params.search);
+    if (searchMode && searchMode !== 'semantic') newSp.set('searchMode', searchMode);
+    if (params.status) newSp.set('status', params.status);
+    if (params.priority) newSp.set('priority', params.priority);
+    if (params.teamId) newSp.set('teamId', params.teamId);
+    if (params.createdById) newSp.set('createdById', params.createdById);
+    if (params.assigneeId) newSp.set('assigneeId', params.assigneeId);
+    if (params.dateFrom) newSp.set('dateFrom', params.dateFrom);
+    if (params.dateTo) newSp.set('dateTo', params.dateTo);
+    if (params.sortBy) newSp.set('sortBy', params.sortBy);
+    if (params.sortOrder) newSp.set('sortOrder', params.sortOrder);
+    if (params.page && params.page > 1) newSp.set('page', String(params.page));
+    if (params.limit && params.limit !== 12) newSp.set('limit', String(params.limit));
+
+    if (newSp.toString() !== searchParams.toString()) {
+      setSearchParams(newSp, { replace: true });
+    }
+
+    try {
+      sessionStorage.setItem(
+        TICKET_FILTERS_STORAGE_KEY,
+        JSON.stringify({ ...params, searchMode })
+      );
+    } catch {}
   }, [params, searchMode, fetchTickets]);
+
+  useEffect(() => {
+    const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
+    if (!hasAnyUrlParam) return;
+
+    const urlMyTickets = searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true;
+    const urlMode = (searchParams.get('searchMode') as 'semantic' | 'keyword') || 'semantic';
+    const urlPage = searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1;
+    const urlLimit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 12;
+    const urlSearch = searchParams.get('search') || '';
+    const urlStatus = searchParams.get('status') || undefined;
+    const urlPriority = searchParams.get('priority') || undefined;
+    const urlTeamId = searchParams.get('teamId') || undefined;
+    const urlCreatedById = searchParams.get('createdById') || undefined;
+    const urlAssigneeId = searchParams.get('assigneeId') || undefined;
+    const urlDateFrom = searchParams.get('dateFrom') || undefined;
+    const urlDateTo = searchParams.get('dateTo') || undefined;
+    const urlSortBy = searchParams.get('sortBy') || undefined;
+    const urlSortOrder = searchParams.get('sortOrder') || undefined;
+
+    setParams((prev: any) => {
+      if (
+        prev.myTickets === urlMyTickets &&
+        prev.page === urlPage &&
+        prev.limit === urlLimit &&
+        prev.search === urlSearch &&
+        prev.status === urlStatus &&
+        prev.priority === urlPriority &&
+        prev.teamId === urlTeamId &&
+        prev.createdById === urlCreatedById &&
+        prev.assigneeId === urlAssigneeId &&
+        prev.dateFrom === urlDateFrom &&
+        prev.dateTo === urlDateTo &&
+        prev.sortBy === urlSortBy &&
+        prev.sortOrder === urlSortOrder
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        myTickets: urlMyTickets,
+        page: urlPage,
+        limit: urlLimit,
+        search: urlSearch,
+        status: urlStatus,
+        priority: urlPriority,
+        teamId: urlTeamId,
+        createdById: urlCreatedById,
+        assigneeId: urlAssigneeId,
+        dateFrom: urlDateFrom,
+        dateTo: urlDateTo,
+        sortBy: urlSortBy,
+        sortOrder: urlSortOrder,
+      };
+    });
+
+    setSearchMode((prev) => (prev !== urlMode ? urlMode : prev));
+  }, [searchParams]);
 
   useEffect(() => {
     teamService.getTeams({ page: 1, limit: 100 }).then(res => setTeams(res.data)).catch(console.error);
@@ -105,11 +272,12 @@ export const TicketListPage: React.FC = () => {
     if (params.createdById) count++;
     if (params.assigneeId) count++;
     if (params.dateFrom || params.dateTo) count++;
+    if (params.myTickets === false) count++;
     return count;
   }, [params]);
 
   const resetFilters = () => {
-    setParams({
+    const defaultState = {
       page: 1,
       limit: 12,
       search: '',
@@ -122,7 +290,17 @@ export const TicketListPage: React.FC = () => {
       dateTo: undefined,
       sortBy: undefined,
       sortOrder: undefined,
-    });
+      myTickets: true,
+    };
+    setParams(defaultState);
+    setSearchMode('semantic');
+    setSearchInput('');
+    try {
+      sessionStorage.setItem(
+        TICKET_FILTERS_STORAGE_KEY,
+        JSON.stringify({ ...defaultState, searchMode: 'semantic' })
+      );
+    } catch {}
   };
 
   const getTicketSLAStatus = (ticket: any) => {
@@ -141,12 +319,33 @@ export const TicketListPage: React.FC = () => {
 
   const FilterControls = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-wrap gap-3 items-center w-full'}`}>
+      <Button
+        type={params.myTickets ? 'primary' : 'default'}
+        onClick={() => setParams((prev: any) => ({ ...prev, myTickets: !prev.myTickets, page: 1 }))}
+        className={
+          isMobile
+            ? `w-full font-medium ${params.myTickets ? 'bg-blue-600 text-white' : 'text-gray-700'}`
+            : `min-w-[130px] font-medium flex items-center justify-center gap-1.5 ${
+                params.myTickets
+                  ? 'bg-blue-600 text-white hover:!bg-blue-700'
+                  : 'text-gray-700 hover:text-blue-600 border-gray-300'
+              }`
+        }
+        title={
+          params.myTickets
+            ? 'Currently viewing My Tickets (created by or assigned to you). Click to view all visible tickets.'
+            : 'Currently viewing All Visible Tickets. Click to view only your tickets.'
+        }
+      >
+        <span>{params.myTickets ? 'My Tickets ✓' : 'All Visible Tickets'}</span>
+      </Button>
+
       <Select
         placeholder="Status"
         allowClear
         className={isMobile ? 'w-full' : 'flex-1 min-w-[130px]'}
         value={params.status || undefined}
-        onChange={(val) => setParams({ ...params, status: val || undefined, page: 1 })}
+        onChange={(val) => setParams((prev: any) => ({ ...prev, status: val || undefined, page: 1 }))}
         options={[
           { value: 'OPEN', label: 'Open' },
           { value: 'IN_PROGRESS', label: 'In Progress' },
@@ -161,7 +360,7 @@ export const TicketListPage: React.FC = () => {
         allowClear
         className={isMobile ? 'w-full' : 'flex-1 min-w-[120px]'}
         value={params.priority || undefined}
-        onChange={(val) => setParams({ ...params, priority: val || undefined, page: 1 })}
+        onChange={(val) => setParams((prev: any) => ({ ...prev, priority: val || undefined, page: 1 }))}
         options={[
           { value: 'LOW', label: 'Low' },
           { value: 'MEDIUM', label: 'Medium' },
@@ -177,7 +376,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
         value={params.teamId || undefined}
-        onChange={(val) => setParams({ ...params, teamId: val || undefined, page: 1 })}
+        onChange={(val) => setParams((prev: any) => ({ ...prev, teamId: val || undefined, page: 1 }))}
         options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
       />
 
@@ -188,7 +387,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
         value={params.createdById || undefined}
-        onChange={(val) => setParams({ ...params, createdById: val || undefined, page: 1 })}
+        onChange={(val) => setParams((prev: any) => ({ ...prev, createdById: val || undefined, page: 1 }))}
         options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
@@ -199,7 +398,7 @@ export const TicketListPage: React.FC = () => {
         optionFilterProp="label"
         className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
         value={params.assigneeId || undefined}
-        onChange={(val) => setParams({ ...params, assigneeId: val || undefined, page: 1 })}
+        onChange={(val) => setParams((prev: any) => ({ ...prev, assigneeId: val || undefined, page: 1 }))}
         options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
       />
 
@@ -209,7 +408,7 @@ export const TicketListPage: React.FC = () => {
         value={params.sortBy ? `${params.sortBy}:${params.sortOrder || 'desc'}` : 'createdAt:desc'}
         onChange={(val) => {
           const [sortBy, sortOrder] = val.split(':');
-          setParams({ ...params, sortBy, sortOrder, page: 1 });
+          setParams((prev: any) => ({ ...prev, sortBy, sortOrder, page: 1 }));
         }}
         options={[
           { value: 'createdAt:desc', label: 'Newest First' },
@@ -221,13 +420,14 @@ export const TicketListPage: React.FC = () => {
 
       <DatePicker.RangePicker
         className={isMobile ? 'w-full' : 'flex-1 min-w-[220px]'}
+        value={params.dateFrom && params.dateTo ? [dayjs(params.dateFrom), dayjs(params.dateTo)] : undefined}
         onChange={(dates) => {
-          setParams({
-            ...params,
+          setParams((prev: any) => ({
+            ...prev,
             dateFrom: dates?.[0]?.toISOString() || undefined,
             dateTo: dates?.[1]?.toISOString() || undefined,
             page: 1
-          });
+          }));
         }}
       />
 
@@ -247,7 +447,20 @@ export const TicketListPage: React.FC = () => {
   return (
     <PageContainer>
       <PageHeader
-        title="Tickets & Issues"
+        title={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span>Tickets & Issues</span>
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
+                params.myTickets
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}
+            >
+              {params.myTickets ? 'Viewing: My Tickets' : 'Viewing: All Visible Tickets'}
+            </span>
+          </div>
+        }
         description="Manage and track your enterprise tickets and issues."
         extra={
           <div className="flex items-center gap-2">
@@ -280,6 +493,15 @@ export const TicketListPage: React.FC = () => {
             <div className="flex items-center gap-2 text-gray-700 font-medium text-sm shrink-0">
               <FilterOutlined className="text-gray-500" />
               <span>Filter Tickets</span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
+                  params.myTickets
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                {params.myTickets ? 'My Tickets' : 'All Visible'}
+              </span>
               {activeFiltersCount > 0 && (
                 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold">
                   {activeFiltersCount} active
@@ -289,12 +511,14 @@ export const TicketListPage: React.FC = () => {
             <div className="flex-1 flex items-center gap-2">
               <Input.Search
                 placeholder={searchMode === 'semantic' ? "Semantic search: describe an issue, concept, or symptom..." : "Search by title, description or ID..."}
-                onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+                value={searchInput}
                 onChange={(e) => {
+                  setSearchInput(e.target.value);
                   if (!e.target.value && params.search) {
                     setParams({ ...params, search: '', page: 1 });
                   }
                 }}
+                onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
                 className="w-full"
                 allowClear
               />
@@ -315,12 +539,14 @@ export const TicketListPage: React.FC = () => {
         <div className="md:hidden mb-4 flex items-center gap-2">
           <Input.Search
             placeholder={searchMode === 'semantic' ? "Semantic AI search..." : "Search tickets..."}
-            onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
+            value={searchInput}
             onChange={(e) => {
+              setSearchInput(e.target.value);
               if (!e.target.value && params.search) {
                 setParams({ ...params, search: '', page: 1 });
               }
             }}
+            onSearch={(val) => setParams({ ...params, search: val, page: 1 })}
             className="w-full"
             size="large"
             allowClear
@@ -506,7 +732,20 @@ export const TicketListPage: React.FC = () => {
 
       {/* Mobile Filter Modal */}
       <Modal
-        title="Filter Tickets"
+        title={
+          <div className="flex items-center gap-2">
+            <span>Filter Tickets</span>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
+                params.myTickets
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}
+            >
+              {params.myTickets ? 'My Tickets' : 'All Visible'}
+            </span>
+          </div>
+        }
         open={isFilterModalOpen}
         onCancel={() => setIsFilterModalOpen(false)}
         footer={[

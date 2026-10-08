@@ -95,26 +95,49 @@ export const ticketService = {
     return data;
   },
 
-  uploadAudio: async (audioBlob: Blob): Promise<{ url: string }> => {
+  uploadAudio: async (
+    audioBlob: Blob,
+    ticketId?: string,
+    onProgress?: (percent: number) => void
+  ): Promise<{ url: string }> => {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'voice-message.webm');
+    if (ticketId) formData.append('ticketId', ticketId);
     
-    // We send this as multipart/form-data
-    const { data } = await apiClient.post('/upload/audio', formData, {
+    const endpoint = ticketId ? `/upload/audio?ticketId=${encodeURIComponent(ticketId)}` : '/upload/audio';
+    const { data } = await apiClient.post(endpoint, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
       },
     });
     return data.data; // ApiResponse format: { status: 'success', data: { url: '...' } }
   },
 
-  uploadAttachment: async (file: File): Promise<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> => {
+  uploadAttachment: async (
+    file: File,
+    ticketId?: string,
+    onProgress?: (percent: number) => void
+  ): Promise<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (ticketId) formData.append('ticketId', ticketId);
     
-    const { data } = await apiClient.post('/upload/attachment', formData, {
+    const endpoint = ticketId ? `/upload/attachment?ticketId=${encodeURIComponent(ticketId)}` : '/upload/attachment';
+    const { data } = await apiClient.post(endpoint, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
       },
     });
     return data.data; 

@@ -1,7 +1,32 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
-import { UserOutlined, SendOutlined, MoreOutlined, ReloadOutlined, SmileOutlined, CloseOutlined, EnterOutlined, AudioOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, DeleteOutlined, EditOutlined, PaperClipOutlined, FileOutlined, DownloadOutlined, ArrowDownOutlined, DownOutlined, UpOutlined, UserAddOutlined } from '@ant-design/icons';
+import {
+  UserOutlined,
+  SendOutlined,
+  MoreOutlined,
+  ReloadOutlined,
+  SmileOutlined,
+  CloseOutlined,
+  EnterOutlined,
+  AudioOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
+  StopOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PaperClipOutlined,
+  FileOutlined,
+  DownloadOutlined,
+  ArrowDownOutlined,
+  DownOutlined,
+  UpOutlined,
+  UserAddOutlined,
+  PictureOutlined,
+  FilePdfOutlined,
+  FileWordOutlined,
+  CustomerServiceOutlined,
+} from '@ant-design/icons';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService, type MentionUser } from '../api/ticket.service';
@@ -9,6 +34,10 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { VoiceMessagePlayer } from '../components/VoiceMessagePlayer';
 import { TicketAssigneesSection } from '../components/TicketAssigneesSection';
+import { FormattedMessageContent } from '@/shared/utils/linkify';
+import { compressImage } from '@/shared/utils/imageCompressor';
+import { AudioPreviewPlayer } from '../components/AudioPreviewPlayer';
+import { AttachmentPreviewList, formatFileSize } from '../components/AttachmentPreviewList';
 import EmojiPicker from 'emoji-picker-react';
 
 const { Title, Text, Paragraph } = Typography;
@@ -221,7 +250,11 @@ export const TicketDetailsPage: React.FC = () => {
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ url: string, name: string, type: string } | null>(null);
+  const [pdfViewMode, setPdfViewMode] = useState<'document' | 'image'>('document');
   
   // Scroll State
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -239,6 +272,9 @@ export const TicketDetailsPage: React.FC = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup object URLs to avoid memory leaks
   useEffect(() => {
@@ -384,30 +420,48 @@ export const TicketDetailsPage: React.FC = () => {
     }
 
     setIsSending(true);
+    setUploadProgress(0);
     try {
       let finalAudioUrl = undefined;
       let finalAttachments: any[] = [];
       
       if (attachments.length > 0) {
         setIsUploadingAttachments(true);
-        const uploadPromises = attachments.map(file => ticketService.uploadAttachment(file));
+        setUploadProgress(10);
+        let completed = 0;
+        const uploadPromises = attachments.map(async (file) => {
+          const res = await ticketService.uploadAttachment(file, id, (percent) => {
+            const currentItemWeight = percent / attachments.length;
+            const completedWeight = (completed / attachments.length) * 100;
+            setUploadProgress(Math.min(95, Math.round(completedWeight + currentItemWeight)));
+          });
+          completed++;
+          setUploadProgress(Math.min(95, Math.round((completed / attachments.length) * 100)));
+          return res;
+        });
         finalAttachments = await Promise.all(uploadPromises);
+        setUploadProgress(100);
         setIsUploadingAttachments(false);
       }
 
       if (audioBlob) {
-        const { url } = await ticketService.uploadAudio(audioBlob);
+        const { url } = await ticketService.uploadAudio(audioBlob, id, (percent) => {
+          setUploadProgress(percent);
+        });
         finalAudioUrl = url;
       }
-      const finalMessage = message.trim() || (attachments.length > 0 ? '📁 Sent attachments' : '🎤 Voice Message');
+      const finalMessage = message.trim() || (attachments.length > 0 ? (attachments.length === 1 ? `📁 ${attachments[0].name}` : `📁 ${attachments.length} attachments`) : '🎤 Voice Message');
       await addMessage(id, finalMessage, undefined, replyingTo?.id, finalAudioUrl, finalAttachments);
       setMessage('');
       setReplyingTo(null);
       setAttachments([]);
       cancelRecording();
-    } catch (err) {
+      setUploadProgress(0);
+    } catch (err: any) {
       console.error('Failed to send message:', err);
+      antMessage.error(err?.response?.data?.message || err?.message || 'Failed to send message');
       setIsUploadingAttachments(false);
+      setUploadProgress(0);
     } finally {
       setIsSending(false);
       focusInput();
@@ -417,7 +471,16 @@ export const TicketDetailsPage: React.FC = () => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const options: MediaRecorderOptions = {};
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options.mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          options.mimeType = 'audio/mp4';
+        }
+      }
+      options.audioBitsPerSecond = 64000;
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -426,7 +489,9 @@ export const TicketDetailsPage: React.FC = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { 
+          type: mediaRecorder.mimeType || 'audio/webm' 
+        });
         setAudioBlob(blob);
         setAudioPreviewUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach(track => track.stop());
@@ -439,8 +504,9 @@ export const TicketDetailsPage: React.FC = () => {
       timerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error accessing microphone:', err);
+      antMessage.error('Unable to access microphone. Please check permissions.');
     }
   };
 
@@ -460,6 +526,14 @@ export const TicketDetailsPage: React.FC = () => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
     }
+  };
+
+  const stopRecordingToPreview = () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+    clearInterval(timerRef.current);
+    setIsRecording(false);
+    setIsPaused(false);
+    mediaRecorderRef.current.stop();
   };
 
   const stopAndSendRecording = async () => {
@@ -486,13 +560,16 @@ export const TicketDetailsPage: React.FC = () => {
 
     if (blob && blob.size > 0 && id) {
       setIsSending(true);
+      setUploadProgress(10);
       try {
-        const { url } = await ticketService.uploadAudio(blob);
+        const { url } = await ticketService.uploadAudio(blob, id, (percent) => {
+          setUploadProgress(percent);
+        });
         const finalMessage = message.trim() || '🎤 Voice Message';
         let finalAttachments: any[] = [];
         if (attachments.length > 0) {
           setIsUploadingAttachments(true);
-          finalAttachments = await Promise.all(attachments.map(f => ticketService.uploadAttachment(f)));
+          finalAttachments = await Promise.all(attachments.map(f => ticketService.uploadAttachment(f, id)));
           setIsUploadingAttachments(false);
         }
         await addMessage(id, finalMessage, undefined, replyingTo?.id, url, finalAttachments);
@@ -504,6 +581,7 @@ export const TicketDetailsPage: React.FC = () => {
         setAudioPreviewUrl(null);
         setRecordingDuration(0);
         audioChunksRef.current = [];
+        setUploadProgress(0);
       } catch (err: any) {
         console.error('Failed to send voice message:', err);
         antMessage.error(err?.message || 'Failed to send voice message');
@@ -540,12 +618,54 @@ export const TicketDetailsPage: React.FC = () => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const DANGEROUS_EXTENSIONS = ['.exe', '.sh', '.bat', '.cmd', '.ps1', '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.php', '.py', '.vbs', '.msi', '.dll'];
+  const MAX_ALLOWED_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
+  const validateAndAddFiles = async (files: File[]) => {
+    const validFiles: File[] = [];
+
+    for (const file of files) {
+      const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      if (DANGEROUS_EXTENSIONS.includes(ext)) {
+        antMessage.error(`File "${file.name}" is not allowed for security reasons.`);
+        continue;
+      }
+
+      if (file.size > MAX_ALLOWED_FILE_SIZE) {
+        antMessage.error(`File "${file.name}" exceeds the 25MB size limit.`);
+        continue;
+      }
+
+      const isDuplicate = attachments.some(a => a.name === file.name && a.size === file.size);
+      if (isDuplicate) {
+        antMessage.warning(`File "${file.name}" is already attached.`);
+        continue;
+      }
+
+      // If image, optimize and compress before attaching
+      if (file.type.startsWith('image/') && !file.type.includes('svg') && !file.type.includes('gif')) {
+        try {
+          const compressed = await compressImage(file);
+          validFiles.push(compressed);
+        } catch {
+          validFiles.push(file);
+        }
+      } else {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length > 0) {
+      setAttachments(prev => [...prev, ...validFiles]);
+    }
+  };
+
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+      validateAndAddFiles(Array.from(e.target.files));
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    if (e.target) {
+      e.target.value = '';
     }
     focusInput();
   };
@@ -553,6 +673,27 @@ export const TicketDetailsPage: React.FC = () => {
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
     focusInput();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      validateAndAddFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const handleStatusChange = async (value: string) => {
@@ -783,7 +924,13 @@ export const TicketDetailsPage: React.FC = () => {
             <Text type="secondary">{new Date(ticket.createdAt).toLocaleString()}</Text>
           </Space>
         </div>
-        <Button onClick={() => navigate('/tickets')}>Back to Tickets</Button>
+        <Button onClick={() => {
+          if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate('/tickets');
+          }
+        }}>Back to Tickets</Button>
       </div>
 
       {ticket.aiSummary && <AIInsightsPanel summary={ticket.aiSummary} confidence={ticket.aiConfidence} />}
@@ -810,7 +957,13 @@ export const TicketDetailsPage: React.FC = () => {
                   type="text" 
                   icon={<span className="text-xl">←</span>} 
                   className="lg:hidden p-0 w-8 h-8 flex items-center justify-center -ml-2"
-                  onClick={() => navigate('/tickets')}
+                  onClick={() => {
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate('/tickets');
+                    }
+                  }}
                 />
                 <span className="font-semibold text-base truncate max-w-[200px]">{ticket.title}</span>
               </div>
@@ -916,21 +1069,24 @@ export const TicketDetailsPage: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col">
-                              <span className="whitespace-pre-wrap break-words text-[15px] leading-snug">{msg.content}</span>
+                              <FormattedMessageContent content={msg.content} isMe={isMe} />
                               {msg.audioUrl && (
                                 <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
                                   <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />
                                 </div>
                               )}
                               {msg.attachments && msg.attachments.length > 0 && (
-                                <div className="mt-1.5 flex flex-col gap-1">
+                                <div className="mt-1.5 flex flex-col gap-1.5">
                                   {msg.attachments.map((att: any) => {
-                                    const isImage = att.fileType.startsWith('image/');
-                                    const isVideo = att.fileType.startsWith('video/');
+                                    const isImage = att.fileType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(att.fileName);
+                                    const isVideo = att.fileType.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(att.fileName);
+                                    const isAudio = att.fileType.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(att.fileName);
+                                    const isPdf = att.fileType === 'application/pdf' || /\.pdf$/i.test(att.fileName);
+                                    const isDoc = att.fileType.includes('word') || /\.(doc|docx)$/i.test(att.fileName);
                                     
                                     if (isImage) {
                                       return (
-                                        <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
+                                        <div key={att.id} className="rounded-lg overflow-hidden max-w-[250px] sm:max-w-[320px] border border-black/5 shadow-xs">
                                           <Image src={att.fileUrl} alt={att.fileName} className="w-full h-auto object-cover" />
                                         </div>
                                       );
@@ -938,8 +1094,16 @@ export const TicketDetailsPage: React.FC = () => {
                                     
                                     if (isVideo) {
                                       return (
-                                        <div key={att.id} className="rounded overflow-hidden max-w-[250px] sm:max-w-[300px] border border-black/5">
+                                        <div key={att.id} className="rounded-lg overflow-hidden max-w-[250px] sm:max-w-[320px] border border-black/5 shadow-xs">
                                           <video src={att.fileUrl} controls className="w-full h-auto bg-black" />
+                                        </div>
+                                      );
+                                    }
+
+                                    if (isAudio) {
+                                      return (
+                                        <div key={att.id} className="w-full sm:max-w-[320px] py-0.5">
+                                          <VoiceMessagePlayer src={att.fileUrl} isMe={isMe} />
                                         </div>
                                       );
                                     }
@@ -948,16 +1112,30 @@ export const TicketDetailsPage: React.FC = () => {
                                       <div 
                                         key={att.id} 
                                         onClick={() => setPreviewFile({ url: att.fileUrl, name: att.fileName, type: att.fileType })}
-                                        className="flex items-center gap-3 p-2 rounded-lg bg-black/5 border border-black/10 text-sm max-w-[250px] sm:max-w-[300px] cursor-pointer hover:bg-black/10 transition-colors"
+                                        className="flex items-center gap-3 p-2.5 rounded-lg bg-black/5 border border-black/10 text-sm max-w-[260px] sm:max-w-[320px] cursor-pointer hover:bg-black/10 transition-colors shadow-xs"
                                       >
-                                        <div className="bg-red-400 text-white rounded p-1.5 flex items-center justify-center">
-                                          <FileOutlined className="text-lg" />
+                                        <div className={`rounded p-2 flex items-center justify-center shrink-0 ${
+                                          isPdf ? 'bg-red-500 text-white' : isDoc ? 'bg-blue-500 text-white' : 'bg-gray-500 text-white'
+                                        }`}>
+                                          {isPdf ? <FilePdfOutlined className="text-lg" /> : isDoc ? <FileWordOutlined className="text-lg" /> : <FileOutlined className="text-lg" />}
                                         </div>
-                                        <div className="flex flex-col overflow-hidden flex-1">
-                                          <span className="truncate max-w-full font-medium leading-tight text-gray-700">{att.fileName}</span>
-                                          <span className="text-[10px] text-gray-500 leading-tight">{(att.fileSize / 1024).toFixed(1)} KB • {att.fileType.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                                        <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                                          <span className="truncate max-w-full font-medium leading-tight text-gray-800" title={att.fileName}>{att.fileName}</span>
+                                          <span className="text-[10px] text-gray-500 leading-tight font-mono mt-0.5">
+                                            {formatFileSize(att.fileSize)} • {isPdf ? 'PDF' : isDoc ? 'DOCX' : att.fileType.split('/')[1]?.toUpperCase() || 'FILE'}
+                                          </span>
                                         </div>
-                                        <DownloadOutlined className="flex-shrink-0 text-gray-400" />
+                                        <a
+                                          href={att.fileUrl}
+                                          download={att.fileName}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="flex-shrink-0 text-gray-400 hover:text-blue-600 p-1"
+                                          title="Download file"
+                                        >
+                                          <DownloadOutlined className="text-base" />
+                                        </a>
                                       </div>
                                     );
                                   })}
@@ -1072,7 +1250,21 @@ export const TicketDetailsPage: React.FC = () => {
             )}
 
             {(hasPermission('tickets:comment') || isAssignee || isCreator || isAdmin) && ticket.status !== 'CLOSED' && (
-              <div className="bg-[#f0f2f5] px-4 py-3 z-20 flex flex-col flex-shrink-0 border-t border-gray-200 relative">
+              <div 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`bg-[#f0f2f5] px-4 py-3 z-20 flex flex-col flex-shrink-0 border-t border-gray-200 relative transition-colors ${
+                  isDraggingOver ? 'bg-blue-50/80 ring-2 ring-blue-400 ring-inset' : ''
+                }`}
+              >
+                {isDraggingOver && (
+                  <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px] flex items-center justify-center z-30 pointer-events-none rounded border-2 border-dashed border-blue-400">
+                    <span className="text-blue-600 font-medium text-sm flex items-center gap-2">
+                      <PaperClipOutlined /> Drop files here to attach
+                    </span>
+                  </div>
+                )}
                 {replyingTo && (
                   <div className="flex items-center justify-between bg-black/5 border-l-4 border-[#128c7e] p-2 mb-2 rounded-r text-sm">
                     <div className="flex flex-col overflow-hidden">
@@ -1084,37 +1276,14 @@ export const TicketDetailsPage: React.FC = () => {
                 )}
                 
                 {attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-2 mb-2 bg-white rounded-lg border border-gray-200 shadow-sm">
-                    {attachments.map((file, index) => {
-                        const isImage = file.type.startsWith('image/');
-                        return (
-                          <div key={index} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1 text-sm max-w-[200px]">
-                            {isImage ? (
-                              <Image src={URL.createObjectURL(file)} alt={file.name} width={24} height={24} className="object-cover rounded flex-shrink-0" />
-                            ) : (
-                              <FileOutlined className="text-gray-400 flex-shrink-0" />
-                            )}
-                            <span 
-                              className={`truncate max-w-[120px] text-gray-700 ${!isImage ? 'cursor-pointer hover:text-blue-500 hover:underline' : ''}`}
-                              onClick={() => {
-                                if (!isImage) {
-                                  setPreviewFile({ url: URL.createObjectURL(file), name: file.name, type: file.type });
-                                }
-                              }}
-                            >
-                              {file.name}
-                            </span>
-                            <Button type="text" size="small" className="p-0 min-w-0 h-auto text-gray-400 hover:text-red-500" icon={<CloseOutlined className="text-[10px]" />} onClick={() => removeAttachment(index)} disabled={isSending || isUploadingAttachments} />
-                          </div>
-                        );
-                      })}
-                      {isUploadingAttachments && (
-                        <div className="flex items-center text-blue-500 text-xs px-2 animate-pulse">
-                          Uploading attachments...
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <AttachmentPreviewList
+                    attachments={attachments}
+                    onRemove={removeAttachment}
+                    isUploading={isUploadingAttachments}
+                    uploadProgress={uploadProgress}
+                    onPreview={(file) => setPreviewFile({ url: URL.createObjectURL(file), name: file.name, type: file.type })}
+                  />
+                )}
 
                   {/* Contextual Autocomplete Mention & Assignee Dropdown */}
                   {mentionDropdownOpen && filteredMentionUsers.length > 0 && (
@@ -1210,6 +1379,31 @@ export const TicketDetailsPage: React.FC = () => {
                           disabled={isSending} 
                         />
                       </Popover>
+                      {/* Hidden Category-specific File Inputs */}
+                      <input 
+                        type="file" 
+                        multiple 
+                        ref={imageInputRef} 
+                        accept="image/*"
+                        onChange={handleAttachmentChange} 
+                        className="hidden" 
+                      />
+                      <input 
+                        type="file" 
+                        multiple 
+                        ref={docInputRef} 
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                        onChange={handleAttachmentChange} 
+                        className="hidden" 
+                      />
+                      <input 
+                        type="file" 
+                        multiple 
+                        ref={audioInputRef} 
+                        accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm"
+                        onChange={handleAttachmentChange} 
+                        className="hidden" 
+                      />
                       <input 
                         type="file" 
                         multiple 
@@ -1217,15 +1411,58 @@ export const TicketDetailsPage: React.FC = () => {
                         onChange={handleAttachmentChange} 
                         className="hidden" 
                       />
-                      <Button 
-                        type="text" 
-                        shape="circle"
-                        icon={<PaperClipOutlined className="text-gray-500 text-xl" />} 
-                        onClick={() => fileInputRef.current?.click()} 
-                        disabled={isSending || isUploadingAttachments} 
-                        title="Attach files" 
-                        className="flex-shrink-0 w-10 h-10 hover:bg-gray-200"
-                      />
+                      <Popover
+                        open={attachmentMenuOpen}
+                        onOpenChange={setAttachmentMenuOpen}
+                        trigger="click"
+                        placement="topLeft"
+                        content={
+                          <div className="flex flex-col gap-1 py-1 w-44">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttachmentMenuOpen(false);
+                                imageInputRef.current?.click();
+                              }}
+                              className="flex items-center gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                              <PictureOutlined className="text-blue-500 text-base" />
+                              <span>Photo / Image</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttachmentMenuOpen(false);
+                                docInputRef.current?.click();
+                              }}
+                              className="flex items-center gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                              <FilePdfOutlined className="text-red-500 text-base" />
+                              <span>Document</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttachmentMenuOpen(false);
+                                audioInputRef.current?.click();
+                              }}
+                              className="flex items-center gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                              <CustomerServiceOutlined className="text-purple-500 text-base" />
+                              <span>Audio File</span>
+                            </button>
+                          </div>
+                        }
+                      >
+                        <Button 
+                          type="text" 
+                          shape="circle"
+                          icon={<PaperClipOutlined className="text-gray-500 text-xl" />} 
+                          disabled={isSending || isUploadingAttachments} 
+                          title="Attach files" 
+                          className="flex-shrink-0 w-10 h-10 hover:bg-gray-200"
+                        />
+                      </Popover>
                     </div>
 
                     {/* Auto-growing Textarea Capsule or Active Voice Recording Bar */}
@@ -1266,12 +1503,23 @@ export const TicketDetailsPage: React.FC = () => {
                               className="flex items-center justify-center hover:bg-gray-100"
                             />
 
-                            {/* Stop Button: cancels/discards recording without sending */}
+                            {/* Stop Button: stops recording and transitions to preview */}
                             <Button
                               type="text"
                               shape="circle"
                               size="small"
-                              icon={<StopOutlined className="text-lg text-red-500 hover:text-red-700" />}
+                              icon={<StopOutlined className="text-lg text-emerald-600 hover:text-emerald-700" />}
+                              onClick={stopRecordingToPreview}
+                              title="Stop recording"
+                              className="flex items-center justify-center hover:bg-emerald-50"
+                            />
+
+                            {/* Discard Button: cancels/discards recording without sending */}
+                            <Button
+                              type="text"
+                              shape="circle"
+                              size="small"
+                              icon={<DeleteOutlined className="text-lg text-red-500 hover:text-red-700" />}
                               onClick={cancelRecording}
                               title="Stop & cancel recording (discard)"
                               className="flex items-center justify-center hover:bg-red-50"
@@ -1279,15 +1527,13 @@ export const TicketDetailsPage: React.FC = () => {
                           </div>
                         </div>
                       ) : audioBlob ? (
-                        <div className="flex items-center gap-2 w-full justify-between py-0.5">
-                          <audio controls src={audioPreviewUrl!} className="h-7 max-w-[200px]" />
-                          <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<DeleteOutlined className="text-gray-400 hover:text-red-500" />}
-                            onClick={cancelRecording}
-                            title="Discard audio"
+                        <div className="w-full py-0.5">
+                          <AudioPreviewPlayer
+                            src={audioPreviewUrl!}
+                            blob={audioBlob}
+                            duration={recordingDuration}
+                            onDiscard={cancelRecording}
+                            disabled={isSending}
                           />
                         </div>
                       ) : (
@@ -1469,7 +1715,7 @@ export const TicketDetailsPage: React.FC = () => {
       </Modal>
 
       <Modal
-        title={previewFile?.name}
+        title={previewFile?.name || 'File Preview'}
         open={!!previewFile}
         onCancel={() => setPreviewFile(null)}
         footer={[
@@ -1482,10 +1728,64 @@ export const TicketDetailsPage: React.FC = () => {
         centered
         styles={{ body: { padding: 0, height: '70vh' } }}
       >
-        {previewFile?.type.startsWith('video/') ? (
+        {previewFile?.type.startsWith('image/') ? (
+          <div className="w-full h-full flex items-center justify-center bg-black/90 p-4">
+            <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain" />
+          </div>
+        ) : previewFile?.type.startsWith('video/') ? (
           <video src={previewFile.url} controls autoPlay className="w-full h-full bg-black object-contain" />
+        ) : previewFile?.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|webm)$/i.test(previewFile?.name || '') ? (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 p-6">
+            <CustomerServiceOutlined className="text-6xl text-purple-500 mb-4" />
+            <p className="text-gray-800 font-semibold text-lg mb-4">{previewFile?.name}</p>
+            <audio controls src={previewFile?.url} className="w-80" autoPlay />
+          </div>
+        ) : previewFile?.type === 'application/pdf' || previewFile?.name.toLowerCase().endsWith('.pdf') ? (
+          <div className="w-full h-full flex flex-col">
+            {previewFile.url.includes('cloudinary.com') && (
+              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-100 border-b text-xs text-gray-600">
+                <span className="font-medium">PDF Preview</span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="small"
+                    type={pdfViewMode === 'document' ? 'primary' : 'default'}
+                    onClick={() => setPdfViewMode('document')}
+                    className="text-xs h-6 px-2"
+                  >
+                    Full Document (PDF)
+                  </Button>
+                  <Button
+                    size="small"
+                    type={pdfViewMode === 'image' ? 'primary' : 'default'}
+                    onClick={() => setPdfViewMode('image')}
+                    className="text-xs h-6 px-2"
+                  >
+                    Image View (Page 1)
+                  </Button>
+                </div>
+              </div>
+            )}
+            {pdfViewMode === 'image' && previewFile.url.includes('cloudinary.com') ? (
+              <div className="w-full flex-1 flex items-center justify-center bg-gray-900 p-4 overflow-auto">
+                <img
+                  src={previewFile.url.replace(/\.pdf(\?.*)?$/i, '.jpg$1')}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-full object-contain shadow-lg rounded"
+                />
+              </div>
+            ) : (
+              <iframe src={previewFile?.url} className="w-full flex-1 border-none" title={previewFile?.name} />
+            )}
+          </div>
         ) : (
-          <iframe src={previewFile?.url} className="w-full h-full border-none" title={previewFile?.name} />
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+            <FileOutlined className="text-6xl text-blue-500 mb-4" />
+            <h4 className="text-lg font-semibold text-gray-800 mb-1">{previewFile?.name}</h4>
+            <p className="text-sm text-gray-500 mb-6">Preview is not available directly for this document format.</p>
+            <Button type="primary" size="large" icon={<DownloadOutlined />} href={previewFile?.url} target="_blank" download>
+              Download to view
+            </Button>
+          </div>
         )}
       </Modal>
 
