@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TicketDetailsPage } from '../TicketDetailsPage';
 import { useTicketStore } from '../../store/ticket.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
-import { ticketService } from '../../api/ticket.service';
 
 vi.mock('../../api/ticket.service', () => ({
   ticketService: {
