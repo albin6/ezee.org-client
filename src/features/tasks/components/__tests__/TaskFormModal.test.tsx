@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import dayjs from 'dayjs';
 import { TaskFormModal } from '../TaskFormModal';
 import { useUserStore } from '@/features/users/store/user.store';
 
@@ -256,5 +257,124 @@ describe('TaskFormModal Assignee Name Resolution', () => {
 
     expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     expect(screen.queryByText('user-id-1')).not.toBeInTheDocument();
+  });
+});
+
+describe('TaskFormModal - Deadline 12-Hour AM/PM Time Format', () => {
+  const mockTeamMembers = [
+    {
+      userId: 'user-id-1',
+      user: { id: 'user-id-1', name: 'Alice Smith' },
+      role: { name: 'Developer', level: 2 },
+    },
+  ];
+
+  it('renders date & time picker with user-friendly 12-hour placeholder and empty initial state on task creation', () => {
+    render(
+      <TaskFormModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        teamMembers={mockTeamMembers}
+        currentUserLevel={0}
+      />
+    );
+
+    const deadlineInput = screen.getByPlaceholderText('Select deadline date & time') as HTMLInputElement;
+    expect(deadlineInput).toBeInTheDocument();
+    expect(deadlineInput.value).toBe('');
+  });
+
+  it('displays existing deadline formatted in 12-hour format with AM/PM', () => {
+    // 2028-06-15 at 15:45 (3:45 PM)
+    const afternoonDate = dayjs('2028-06-15T15:45:00');
+    const afternoonIso = afternoonDate.toISOString();
+
+    const taskWithAfternoonDeadline = {
+      id: 'task-afternoon',
+      title: 'Afternoon Task',
+      deadline: afternoonIso,
+      assignees: [{ userId: 'user-id-1', user: { id: 'user-id-1', name: 'Alice Smith' } }],
+    };
+
+    render(
+      <TaskFormModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        initialValues={taskWithAfternoonDeadline}
+        teamMembers={mockTeamMembers}
+        currentUserLevel={0}
+      />
+    );
+
+    const deadlineInput = screen.getByPlaceholderText('Select deadline date & time') as HTMLInputElement;
+    expect(deadlineInput).toBeInTheDocument();
+    const expectedDisplay = afternoonDate.format('YYYY-MM-DD hh:mm A');
+    expect(deadlineInput.value).toBe(expectedDisplay);
+    expect(deadlineInput.value).toContain('PM');
+    expect(deadlineInput.value).not.toContain('15:45');
+  });
+
+  it('clearly distinguishes AM for morning deadlines', () => {
+    // 2028-06-15 at 09:15 (9:15 AM)
+    const morningDate = dayjs('2028-06-15T09:15:00');
+    const morningIso = morningDate.toISOString();
+
+    const taskWithMorningDeadline = {
+      id: 'task-morning',
+      title: 'Morning Task',
+      deadline: morningIso,
+      assignees: [{ userId: 'user-id-1', user: { id: 'user-id-1', name: 'Alice Smith' } }],
+    };
+
+    render(
+      <TaskFormModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        initialValues={taskWithMorningDeadline}
+        teamMembers={mockTeamMembers}
+        currentUserLevel={0}
+      />
+    );
+
+    const deadlineInput = screen.getByPlaceholderText('Select deadline date & time') as HTMLInputElement;
+    const expectedDisplay = morningDate.format('YYYY-MM-DD hh:mm A');
+    expect(deadlineInput.value).toBe(expectedDisplay);
+    expect(deadlineInput.value).toContain('AM');
+  });
+
+  it('submits correctly converted ISO deadline string to backend when updating', async () => {
+    const afternoonDate = dayjs('2028-08-20T14:30:00');
+    const task = {
+      id: 'task-submit-test',
+      title: 'Task for deadline submission test',
+      deadline: afternoonDate.toISOString(),
+      assignees: [{ userId: 'user-id-1', user: { id: 'user-id-1', name: 'Alice Smith' } }],
+    };
+
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <TaskFormModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={onSubmit}
+        initialValues={task}
+        teamMembers={mockTeamMembers}
+        currentUserLevel={0}
+      />
+    );
+
+    const updateBtn = screen.getByRole('button', { name: 'Update Task' });
+    fireEvent.click(updateBtn);
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    const submittedValues = onSubmit.mock.calls[0][0];
+    expect(submittedValues.deadline).toBe(afternoonDate.toISOString());
   });
 });

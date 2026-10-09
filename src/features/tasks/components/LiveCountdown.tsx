@@ -9,7 +9,16 @@ export const LiveCountdown: React.FC<LiveCountdownProps> = ({ deadline }) => {
   const [isOverdue, setIsOverdue] = useState(false);
 
   useEffect(() => {
+    if (!deadline) {
+      setTimeLeft('-');
+      return;
+    }
+
     const targetDate = new Date(deadline).getTime();
+    if (isNaN(targetDate)) {
+      setTimeLeft('-');
+      return;
+    }
 
     const updateCountdown = () => {
       const now = new Date().getTime();

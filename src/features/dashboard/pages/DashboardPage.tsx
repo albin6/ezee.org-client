@@ -995,7 +995,7 @@ export const DashboardPage: React.FC = () => {
                                         {task.title}
                                       </div>
                                       <div className="text-[11px] text-gray-400">
-                                        Due: {task.deadline ? dayjs(task.deadline).format('MMM D, YYYY') : 'No deadline'}
+                                        Due: {task.deadline ? dayjs(task.deadline).format('MMM D, YYYY • hh:mm A') : 'No deadline'}
                                       </div>
                                     </div>
                                     <Tag
@@ -1037,7 +1037,7 @@ export const DashboardPage: React.FC = () => {
                                         {task.title}
                                       </div>
                                       <div className="text-[11px] text-rose-600 font-medium">
-                                        Was due: {task.deadline ? dayjs(task.deadline).format('MMM D, YYYY') : 'Past due'}
+                                        Was due: {task.deadline ? dayjs(task.deadline).format('MMM D, YYYY • hh:mm A') : 'Past due'}
                                       </div>
                                     </div>
                                     <Tag color="error" className="m-0 text-[10px]">

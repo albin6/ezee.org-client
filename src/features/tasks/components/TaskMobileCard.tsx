@@ -183,7 +183,7 @@ export const TaskMobileCard: React.FC<TaskMobileCardProps> = ({
             <span>Due Date:</span>
           </span>
           <span className="font-medium text-gray-800">
-            {dayjs(task.deadline).format('MMM DD, YYYY • hh:mm A')}
+            {task.deadline ? dayjs(task.deadline).format('MMM DD, YYYY • hh:mm A') : 'No deadline'}
           </span>
         </div>
 

@@ -202,7 +202,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     try {
       await onSubmit({
         ...values,
-        deadline: values.deadline ? values.deadline.toISOString() : undefined
+        deadline: values.deadline ? dayjs(values.deadline).toISOString() : undefined
       });
       form.resetFields();
       onCancel();
@@ -295,7 +295,15 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             }
           ]}
         >
-          <DatePicker showTime className="w-full h-9" />
+          <DatePicker 
+            showTime={{ 
+              use12Hours: true, 
+              format: 'hh:mm A' 
+            }} 
+            format={['YYYY-MM-DD hh:mm A', 'YYYY-MM-DD h:mm A']} 
+            placeholder="Select deadline date & time"
+            className="w-full h-9" 
+          />
         </Form.Item>
 
         <Form.Item 

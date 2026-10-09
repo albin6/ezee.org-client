@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Avatar, Tag, Popover, Image, Progress, message } from 'antd';
+import { Button, Avatar, Tag, Popover, Image, Progress, message, Select } from 'antd';
 import { 
   ArrowLeftOutlined, 
   SendOutlined, 
@@ -29,16 +29,60 @@ const DRAFT_STORAGE_KEY = 'ticket_composer_draft_v1';
 const TOTAL_UNDO_SECONDS = 6;
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const PRIORITY_OPTIONS: { value: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL'; label: string; color: string }[] = [
+  { value: 'CRITICAL', label: 'Critical', color: 'red' },
+  { value: 'URGENT', label: 'Urgent', color: 'volcano' },
+  { value: 'HIGH', label: 'High', color: 'magenta' },
+  { value: 'MEDIUM', label: 'Medium', color: 'orange' },
+  { value: 'LOW', label: 'Low', color: 'default' },
+];
+
 export const ChatTicketCreator: React.FC = () => {
   const navigate = useNavigate();
   const { createTicket } = useTicketStore();
   const { user: authUser } = useAuthStore();
 
   // Content state
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState<string>(() => {
+    try {
+      const savedDraftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraftRaw) {
+        const parsed = JSON.parse(savedDraftRaw);
+        if (Date.now() - parsed.timestamp < DRAFT_MAX_AGE_MS) {
+          return parsed.content || '';
+        }
+      }
+    } catch {}
+    return '';
+  });
+
+  const [selectedPriority, setSelectedPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL'>(() => {
+    try {
+      const savedDraftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraftRaw) {
+        const parsed = JSON.parse(savedDraftRaw);
+        if (Date.now() - parsed.timestamp < DRAFT_MAX_AGE_MS && parsed.selectedPriority) {
+          return parsed.selectedPriority;
+        }
+      }
+    } catch {}
+    return 'MEDIUM';
+  });
+
   const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(() => {
+    try {
+      const savedDraftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraftRaw) {
+        const parsed = JSON.parse(savedDraftRaw);
+        if (Date.now() - parsed.timestamp < DRAFT_MAX_AGE_MS && parsed.selectedTeamId) {
+          return parsed.selectedTeamId;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -78,17 +122,15 @@ export const ChatTicketCreator: React.FC = () => {
       .catch(console.error);
   }, []);
 
-  // Restore draft from localStorage (if < 24 hours old)
+  // Show restore toast on mount if draft exists
   useEffect(() => {
     try {
       const savedDraftRaw = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (savedDraftRaw) {
         const parsed = JSON.parse(savedDraftRaw);
-        if (Date.now() - parsed.timestamp < DRAFT_MAX_AGE_MS) {
-          setContent(parsed.content || '');
-          if (parsed.selectedTeamId) setSelectedTeamId(parsed.selectedTeamId);
+        if (Date.now() - parsed.timestamp < DRAFT_MAX_AGE_MS && (parsed.content || parsed.selectedPriority)) {
           message.info('Restored your previous draft (expires in 24h)');
-        } else {
+        } else if (Date.now() - parsed.timestamp >= DRAFT_MAX_AGE_MS) {
           localStorage.removeItem(DRAFT_STORAGE_KEY);
         }
       }
@@ -109,6 +151,7 @@ export const ChatTicketCreator: React.FC = () => {
         localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
           content,
           selectedTeamId,
+          selectedPriority,
           timestamp: Date.now()
         }));
       } catch (e) {
@@ -116,7 +159,7 @@ export const ChatTicketCreator: React.FC = () => {
       }
     }, 500);
     return () => clearTimeout(timeout);
-  }, [content, selectedTeamId, audioBlob, attachments.length, isUndoPending]);
+  }, [content, selectedTeamId, selectedPriority, audioBlob, attachments.length, isUndoPending]);
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -434,6 +477,7 @@ export const ChatTicketCreator: React.FC = () => {
       title: finalTitle,
       description: parsedTicket.description,
       teamId: inferredTeam?.id,
+      priority: selectedPriority,
       assignees: taggedAssignees.map(a => a.id),
       rawText: content.trim(),
       audioBlob: activeBlob,
@@ -495,6 +539,7 @@ export const ChatTicketCreator: React.FC = () => {
         title: payloadData.title,
         description: payloadData.description,
         teamId: payloadData.teamId,
+        priority: payloadData.priority,
         assignees: payloadData.assignees,
         firstMessage,
       });
@@ -578,6 +623,33 @@ export const ChatTicketCreator: React.FC = () => {
 
         {/* Action badges & Assignee chips */}
         <div className="flex items-center gap-2">
+          {/* Priority Selection Field */}
+          <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-0.5">
+            <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Priority:</span>
+            <Select
+              size="small"
+              value={selectedPriority}
+              onChange={(val) => setSelectedPriority(val)}
+              className="w-24 sm:w-28 text-xs"
+              options={PRIORITY_OPTIONS.map(opt => ({
+                value: opt.value,
+                label: (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                    <span 
+                      className={`inline-block w-2 h-2 rounded-full ${
+                        opt.value === 'CRITICAL' ? 'bg-red-500' :
+                        opt.value === 'URGENT' ? 'bg-orange-600' :
+                        opt.value === 'HIGH' ? 'bg-pink-600' :
+                        opt.value === 'MEDIUM' ? 'bg-amber-500' : 'bg-gray-400'
+                      }`} 
+                    />
+                    {opt.label}
+                  </span>
+                )
+              }))}
+            />
+          </div>
+
           {taggedAssignees.length > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto max-w-xs">
               {taggedAssignees.map(a => (
@@ -645,11 +717,24 @@ export const ChatTicketCreator: React.FC = () => {
                   <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-800 flex items-center gap-1">
                     <CheckCircleOutlined /> Ticket Title
                   </span>
-                  {inferredTeam && (
-                    <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded font-medium">
-                      {inferredTeam.name}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <Tag 
+                      color={
+                        selectedPriority === 'CRITICAL' ? 'red' :
+                        selectedPriority === 'URGENT' ? 'volcano' :
+                        selectedPriority === 'HIGH' ? 'magenta' :
+                        selectedPriority === 'MEDIUM' ? 'orange' : 'default'
+                      } 
+                      className="!m-0 text-[10px] font-semibold rounded"
+                    >
+                      {selectedPriority}
+                    </Tag>
+                    {inferredTeam && (
+                      <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded font-medium">
+                        {inferredTeam.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="font-bold text-base text-emerald-950 mt-0.5 leading-snug">
                   {parsedTicket.title || 'Untitled Ticket'}

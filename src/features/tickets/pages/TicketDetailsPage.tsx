@@ -1644,7 +1644,7 @@ export const TicketDetailsPage: React.FC = () => {
 
               <div>
                 <Text type="secondary" className="block mb-1">Priority</Text>
-                <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>
+                <Tag color={ticket.priority === 'CRITICAL' ? 'red' : ticket.priority === 'URGENT' ? 'volcano' : ticket.priority === 'HIGH' ? 'magenta' : ticket.priority === 'MEDIUM' ? 'orange' : 'default'}>
                   {ticket.priority}
                 </Tag>
               </div>
@@ -1898,7 +1898,7 @@ export const TicketDetailsPage: React.FC = () => {
 
             <div>
               <Text type="secondary" className="block mb-1">Priority</Text>
-              <Tag color={ticket.priority === 'URGENT' ? 'red' : ticket.priority === 'HIGH' ? 'magenta' : 'default'}>
+              <Tag color={ticket.priority === 'CRITICAL' ? 'red' : ticket.priority === 'URGENT' ? 'volcano' : ticket.priority === 'HIGH' ? 'magenta' : ticket.priority === 'MEDIUM' ? 'orange' : 'default'}>
                 {ticket.priority}
               </Tag>
             </div>

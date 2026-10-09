@@ -125,8 +125,8 @@ export const TaskDashboardPage: React.FC = () => {
       dataIndex: 'deadline', 
       key: 'deadline', 
       render: (date: string) => (
-        <span className="text-red-500 font-semibold text-xs">
-          {dayjs(date).format('MMM DD, YYYY')}
+        <span className="text-red-500 font-semibold text-xs whitespace-nowrap">
+          {date ? dayjs(date).format('MMM DD, YYYY • hh:mm A') : '-'}
         </span>
       ) 
     },
@@ -168,8 +168,8 @@ export const TaskDashboardPage: React.FC = () => {
       dataIndex: 'deadline', 
       key: 'deadline', 
       render: (date: string) => (
-        <span className="text-blue-600 font-semibold text-xs">
-          {dayjs(date).format('MMM DD, YYYY')}
+        <span className="text-blue-600 font-semibold text-xs whitespace-nowrap">
+          {date ? dayjs(date).format('MMM DD, YYYY • hh:mm A') : '-'}
         </span>
       ) 
     },
@@ -215,9 +215,9 @@ export const TaskDashboardPage: React.FC = () => {
                   {task.assignees?.map((a: any) => a.user?.name).join(', ') || 'Unassigned'}
                 </span>
               </span>
-              <span className={`font-medium flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
+              <span className={`font-medium flex items-center gap-1 shrink-0 ${isOverdue ? 'text-red-500 font-semibold' : 'text-blue-600'}`}>
                 <CalendarOutlined className="text-[11px]" />
-                {dayjs(task.deadline).format('MMM DD, YYYY')}
+                {task.deadline ? dayjs(task.deadline).format('MMM DD, YYYY • hh:mm A') : 'No deadline'}
               </span>
             </div>
           </div>

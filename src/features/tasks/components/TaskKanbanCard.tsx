@@ -1,4 +1,5 @@
 import React from 'react';
+import dayjs from 'dayjs';
 import { Card, Tag, Button, Popconfirm, Tooltip, Avatar, Popover } from 'antd';
 import { 
   EditOutlined, 
@@ -376,7 +377,10 @@ export const TaskKanbanCard: React.FC<TaskKanbanCardProps> = ({
           </div>
 
           {/* Deadline & LiveCountdown */}
-          <div className="flex items-center gap-1 shrink-0 font-mono text-[11px] text-gray-700 bg-gray-100/90 px-1.5 py-0.5 rounded border border-gray-200/60">
+          <div 
+            className="flex items-center gap-1 shrink-0 font-mono text-[11px] text-gray-700 bg-gray-100/90 px-1.5 py-0.5 rounded border border-gray-200/60"
+            title={task.deadline ? `Deadline: ${dayjs(task.deadline).format('MMM DD, YYYY • hh:mm A')}` : 'No deadline'}
+          >
             <ClockCircleOutlined className="text-gray-400 text-[10px]" />
             <LiveCountdown deadline={task.deadline} />
           </div>

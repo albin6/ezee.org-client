@@ -8,6 +8,7 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { useTicketStore } from '../store/ticket.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { teamService } from '@/features/teams/api/team.service';
+import { ticketService } from '../api/ticket.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 
@@ -101,20 +102,26 @@ export const TicketListPage: React.FC = () => {
   const [params, setParams] = useState<any>(() => {
     const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
     if (hasAnyUrlParam) {
+      const urlMyGroup = searchParams.get('myGroup') === 'true';
+      const urlMyTickets = urlMyGroup
+        ? false
+        : (searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true);
+
       return {
         page: searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1,
         limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 12,
         search: searchParams.get('search') || '',
-        status: searchParams.get('status') || undefined,
+        status: searchParams.has('status') ? searchParams.get('status') || undefined : 'OPEN,IN_PROGRESS',
         priority: searchParams.get('priority') || undefined,
         teamId: searchParams.get('teamId') || undefined,
         createdById: searchParams.get('createdById') || undefined,
         assigneeId: searchParams.get('assigneeId') || undefined,
         dateFrom: searchParams.get('dateFrom') || undefined,
         dateTo: searchParams.get('dateTo') || undefined,
-        sortBy: searchParams.get('sortBy') || undefined,
-        sortOrder: searchParams.get('sortOrder') || undefined,
-        myTickets: searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true,
+        sortBy: searchParams.has('sortBy') ? searchParams.get('sortBy') || undefined : 'priority',
+        sortOrder: searchParams.has('sortOrder') ? searchParams.get('sortOrder') || undefined : 'desc',
+        myTickets: urlMyTickets,
+        myGroup: urlMyGroup,
       };
     }
 
@@ -122,20 +129,26 @@ export const TicketListPage: React.FC = () => {
       const saved = sessionStorage.getItem(TICKET_FILTERS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        const savedMyGroup = parsed.myGroup === true;
+        const savedMyTickets = savedMyGroup
+          ? false
+          : (parsed.myTickets !== undefined ? parsed.myTickets : true);
+
         return {
           page: parsed.page || 1,
           limit: parsed.limit || 12,
           search: parsed.search || '',
-          status: parsed.status || undefined,
+          status: parsed.status !== undefined ? parsed.status : 'OPEN,IN_PROGRESS',
           priority: parsed.priority || undefined,
           teamId: parsed.teamId || undefined,
           createdById: parsed.createdById || undefined,
           assigneeId: parsed.assigneeId || undefined,
           dateFrom: parsed.dateFrom || undefined,
           dateTo: parsed.dateTo || undefined,
-          sortBy: parsed.sortBy || undefined,
-          sortOrder: parsed.sortOrder || undefined,
-          myTickets: parsed.myTickets !== undefined ? parsed.myTickets : true,
+          sortBy: parsed.sortBy || 'priority',
+          sortOrder: parsed.sortOrder || 'desc',
+          myTickets: savedMyTickets,
+          myGroup: savedMyGroup,
         };
       }
     } catch {}
@@ -144,16 +157,17 @@ export const TicketListPage: React.FC = () => {
       page: 1,
       limit: 12,
       search: '',
-      status: undefined,
+      status: 'OPEN,IN_PROGRESS',
       priority: undefined,
       teamId: undefined,
       createdById: undefined,
       assigneeId: undefined,
       dateFrom: undefined,
       dateTo: undefined,
-      sortBy: undefined,
-      sortOrder: undefined,
+      sortBy: 'priority',
+      sortOrder: 'desc',
       myTickets: true,
+      myGroup: false,
     };
   });
 
@@ -163,6 +177,19 @@ export const TicketListPage: React.FC = () => {
     setSearchInput(params.search || '');
   }, [params.search]);
 
+  const [myGroupMembers, setMyGroupMembers] = useState<any[]>([]);
+
+  useEffect(() => {
+    ticketService.getMyGroupMembers()
+      .then((data) => {
+        setMyGroupMembers(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        console.error('Failed to load group members:', err);
+        setMyGroupMembers([]);
+      });
+  }, []);
+
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -171,7 +198,11 @@ export const TicketListPage: React.FC = () => {
     fetchTickets({ ...params, searchMode });
 
     const newSp = new URLSearchParams();
-    newSp.set('myTickets', params.myTickets ? 'true' : 'false');
+    if (params.myGroup) {
+      newSp.set('myGroup', 'true');
+    } else {
+      newSp.set('myTickets', params.myTickets ? 'true' : 'false');
+    }
     if (params.search) newSp.set('search', params.search);
     if (searchMode && searchMode !== 'semantic') newSp.set('searchMode', searchMode);
     if (params.status) newSp.set('status', params.status);
@@ -202,24 +233,28 @@ export const TicketListPage: React.FC = () => {
     const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
     if (!hasAnyUrlParam) return;
 
-    const urlMyTickets = searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true;
+    const urlMyGroup = searchParams.get('myGroup') === 'true';
+    const urlMyTickets = urlMyGroup
+      ? false
+      : (searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true);
     const urlMode = (searchParams.get('searchMode') as 'semantic' | 'keyword') || 'semantic';
     const urlPage = searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1;
     const urlLimit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 12;
     const urlSearch = searchParams.get('search') || '';
-    const urlStatus = searchParams.get('status') || undefined;
+    const urlStatus = searchParams.has('status') ? searchParams.get('status') || undefined : 'OPEN,IN_PROGRESS';
     const urlPriority = searchParams.get('priority') || undefined;
     const urlTeamId = searchParams.get('teamId') || undefined;
     const urlCreatedById = searchParams.get('createdById') || undefined;
     const urlAssigneeId = searchParams.get('assigneeId') || undefined;
     const urlDateFrom = searchParams.get('dateFrom') || undefined;
     const urlDateTo = searchParams.get('dateTo') || undefined;
-    const urlSortBy = searchParams.get('sortBy') || undefined;
-    const urlSortOrder = searchParams.get('sortOrder') || undefined;
+    const urlSortBy = searchParams.has('sortBy') ? searchParams.get('sortBy') || undefined : 'priority';
+    const urlSortOrder = searchParams.has('sortOrder') ? searchParams.get('sortOrder') || undefined : 'desc';
 
     setParams((prev: any) => {
       if (
         prev.myTickets === urlMyTickets &&
+        prev.myGroup === urlMyGroup &&
         prev.page === urlPage &&
         prev.limit === urlLimit &&
         prev.search === urlSearch &&
@@ -238,6 +273,7 @@ export const TicketListPage: React.FC = () => {
       return {
         ...prev,
         myTickets: urlMyTickets,
+        myGroup: urlMyGroup,
         page: urlPage,
         limit: urlLimit,
         search: urlSearch,
@@ -266,13 +302,14 @@ export const TicketListPage: React.FC = () => {
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (params.status) count++;
+    if (params.status && params.status !== 'OPEN,IN_PROGRESS') count++;
     if (params.priority) count++;
     if (params.teamId) count++;
     if (params.createdById) count++;
     if (params.assigneeId) count++;
     if (params.dateFrom || params.dateTo) count++;
-    if (params.myTickets === false) count++;
+    if (params.myGroup) count++;
+    else if (params.myTickets === false) count++;
     return count;
   }, [params]);
 
@@ -281,16 +318,17 @@ export const TicketListPage: React.FC = () => {
       page: 1,
       limit: 12,
       search: '',
-      status: undefined,
+      status: 'OPEN,IN_PROGRESS',
       priority: undefined,
       teamId: undefined,
       createdById: undefined,
       assigneeId: undefined,
       dateFrom: undefined,
       dateTo: undefined,
-      sortBy: undefined,
-      sortOrder: undefined,
+      sortBy: 'priority',
+      sortOrder: 'desc',
       myTickets: true,
+      myGroup: false,
     };
     setParams(defaultState);
     setSearchMode('semantic');
@@ -309,7 +347,8 @@ export const TicketListPage: React.FC = () => {
     const ageHours = (Date.now() - createdAt) / (1000 * 60 * 60);
     
     let slaLimit = 120;
-    if (ticket.priority === 'HIGH' || ticket.priority === 'URGENT') slaLimit = 24;
+    if (ticket.priority === 'CRITICAL' || ticket.priority === 'URGENT') slaLimit = 24;
+    else if (ticket.priority === 'HIGH') slaLimit = 48;
     else if (ticket.priority === 'MEDIUM') slaLimit = 72;
     
     if (ageHours >= slaLimit) return 'breached';
@@ -317,132 +356,172 @@ export const TicketListPage: React.FC = () => {
     return 'ok';
   };
 
-  const FilterControls = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-wrap gap-3 items-center w-full'}`}>
-      <Button
-        type={params.myTickets ? 'primary' : 'default'}
-        onClick={() => setParams((prev: any) => ({ ...prev, myTickets: !prev.myTickets, page: 1 }))}
-        className={
-          isMobile
-            ? `w-full font-medium ${params.myTickets ? 'bg-blue-600 text-white' : 'text-gray-700'}`
-            : `min-w-[130px] font-medium flex items-center justify-center gap-1.5 ${
-                params.myTickets
-                  ? 'bg-blue-600 text-white hover:!bg-blue-700'
-                  : 'text-gray-700 hover:text-blue-600 border-gray-300'
-              }`
-        }
-        title={
-          params.myTickets
-            ? 'Currently viewing My Tickets (created by or assigned to you). Click to view all visible tickets.'
-            : 'Currently viewing All Visible Tickets. Click to view only your tickets.'
-        }
-      >
-        <span>{params.myTickets ? 'My Tickets ✓' : 'All Visible Tickets'}</span>
-      </Button>
+  const FilterControls = ({ isMobile = false }: { isMobile?: boolean }) => {
+    const hasGroupMembers = myGroupMembers.length > 0;
 
-      <Select
-        placeholder="Status"
-        allowClear
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[130px]'}
-        value={params.status || undefined}
-        onChange={(val) => setParams((prev: any) => ({ ...prev, status: val || undefined, page: 1 }))}
-        options={[
-          { value: 'OPEN', label: 'Open' },
-          { value: 'IN_PROGRESS', label: 'In Progress' },
-          { value: 'RESOLVED', label: 'Resolved' },
-          { value: 'CLOSED', label: 'Closed' },
-          { value: 'REOPENED', label: 'Reopened' },
-        ]}
-      />
-
-      <Select
-        placeholder="Priority"
-        allowClear
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[120px]'}
-        value={params.priority || undefined}
-        onChange={(val) => setParams((prev: any) => ({ ...prev, priority: val || undefined, page: 1 }))}
-        options={[
-          { value: 'LOW', label: 'Low' },
-          { value: 'MEDIUM', label: 'Medium' },
-          { value: 'HIGH', label: 'High' },
-          { value: 'URGENT', label: 'Urgent' },
-        ]}
-      />
-
-      <Select
-        placeholder="Team"
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
-        value={params.teamId || undefined}
-        onChange={(val) => setParams((prev: any) => ({ ...prev, teamId: val || undefined, page: 1 }))}
-        options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
-      />
-
-      <Select
-        placeholder="Creator"
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
-        value={params.createdById || undefined}
-        onChange={(val) => setParams((prev: any) => ({ ...prev, createdById: val || undefined, page: 1 }))}
-        options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
-      />
-
-      <Select
-        placeholder="Assignee"
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
-        value={params.assigneeId || undefined}
-        onChange={(val) => setParams((prev: any) => ({ ...prev, assigneeId: val || undefined, page: 1 }))}
-        options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
-      />
-
-      <Select
-        placeholder="Sort By"
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
-        value={params.sortBy ? `${params.sortBy}:${params.sortOrder || 'desc'}` : 'createdAt:desc'}
-        onChange={(val) => {
-          const [sortBy, sortOrder] = val.split(':');
-          setParams((prev: any) => ({ ...prev, sortBy, sortOrder, page: 1 }));
-        }}
-        options={[
-          { value: 'createdAt:desc', label: 'Newest First' },
-          { value: 'createdAt:asc', label: 'Oldest First' },
-          { value: 'updatedAt:desc', label: 'Recently Updated' },
-          { value: 'priority:desc', label: 'Priority' },
-        ]}
-      />
-
-      <DatePicker.RangePicker
-        className={isMobile ? 'w-full' : 'flex-1 min-w-[220px]'}
-        value={params.dateFrom && params.dateTo ? [dayjs(params.dateFrom), dayjs(params.dateTo)] : undefined}
-        onChange={(dates) => {
-          setParams((prev: any) => ({
-            ...prev,
-            dateFrom: dates?.[0]?.toISOString() || undefined,
-            dateTo: dates?.[1]?.toISOString() || undefined,
-            page: 1
-          }));
-        }}
-      />
-
-      {activeFiltersCount > 0 && !isMobile && (
+    return (
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-wrap gap-3 items-center w-full'}`}>
         <Button
-          type="text"
-          icon={<CloseCircleOutlined />}
-          onClick={resetFilters}
-          className="text-gray-500 hover:text-red-500 text-xs flex items-center"
+          type={params.myTickets ? 'primary' : 'default'}
+          onClick={() => setParams((prev: any) => ({
+            ...prev,
+            myTickets: !prev.myTickets,
+            myGroup: false,
+            page: 1,
+          }))}
+          className={
+            isMobile
+              ? `w-full font-medium ${params.myTickets ? 'bg-blue-600 text-white' : 'text-gray-700'}`
+              : `min-w-[130px] font-medium flex items-center justify-center gap-1.5 ${
+                  params.myTickets
+                    ? 'bg-blue-600 text-white hover:!bg-blue-700'
+                    : 'text-gray-700 hover:text-blue-600 border-gray-300'
+                }`
+          }
+          title={
+            params.myTickets
+              ? 'Currently viewing My Tickets (created by or assigned to you). Click to view all visible tickets.'
+              : 'Click to view only your tickets (created by or assigned to you).'
+          }
         >
-          Reset
+          <span>{params.myTickets ? 'My Tickets ✓' : (hasGroupMembers ? 'My Tickets' : 'All Visible Tickets')}</span>
         </Button>
-      )}
-    </div>
-  );
+
+        {hasGroupMembers && (
+          <Button
+            type={params.myGroup ? 'primary' : 'default'}
+            onClick={() => setParams((prev: any) => ({
+              ...prev,
+              myGroup: !prev.myGroup,
+              myTickets: false,
+              page: 1,
+            }))}
+            className={
+              isMobile
+                ? `w-full font-medium ${params.myGroup ? 'bg-indigo-600 text-white' : 'text-gray-700'}`
+                : `min-w-[130px] font-medium flex items-center justify-center gap-1.5 ${
+                    params.myGroup
+                      ? 'bg-indigo-600 text-white hover:!bg-indigo-700 border-indigo-600'
+                      : 'text-gray-700 hover:text-indigo-600 border-gray-300'
+                  }`
+            }
+            title={
+              params.myGroup
+                ? `Currently viewing My Group tickets (${myGroupMembers.length} direct report${myGroupMembers.length > 1 ? 's' : ''}). Click to view all visible tickets.`
+                : `Click to view tickets associated with your direct reports (${myGroupMembers.length} member${myGroupMembers.length > 1 ? 's' : ''}).`
+            }
+          >
+            <span>{params.myGroup ? 'My Group ✓' : 'My Group'}</span>
+          </Button>
+        )}
+
+        <Select
+          placeholder="Status"
+          allowClear
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[130px]'}
+          value={params.status || undefined}
+          onChange={(val) => setParams((prev: any) => ({ ...prev, status: val || undefined, page: 1 }))}
+          options={[
+            { value: 'OPEN,IN_PROGRESS', label: 'Open & In Progress' },
+            { value: 'OPEN', label: 'Open' },
+            { value: 'IN_PROGRESS', label: 'In Progress' },
+            { value: 'RESOLVED', label: 'Resolved' },
+            { value: 'CLOSED', label: 'Closed' },
+            { value: 'REOPENED', label: 'Reopened' },
+            { value: 'ALL', label: 'All Statuses' },
+          ]}
+        />
+
+        <Select
+          placeholder="Priority"
+          allowClear
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[120px]'}
+          value={params.priority || undefined}
+          onChange={(val) => setParams((prev: any) => ({ ...prev, priority: val || undefined, page: 1 }))}
+          options={[
+            { value: 'CRITICAL', label: 'Critical' },
+            { value: 'URGENT', label: 'Urgent' },
+            { value: 'HIGH', label: 'High' },
+            { value: 'MEDIUM', label: 'Medium' },
+            { value: 'LOW', label: 'Low' },
+          ]}
+        />
+
+        <Select
+          placeholder="Team"
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
+          value={params.teamId || undefined}
+          onChange={(val) => setParams((prev: any) => ({ ...prev, teamId: val || undefined, page: 1 }))}
+          options={(teams || []).map(t => ({ value: t.id, label: t.name }))}
+        />
+
+        <Select
+          placeholder="Creator"
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
+          value={params.createdById || undefined}
+          onChange={(val) => setParams((prev: any) => ({ ...prev, createdById: val || undefined, page: 1 }))}
+          options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
+        />
+
+        <Select
+          placeholder="Assignee"
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
+          value={params.assigneeId || undefined}
+          onChange={(val) => setParams((prev: any) => ({ ...prev, assigneeId: val || undefined, page: 1 }))}
+          options={(users || []).map((u: any) => ({ value: u.id, label: u.name }))}
+        />
+
+        <Select
+          placeholder="Sort By"
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[140px]'}
+          value={params.sortBy ? `${params.sortBy}:${params.sortOrder || 'desc'}` : 'priority:desc'}
+          onChange={(val) => {
+            const [sortBy, sortOrder] = val.split(':');
+            setParams((prev: any) => ({ ...prev, sortBy, sortOrder, page: 1 }));
+          }}
+          options={[
+            { value: 'priority:desc', label: 'Priority (High to Low)' },
+            { value: 'createdAt:desc', label: 'Newest First' },
+            { value: 'createdAt:asc', label: 'Oldest First' },
+            { value: 'updatedAt:desc', label: 'Recently Updated' },
+          ]}
+        />
+
+        <DatePicker.RangePicker
+          className={isMobile ? 'w-full' : 'flex-1 min-w-[220px]'}
+          value={params.dateFrom && params.dateTo ? [dayjs(params.dateFrom), dayjs(params.dateTo)] : undefined}
+          onChange={(dates) => {
+            setParams((prev: any) => ({
+              ...prev,
+              dateFrom: dates?.[0]?.toISOString() || undefined,
+              dateTo: dates?.[1]?.toISOString() || undefined,
+              page: 1
+            }));
+          }}
+        />
+
+        {activeFiltersCount > 0 && !isMobile && (
+          <Button
+            type="text"
+            icon={<CloseCircleOutlined />}
+            onClick={resetFilters}
+            className="text-gray-500 hover:text-red-500 text-xs flex items-center"
+          >
+            Reset
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <PageContainer>
@@ -452,12 +531,18 @@ export const TicketListPage: React.FC = () => {
             <span>Tickets & Issues</span>
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-                params.myTickets
+                params.myGroup
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : params.myTickets
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}
             >
-              {params.myTickets ? 'Viewing: My Tickets' : 'Viewing: All Visible Tickets'}
+              {params.myGroup
+                ? `Viewing: My Group (${myGroupMembers.length} direct report${myGroupMembers.length > 1 ? 's' : ''})`
+                : params.myTickets
+                ? 'Viewing: My Tickets'
+                : 'Viewing: All Visible Tickets'}
             </span>
           </div>
         }
@@ -495,12 +580,14 @@ export const TicketListPage: React.FC = () => {
               <span>Filter Tickets</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
-                  params.myTickets
+                  params.myGroup
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : params.myTickets
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-amber-50 text-amber-700 border-amber-200'
                 }`}
               >
-                {params.myTickets ? 'My Tickets' : 'All Visible'}
+                {params.myGroup ? 'My Group' : params.myTickets ? 'My Tickets' : 'All Visible'}
               </span>
               {activeFiltersCount > 0 && (
                 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -599,8 +686,10 @@ export const TicketListPage: React.FC = () => {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Tag
                           color={
-                            ticket.priority === 'URGENT'
+                            ticket.priority === 'CRITICAL'
                               ? 'red'
+                              : ticket.priority === 'URGENT'
+                              ? 'volcano'
                               : ticket.priority === 'HIGH'
                               ? 'magenta'
                               : ticket.priority === 'MEDIUM'

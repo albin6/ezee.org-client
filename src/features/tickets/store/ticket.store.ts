@@ -15,6 +15,7 @@ interface TicketState {
     title: string; 
     description?: string; 
     teamId?: string; 
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
     assignees?: string[];
     firstMessage?: {
       content?: string;

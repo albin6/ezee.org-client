@@ -491,7 +491,7 @@ export const TaskListPage: React.FC = () => {
         <div className="flex flex-col gap-1 pt-0.5 whitespace-nowrap">
           <div className="flex items-center gap-1.5 text-xs text-gray-800 font-medium">
             <CalendarOutlined className="text-gray-400 text-xs" />
-            <span>{dayjs(deadline).format('MMM DD, YYYY • hh:mm A')}</span>
+            <span>{deadline ? dayjs(deadline).format('MMM DD, YYYY • hh:mm A') : 'No deadline'}</span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100/90 border border-gray-200/60 font-mono text-xs text-gray-700 w-fit">
             <ClockCircleOutlined className="text-gray-400 text-[11px]" />

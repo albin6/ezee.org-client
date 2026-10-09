@@ -342,4 +342,84 @@ describe('ChatTicketCreator Component', () => {
       expect(screen.queryByText(/Recording\.\.\./i)).not.toBeInTheDocument();
     });
   });
+
+  it('defaults priority to MEDIUM when submitting ticket creation', async () => {
+    vi.mocked(ticketService.createTicket).mockResolvedValue({ data: { id: 'ticket-med-1' } } as any);
+
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    const textarea = screen.getByPlaceholderText(/Type title on line 1, description below, @name to assign.../i);
+    fireEvent.change(textarea, {
+      target: {
+        value: 'Standard bug title\nStandard bug description\n@Alice Dev'
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTitle(/Send Ticket \(Enter\)/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle(/Send Ticket \(Enter\)/i));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Now/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Now/i }));
+
+    await waitFor(() => {
+      expect(ticketService.createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priority: 'MEDIUM',
+        })
+      );
+    });
+  });
+
+  it('restores draft with custom selected priority from localStorage and submits it', async () => {
+    vi.mocked(ticketService.createTicket).mockResolvedValue({ data: { id: 'ticket-crit-1' } } as any);
+
+    localStorage.setItem(
+      'ticket_composer_draft_v1',
+      JSON.stringify({
+        content: 'Critical production outage\nDatabase cluster offline\n@Alice Dev',
+        selectedPriority: 'CRITICAL',
+        timestamp: Date.now(),
+      })
+    );
+
+    render(
+      <BrowserRouter>
+        <ChatTicketCreator />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => expect(ticketService.getUsersMentionLookup).toHaveBeenCalled());
+
+    await waitFor(() => {
+      expect(screen.getByTitle(/Send Ticket \(Enter\)/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle(/Send Ticket \(Enter\)/i));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Send Now/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Now/i }));
+
+    await waitFor(() => {
+      expect(ticketService.createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priority: 'CRITICAL',
+        })
+      );
+    });
+  });
 });

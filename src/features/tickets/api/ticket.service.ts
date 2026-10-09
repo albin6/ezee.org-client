@@ -5,7 +5,7 @@ export interface Ticket {
   title: string;
   description: string;
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REOPENED';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
   teamId: string;
   createdById: string;
   createdAt: string;
@@ -60,6 +60,11 @@ export const ticketService = {
     return data;
   },
 
+  getMyGroupMembers: async (): Promise<any[]> => {
+    const { data } = await apiClient.get('/tickets/my-group-members');
+    return data.data;
+  },
+
   getUsersMentionLookup: async (search?: string): Promise<MentionUser[]> => {
     const { data } = await apiClient.get('/tickets/users-mention-lookup', { params: { search } });
     return data.data;
@@ -69,6 +74,7 @@ export const ticketService = {
     title: string; 
     description?: string; 
     teamId?: string; 
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
     assignees?: string[];
     firstMessage?: {
       content?: string;
