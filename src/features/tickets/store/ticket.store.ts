@@ -3,12 +3,181 @@ import type { Ticket } from '../api/ticket.service';
 import { ticketService } from '../api/ticket.service';
 import { socketService } from '@/shared/services/socket.service';
 
+const PRIORITY_WEIGHT: Record<string, number> = {
+  CRITICAL: 5,
+  URGENT: 4,
+  HIGH: 3,
+  MEDIUM: 2,
+  LOW: 1,
+};
+
+export function isStaleTicketEvent(existing: Ticket, incoming: Partial<Ticket>): boolean {
+  if (!existing || !incoming) return false;
+  if (typeof existing.version === 'number' && typeof incoming.version === 'number') {
+    if (incoming.version < existing.version) return true;
+    if (incoming.version > existing.version) return false;
+  }
+  if (existing.updatedAt && incoming.updatedAt) {
+    const existingTime = new Date(existing.updatedAt).getTime();
+    const incomingTime = new Date(incoming.updatedAt).getTime();
+    if (!Number.isNaN(existingTime) && !Number.isNaN(incomingTime) && incomingTime < existingTime) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function doesTicketMatchListParams(
+  ticket: Ticket,
+  params: any,
+  currentUserId?: string,
+  myGroupMembers: any[] = []
+): boolean {
+  if (!ticket || !ticket.id) return false;
+  const activeParams = params || {};
+
+  const myGroup = Boolean(activeParams.myGroup);
+  const myTickets = myGroup
+    ? false
+    : activeParams.myTickets !== undefined
+    ? Boolean(activeParams.myTickets)
+    : true;
+
+  const creatorId = ticket.createdById || ticket.createdBy?.id;
+  const assigneeIds: string[] = Array.isArray(ticket.assignees)
+    ? ticket.assignees
+        .map((a: any) => a?.userId || a?.user?.id)
+        .filter((id: any): id is string => Boolean(id))
+    : [];
+
+  if (myGroup) {
+    if (!Array.isArray(myGroupMembers) || myGroupMembers.length === 0) {
+      return false;
+    }
+    const ticketTeamId = ticket.teamId || ticket.team?.id;
+    const matchesGroupMember = myGroupMembers.some((member: any) => {
+      if (!member?.id) return false;
+      const isParticipant = creatorId === member.id || assigneeIds.includes(member.id);
+      if (!isParticipant) return false;
+      if (ticketTeamId && Array.isArray(member.teams) && member.teams.length > 0) {
+        return member.teams.some((t: any) => t.id === ticketTeamId);
+      }
+      return true;
+    });
+    if (!matchesGroupMember) return false;
+  } else if (myTickets && currentUserId) {
+    const isMyTicket = creatorId === currentUserId || assigneeIds.includes(currentUserId);
+    if (!isMyTicket) return false;
+  }
+
+  // Status filter (defaults to 'OPEN,IN_PROGRESS' when undefined)
+  const statusFilter =
+    activeParams.status !== undefined ? activeParams.status : 'OPEN,IN_PROGRESS';
+  if (statusFilter && statusFilter !== 'ALL' && statusFilter !== 'all') {
+    const allowedStatuses = Array.isArray(statusFilter)
+      ? statusFilter.filter((s) => s && s !== 'ALL' && s !== 'all')
+      : String(statusFilter)
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s && s !== 'ALL' && s !== 'all');
+    if (allowedStatuses.length > 0 && !allowedStatuses.includes(ticket.status)) {
+      return false;
+    }
+  }
+
+  // Priority filter
+  if (activeParams.priority && ticket.priority !== activeParams.priority) {
+    return false;
+  }
+
+  // Team filter
+  const ticketTeamId = ticket.teamId || ticket.team?.id;
+  if (activeParams.teamId && ticketTeamId !== activeParams.teamId) {
+    return false;
+  }
+
+  // CreatedBy filter
+  if (activeParams.createdById && creatorId !== activeParams.createdById) {
+    return false;
+  }
+
+  // Assignee filter
+  if (activeParams.assigneeId && !assigneeIds.includes(activeParams.assigneeId)) {
+    return false;
+  }
+
+  // Date range filter
+  if (activeParams.dateFrom && ticket.createdAt) {
+    const fromTime = new Date(activeParams.dateFrom).getTime();
+    const ticketTime = new Date(ticket.createdAt).getTime();
+    if (!Number.isNaN(fromTime) && !Number.isNaN(ticketTime) && ticketTime < fromTime) {
+      return false;
+    }
+  }
+  if (activeParams.dateTo && ticket.createdAt) {
+    const toTime = new Date(activeParams.dateTo).getTime();
+    const ticketTime = new Date(ticket.createdAt).getTime();
+    if (!Number.isNaN(toTime) && !Number.isNaN(ticketTime) && ticketTime > toTime) {
+      return false;
+    }
+  }
+
+  // Search filter
+  if (activeParams.search && String(activeParams.search).trim().length > 0) {
+    const query = String(activeParams.search).trim().toLowerCase();
+    const haystack = `${ticket.id || ''} ${ticket.title || ''} ${ticket.description || ''}`.toLowerCase();
+    const terms = query.split(/\s+/).filter(Boolean);
+    const directMatch = haystack.includes(query);
+    const termMatch =
+      terms.length > 1 &&
+      (terms.every((t) => haystack.includes(t)) ||
+        terms.some((t) => t.length >= 3 && haystack.includes(t)));
+    if (!directMatch && !termMatch) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function sortTicketsList(tickets: Ticket[], params?: any): Ticket[] {
+  const sortBy = params?.sortBy || 'priority';
+  const sortOrder = params?.sortOrder || 'desc';
+
+  return [...tickets].sort((a, b) => {
+    if (sortBy === 'priority') {
+      const weightA = PRIORITY_WEIGHT[a.priority] ?? 0;
+      const weightB = PRIORITY_WEIGHT[b.priority] ?? 0;
+      if (weightA !== weightB) {
+        return sortOrder === 'asc' ? weightA - weightB : weightB - weightA;
+      }
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeA - timeB;
+    }
+
+    if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+      const timeA = new Date((a as any)[sortBy] || a.createdAt || 0).getTime();
+      const timeB = new Date((b as any)[sortBy] || b.createdAt || 0).getTime();
+      return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    }
+
+    const valA = String((a as any)[sortBy] || '');
+    const valB = String((b as any)[sortBy] || '');
+    return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+}
+
 interface TicketState {
   tickets: Ticket[];
   total: number;
   loading: boolean;
   error: string | null;
   currentTicket: Ticket | null;
+  activeListParams: any;
+  myGroupMembers: any[];
+  setActiveListParams: (params: any) => void;
+  setMyGroupMembers: (members: any[]) => void;
   fetchTickets: (params?: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
   createTicket: (payload: { 
@@ -31,6 +200,8 @@ interface TicketState {
   deleteMessage: (ticketId: string, messageId: string, type: 'me' | 'everyone') => Promise<any>;
   joinTicketRoom: (ticketId: string) => void;
   leaveTicketRoom: (ticketId: string) => void;
+  handleTicketCreatedRealtime: (ticket: Ticket, currentUserId?: string) => void;
+  handleTicketUpdatedRealtime: (ticket: Ticket, currentUserId?: string) => void;
   handleNewMessage: (message: any) => void;
   handleReactionUpdated: (data: { messageId: string, message: any }) => void;
   handleMessageEdited: (message: any) => void;
@@ -44,12 +215,34 @@ export const useTicketStore = create<TicketState>((set, get) => ({
   loading: false,
   error: null,
   currentTicket: null,
+  activeListParams: {
+    page: 1,
+    limit: 12,
+    status: 'OPEN,IN_PROGRESS',
+    sortBy: 'priority',
+    sortOrder: 'desc',
+    myTickets: true,
+    myGroup: false,
+  },
+  myGroupMembers: [],
+
+  setActiveListParams: (params) => {
+    set({ activeListParams: params });
+  },
+
+  setMyGroupMembers: (members) => {
+    set({ myGroupMembers: Array.isArray(members) ? members : [] });
+  },
 
   fetchTickets: async (params) => {
-    set({ loading: true, error: null });
+    if (params !== undefined) {
+      set({ loading: true, error: null, activeListParams: params });
+    } else {
+      set({ loading: true, error: null });
+    }
     try {
       const response = await ticketService.getTickets(params);
-      set({ tickets: response.data, total: response.total || response.data.length, loading: false });
+      set({ tickets: response.data, total: response.total ?? response.data.length, loading: false });
     } catch (error: any) {
       set({ error: error.message || 'Failed to fetch tickets', loading: false });
     }
@@ -82,6 +275,9 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     try {
       const response = await ticketService.updateStatus(id, status, version);
       set({ currentTicket: response.data, loading: false });
+      if (response.data) {
+        get().handleTicketUpdatedRealtime(response.data);
+      }
     } catch (error: any) {
       set({ error: error.message || 'Failed to update ticket status', loading: false });
       throw error;
@@ -214,8 +410,19 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
     socket.on('TICKET_UPDATED', (updatedTicket: any) => {
       const ct = get().currentTicket;
-      if (ct && ct.id === updatedTicket.id) {
-        set({ currentTicket: updatedTicket });
+      if (ct && ct.id === updatedTicket?.id) {
+        if (!isStaleTicketEvent(ct, updatedTicket)) {
+          set({
+            currentTicket: {
+              ...ct,
+              ...updatedTicket,
+              messages: updatedTicket.messages !== undefined ? updatedTicket.messages : ct.messages,
+            },
+          });
+        }
+      }
+      if (updatedTicket) {
+        get().handleTicketUpdatedRealtime(updatedTicket);
       }
     });
 
@@ -260,6 +467,122 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       socket.off('MESSAGE_EDITED');
       socket.off('MESSAGE_DELETED_FOR_EVERYONE');
       socket.off('MESSAGE_DELETED_FOR_ME');
+    }
+  },
+
+  handleTicketCreatedRealtime: (incomingTicket: Ticket, currentUserId?: string) => {
+    if (!incomingTicket || !incomingTicket.id) return;
+
+    const { tickets, total, activeListParams, myGroupMembers } = get();
+    const matches = doesTicketMatchListParams(
+      incomingTicket,
+      activeListParams,
+      currentUserId,
+      myGroupMembers
+    );
+
+    const existingIndex = tickets.findIndex((t) => t.id === incomingTicket.id);
+
+    if (existingIndex !== -1) {
+      const existing = tickets[existingIndex];
+      if (isStaleTicketEvent(existing, incomingTicket)) return;
+
+      if (!matches) {
+        const filtered = tickets.filter((t) => t.id !== incomingTicket.id);
+        set({
+          tickets: filtered,
+          total: Math.max(0, total - 1),
+        });
+        return;
+      }
+
+      const merged = tickets.map((t, idx) =>
+        idx === existingIndex ? { ...t, ...incomingTicket } : t
+      );
+      set({
+        tickets: sortTicketsList(merged, activeListParams),
+      });
+      return;
+    }
+
+    if (!matches) return;
+
+    const page = Number(activeListParams?.page) || 1;
+    const limit = Number(activeListParams?.limit) || 12;
+
+    if (page === 1) {
+      const nextTickets = sortTicketsList([incomingTicket, ...tickets], activeListParams).slice(
+        0,
+        limit
+      );
+      set({
+        tickets: nextTickets,
+        total: total + 1,
+      });
+    } else {
+      set({
+        total: total + 1,
+      });
+    }
+  },
+
+  handleTicketUpdatedRealtime: (incomingTicket: Ticket, currentUserId?: string) => {
+    if (!incomingTicket || !incomingTicket.id) return;
+
+    const { tickets, total, activeListParams, myGroupMembers } = get();
+    const existingIndex = tickets.findIndex((t) => t.id === incomingTicket.id);
+    const mergedTicket =
+      existingIndex !== -1
+        ? { ...tickets[existingIndex], ...incomingTicket }
+        : incomingTicket;
+
+    if (existingIndex !== -1 && isStaleTicketEvent(tickets[existingIndex], incomingTicket)) {
+      return;
+    }
+
+    const matches = doesTicketMatchListParams(
+      mergedTicket,
+      activeListParams,
+      currentUserId,
+      myGroupMembers
+    );
+
+    if (existingIndex !== -1) {
+      if (!matches) {
+        const filtered = tickets.filter((t) => t.id !== incomingTicket.id);
+        set({
+          tickets: filtered,
+          total: Math.max(0, total - 1),
+        });
+        return;
+      }
+
+      const updatedList = tickets.map((t, idx) =>
+        idx === existingIndex ? mergedTicket : t
+      );
+      set({
+        tickets: sortTicketsList(updatedList, activeListParams),
+      });
+      return;
+    }
+
+    if (matches) {
+      const page = Number(activeListParams?.page) || 1;
+      const limit = Number(activeListParams?.limit) || 12;
+      if (page === 1) {
+        const nextTickets = sortTicketsList([mergedTicket, ...tickets], activeListParams).slice(
+          0,
+          limit
+        );
+        set({
+          tickets: nextTickets,
+          total: total + 1,
+        });
+      } else {
+        set({
+          total: total + 1,
+        });
+      }
     }
   },
 

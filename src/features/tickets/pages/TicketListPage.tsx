@@ -12,6 +12,7 @@ import { ticketService } from '../api/ticket.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { HolidayCalendarModal } from '../components/HolidayCalendarModal';
+import { socketService } from '@/shared/services/socket.service';
 
 const STATUS_CONFIG: Record<string, {
   label: string;
@@ -80,7 +81,16 @@ const TICKET_FILTERS_STORAGE_KEY = 'tickets_filters_persistence';
 export const TicketListPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tickets, loading, total, fetchTickets } = useTicketStore();
+  const {
+    tickets,
+    loading,
+    total,
+    fetchTickets,
+    setActiveListParams,
+    setMyGroupMembers: setStoreMyGroupMembers,
+    handleTicketCreatedRealtime,
+    handleTicketUpdatedRealtime,
+  } = useTicketStore();
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
 
@@ -183,13 +193,20 @@ export const TicketListPage: React.FC = () => {
   useEffect(() => {
     ticketService.getMyGroupMembers()
       .then((data) => {
-        setMyGroupMembers(Array.isArray(data) ? data : []);
+        const normalized = Array.isArray(data) ? data : [];
+        setMyGroupMembers(normalized);
+        if (typeof setStoreMyGroupMembers === 'function') {
+          setStoreMyGroupMembers(normalized);
+        }
       })
       .catch((err) => {
         console.error('Failed to load group members:', err);
         setMyGroupMembers([]);
+        if (typeof setStoreMyGroupMembers === 'function') {
+          setStoreMyGroupMembers([]);
+        }
       });
-  }, []);
+  }, [setStoreMyGroupMembers]);
 
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
@@ -197,7 +214,11 @@ export const TicketListPage: React.FC = () => {
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchTickets({ ...params, searchMode });
+    const nextListParams = { ...params, searchMode };
+    if (typeof setActiveListParams === 'function') {
+      setActiveListParams(nextListParams);
+    }
+    fetchTickets(nextListParams);
 
     const newSp = new URLSearchParams();
     if (params.myGroup) {
@@ -229,7 +250,62 @@ export const TicketListPage: React.FC = () => {
         JSON.stringify({ ...params, searchMode })
       );
     } catch {}
-  }, [params, searchMode, fetchTickets]);
+  }, [params, searchMode, fetchTickets, setActiveListParams]);
+
+  // Subscribe to real-time ticket creation and status/property updates
+  useEffect(() => {
+    let socket: any = null;
+    let wasDisconnected = false;
+    const currentUserId = (user as any)?.id;
+
+    const onTicketCreated = (newTicket: any) => {
+      if (typeof handleTicketCreatedRealtime === 'function') {
+        handleTicketCreatedRealtime(newTicket, currentUserId);
+      }
+    };
+
+    const onTicketUpdated = (updatedTicket: any) => {
+      if (typeof handleTicketUpdatedRealtime === 'function') {
+        handleTicketUpdatedRealtime(updatedTicket, currentUserId);
+      }
+    };
+
+    const onDisconnect = () => {
+      wasDisconnected = true;
+    };
+
+    const onReconnect = () => {
+      if (wasDisconnected) {
+        wasDisconnected = false;
+        const activeParams =
+          typeof useTicketStore.getState === 'function'
+            ? useTicketStore.getState().activeListParams
+            : undefined;
+        fetchTickets(activeParams || { ...params, searchMode });
+      }
+    };
+
+    try {
+      socket = socketService.connect();
+      if (socket && typeof socket.on === 'function') {
+        socket.on('TICKET_CREATED', onTicketCreated);
+        socket.on('TICKET_UPDATED', onTicketUpdated);
+        socket.on('disconnect', onDisconnect);
+        socket.on('connect', onReconnect);
+      }
+    } catch {
+      // Gracefully fallback to normal REST behavior when socket is unavailable
+    }
+
+    return () => {
+      if (socket && typeof socket.off === 'function') {
+        socket.off('TICKET_CREATED', onTicketCreated);
+        socket.off('TICKET_UPDATED', onTicketUpdated);
+        socket.off('disconnect', onDisconnect);
+        socket.off('connect', onReconnect);
+      }
+    };
+  }, [(user as any)?.id, handleTicketCreatedRealtime, handleTicketUpdatedRealtime, fetchTickets]);
 
   useEffect(() => {
     const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
