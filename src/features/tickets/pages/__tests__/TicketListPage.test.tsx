@@ -5,11 +5,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { TicketListPage } from '../TicketListPage';
 import { useTicketStore } from '../../store/ticket.store';
 import { useUserStore } from '@/features/users/store/user.store';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 import { ticketService } from '../../api/ticket.service';
+import dayjs from 'dayjs';
 
 vi.mock('../../api/ticket.service', () => ({
   ticketService: {
     getMyGroupMembers: vi.fn().mockResolvedValue([]),
+    getHolidays: vi.fn().mockResolvedValue([]),
+    addHoliday: vi.fn().mockImplementation(async ({ date }) => ({ id: `hol-${date}`, date })),
+    removeHoliday: vi.fn().mockImplementation(async (date) => ({ date, removed: true })),
   },
 }));
 
@@ -27,7 +32,12 @@ vi.mock('@/shared/hooks/usePermissions', () => ({
 
 beforeEach(() => {
   sessionStorage.clear();
+  vi.clearAllMocks();
   vi.mocked(ticketService.getMyGroupMembers).mockResolvedValue([]);
+  vi.mocked(ticketService.getHolidays).mockResolvedValue([]);
+  useAuthStore.setState({
+    user: { id: 'u-regular', name: 'Regular User', role: { name: 'Developer' } } as any,
+  });
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: (query: string) => ({
@@ -351,4 +361,85 @@ describe('TicketListPage - My Group Filter', () => {
     });
   });
 });
+
+describe('TicketListPage - Holiday Calendar Management (Admin Only)', () => {
+  it('hides Manage Holidays button for non-admin users', async () => {
+    useAuthStore.setState({
+      user: { id: 'u-dev', name: 'Developer', role: { name: 'Developer' } } as any,
+    });
+
+    render(
+      <MemoryRouter>
+        <TicketListPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId('manage-holidays-btn')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Manage Holidays/i })).not.toBeInTheDocument();
+  });
+
+  it('displays Manage Holidays button for Super Admin and allows marking/unmarking holidays while keeping Sundays as default holidays', async () => {
+    useAuthStore.setState({
+      user: { id: 'super_admin_01', name: 'Super Admin', type: 'super_admin', role: { name: 'Super Admin' } } as any,
+    });
+
+    // Pick a Monday and a Sunday in the current month
+    const startOfMonth = dayjs().startOf('month');
+    let firstSunday = startOfMonth;
+    while (firstSunday.day() !== 0) {
+      firstSunday = firstSunday.add(1, 'day');
+    }
+    let firstMonday = startOfMonth;
+    while (firstMonday.day() !== 1) {
+      firstMonday = firstMonday.add(1, 'day');
+    }
+    const sundayStr = firstSunday.format('YYYY-MM-DD');
+    const mondayStr = firstMonday.format('YYYY-MM-DD');
+
+    render(
+      <MemoryRouter>
+        <TicketListPage />
+      </MemoryRouter>,
+    );
+
+    const manageBtn = screen.getByTestId('manage-holidays-btn');
+    expect(manageBtn).toBeInTheDocument();
+
+    fireEvent.click(manageBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Manage Escalation Holidays')).toBeInTheDocument();
+      expect(screen.getByTestId('legend-sunday')).toBeInTheDocument();
+      expect(screen.getByTestId('legend-admin-holiday')).toBeInTheDocument();
+      expect(screen.getByTestId('legend-working-day')).toBeInTheDocument();
+    });
+
+    // Verify Sunday is marked as default holiday and clicking it does NOT call addHoliday or removeHoliday
+    const sundayCell = screen.getByTestId(`calendar-day-${sundayStr}`);
+    expect(sundayCell).toHaveAttribute('data-day-type', 'sunday');
+    fireEvent.click(sundayCell);
+    expect(ticketService.addHoliday).not.toHaveBeenCalled();
+    expect(ticketService.removeHoliday).not.toHaveBeenCalled();
+
+    // Verify Monday is a regular working day initially, and clicking it marks it as an admin-designated holiday
+    const mondayCell = screen.getByTestId(`calendar-day-${mondayStr}`);
+    expect(mondayCell).toHaveAttribute('data-day-type', 'working');
+
+    fireEvent.click(mondayCell);
+
+    await waitFor(() => {
+      expect(ticketService.addHoliday).toHaveBeenCalledWith({ date: mondayStr });
+      expect(screen.getByTestId(`calendar-day-${mondayStr}`)).toHaveAttribute('data-day-type', 'holiday');
+    });
+
+    // Clicking the marked Monday again removes the holiday designation
+    fireEvent.click(screen.getByTestId(`calendar-day-${mondayStr}`));
+
+    await waitFor(() => {
+      expect(ticketService.removeHoliday).toHaveBeenCalledWith(mondayStr);
+      expect(screen.getByTestId(`calendar-day-${mondayStr}`)).toHaveAttribute('data-day-type', 'working');
+    });
+  });
+});
+
 

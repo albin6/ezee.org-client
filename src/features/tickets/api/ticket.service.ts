@@ -49,6 +49,14 @@ export interface MentionUser {
   teamName: string;
 }
 
+export interface EscalationHoliday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  description?: string | null;
+  createdBy?: string | null;
+  createdAt?: string;
+}
+
 export const ticketService = {
   getTickets: async (params: any) => {
     const { data } = await apiClient.get('/tickets', { params });
@@ -170,5 +178,21 @@ export const ticketService = {
       params: { type },
     });
     return data;
-  }
+  },
+
+  getHolidays: async (params?: { year?: number; month?: number }): Promise<EscalationHoliday[]> => {
+    const { data } = await apiClient.get('/tickets/holidays', { params });
+    return data.data || [];
+  },
+
+  addHoliday: async (payload: { date: string; description?: string }): Promise<EscalationHoliday> => {
+    const { data } = await apiClient.post('/tickets/holidays', payload);
+    return data.data;
+  },
+
+  removeHoliday: async (date: string): Promise<{ date: string; removed: boolean }> => {
+    const { data } = await apiClient.delete(`/tickets/holidays/${encodeURIComponent(date)}`);
+    return data.data;
+  },
 };
+

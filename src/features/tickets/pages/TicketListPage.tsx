@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Tag, Input, Select, DatePicker, Avatar, Modal, Tooltip, Pagination, Empty, Badge } from 'antd';
-import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -11,6 +11,7 @@ import { teamService } from '@/features/teams/api/team.service';
 import { ticketService } from '../api/ticket.service';
 import { useUserStore } from '@/features/users/store/user.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { HolidayCalendarModal } from '../components/HolidayCalendarModal';
 
 const STATUS_CONFIG: Record<string, {
   label: string;
@@ -193,6 +194,7 @@ export const TicketListPage: React.FC = () => {
   const [teams, setTeams] = useState<any[]>([]);
   const { users, fetchUsers } = useUserStore();
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTickets({ ...params, searchMode });
@@ -562,6 +564,16 @@ export const TicketListPage: React.FC = () => {
               loading={loading}
               title="Refresh tickets"
             />
+            {isSuperAdmin && (
+              <Button
+                icon={<CalendarOutlined />}
+                onClick={() => setIsHolidayModalOpen(true)}
+                data-testid="manage-holidays-btn"
+                className="font-medium text-amber-700 border-amber-300 bg-amber-50/70 hover:!bg-amber-100 hover:!border-amber-400 hover:!text-amber-800"
+              >
+                Manage Holidays
+              </Button>
+            )}
             {hasPermission('tickets:create') && !isSuperAdmin && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/tickets/new')}>
                 Create Ticket
@@ -850,6 +862,13 @@ export const TicketListPage: React.FC = () => {
           <FilterControls isMobile={true} />
         </div>
       </Modal>
+
+      {isSuperAdmin && (
+        <HolidayCalendarModal
+          open={isHolidayModalOpen}
+          onClose={() => setIsHolidayModalOpen(false)}
+        />
+      )}
     </PageContainer>
   );
 };
