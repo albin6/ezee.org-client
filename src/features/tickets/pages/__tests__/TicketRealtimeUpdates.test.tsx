@@ -363,6 +363,8 @@ describe('Tickets & Issues Module — Real-Time Updates', () => {
       description: 'Desc',
       status: 'OPEN',
       priority: 'LOW',
+      teamId: 'team-1',
+      createdById: 'u-1',
       createdAt: '2026-10-11T08:00:00Z',
       updatedAt: '2026-10-11T09:00:00Z',
       version: 3,
