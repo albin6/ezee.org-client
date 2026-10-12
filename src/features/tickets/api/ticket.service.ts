@@ -60,7 +60,21 @@ export interface EscalationHoliday {
   createdAt?: string;
 }
 
+export interface TicketDashboardFilters {
+  scope?: 'my_overview' | 'group_overview' | 'my_tickets' | 'my_group';
+  period?: 'today' | 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'custom' | 'all';
+  startDate?: string;
+  endDate?: string;
+  teamId?: string;
+  memberId?: string;
+}
+
 export const ticketService = {
+  getDashboardMetrics: async (params?: TicketDashboardFilters): Promise<any> => {
+    const { data } = await apiClient.get('/tickets/dashboard', { params });
+    return data?.data ?? data;
+  },
+
   getTickets: async (params: any) => {
     const { data } = await apiClient.get('/tickets', { params });
     return data;

@@ -243,7 +243,7 @@ describe('TicketDetailsPage - Closing Ticket Confirmation', () => {
     // 3. Click Pause button: transitions to Paused state
     fireEvent.click(pauseButton);
     await waitFor(() => {
-      expect(screen.getByText(/Paused/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Paused$/i)).toBeInTheDocument();
     });
     const resumeButton = screen.getByTitle(/Resume recording/i);
     expect(resumeButton).toBeInTheDocument();

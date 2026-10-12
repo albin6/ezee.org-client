@@ -36,6 +36,7 @@ vi.mock('../../api/ticket.service', () => ({
     getHolidayDates: vi.fn(),
     extendEscalationTime: vi.fn(),
     getUsersMentionLookup: vi.fn(),
+    getDashboardMetrics: vi.fn(),
   },
 }));
 
@@ -86,6 +87,40 @@ describe('Tickets & Issues Module Enhancements (Dashboard Subtab, Extend Escalat
     (ticketService.getMyGroupMembers as any).mockResolvedValue([]);
     (ticketService.getHolidayDates as any).mockResolvedValue([]);
     (ticketService.getUsersMentionLookup as any).mockResolvedValue([]);
+    (ticketService.getDashboardMetrics as any).mockResolvedValue({
+      scope: 'my_overview',
+      canViewGroupOverview: false,
+      period: {
+        preset: 'this_month',
+        startDate: '2026-10-01T00:00:00.000Z',
+        endDate: '2026-10-12T12:00:00.000Z',
+        label: 'This Month',
+      },
+      summary: {
+        totalTickets: 0,
+        openTickets: 0,
+        inProgressTickets: 0,
+        pendingTickets: 0,
+        resolvedOrClosedTickets: 0,
+        escalatedTickets: 0,
+        overdueTickets: 0,
+        awaitingActionTickets: 0,
+      },
+      statusDistribution: [],
+      resolutionPerformance: {
+        avgResolutionTimeMs: null,
+        avgResolutionTimeFormatted: 'N/A',
+        avgBusinessResolutionTimeMs: null,
+        avgBusinessResolutionTimeFormatted: 'N/A',
+        totalResolved: 0,
+        resolutionRate: 0,
+        escalationCount: 0,
+        escalationRate: 0,
+        overdueCount: 0,
+        trend: [],
+      },
+      groupInsights: null,
+    });
 
     useTicketStore.setState({
       tickets: [],
@@ -97,8 +132,8 @@ describe('Tickets & Issues Module Enhancements (Dashboard Subtab, Extend Escalat
     });
   });
 
-  describe('1. Dashboard Subtab Placeholder', () => {
-    it('renders the Tickets & Issues Dashboard subtab placeholder cleanly without unrequested metrics', () => {
+  describe('1. Dashboard Subtab', () => {
+    it('renders the Tickets & Issues Dashboard subtab cleanly', async () => {
       render(
         <MemoryRouter initialEntries={['/tickets/dashboard']}>
           <Routes>
@@ -107,7 +142,9 @@ describe('Tickets & Issues Module Enhancements (Dashboard Subtab, Extend Escalat
         </MemoryRouter>
       );
 
-      expect(screen.getByTestId('tickets-dashboard-placeholder')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByTestId('tickets-dashboard-page')).toBeInTheDocument();
+      });
       expect(screen.getByText('Tickets & Issues Dashboard')).toBeInTheDocument();
     });
   });
