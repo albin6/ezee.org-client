@@ -19,6 +19,14 @@ export interface Task {
   updatedAt?: string;
 }
 
+export interface TaskDashboardFilters {
+  teamId?: string;
+  startDate?: string;
+  endDate?: string;
+  scope?: 'my_tasks' | 'my_group';
+  memberId?: string;
+}
+
 export const taskApi = {
   createTask: async (data: any) => {
     const response = await api.post('/tasks', data);
@@ -40,8 +48,13 @@ export const taskApi = {
     return response.data;
   },
 
-  getDashboardMetrics: async (params: any) => {
+  getDashboardMetrics: async (params: TaskDashboardFilters = {}) => {
     const response = await api.get('/tasks/dashboard', { params });
+    return response.data.data;
+  },
+
+  getMyGroupMembers: async () => {
+    const response = await api.get('/tasks/my-group-members');
     return response.data.data;
   },
 
@@ -54,3 +67,4 @@ export const taskApi = {
     return response.data;
   }
 };
+

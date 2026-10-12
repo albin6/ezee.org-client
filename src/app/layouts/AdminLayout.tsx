@@ -40,7 +40,8 @@ const getRouteMeta = (pathname: string): { title: string; category?: string } =>
   if (pathname.startsWith('/teams/')) return { title: 'Team Details', category: 'Organization' };
   if (pathname === '/tasks') return { title: 'Task Management', category: 'Operations' };
   if (pathname === '/tasks/dashboard') return { title: 'Task Analytics', category: 'Operations' };
-  if (pathname === '/tickets') return { title: 'Tickets & Issues', category: 'Support' };
+  if (pathname === '/tickets/dashboard') return { title: 'Tickets Dashboard', category: 'Support' };
+  if (pathname === '/tickets' || pathname === '/tickets/list') return { title: 'Tickets & Issues', category: 'Support' };
   if (pathname === '/tickets/new') return { title: 'Create Ticket', category: 'Support' };
   if (pathname.startsWith('/tickets/')) return { title: 'Ticket Details', category: 'Support' };
   if (pathname === '/batches') return { title: 'Batches', category: 'Foundation' };
@@ -308,15 +309,29 @@ export const AdminLayout: React.FC = () => {
 
     if (hasPermission('tickets:read')) {
       menuItems.push({
-      key: '/tickets',
-      icon: <BugOutlined />,
-      label: 'Tickets & Issues',
-      onClick: () => {
-        navigate('/tickets');
-        setMobileMenuOpen(false);
-      },
-    });
-  }
+        key: 'tickets_management',
+        icon: <BugOutlined />,
+        label: 'Tickets & Issues',
+        children: [
+          {
+            key: '/tickets/dashboard',
+            label: 'Dashboard',
+            onClick: () => {
+              navigate('/tickets/dashboard');
+              setMobileMenuOpen(false);
+            },
+          },
+          {
+            key: '/tickets',
+            label: 'Tickets',
+            onClick: () => {
+              navigate('/tickets');
+              setMobileMenuOpen(false);
+            },
+          },
+        ],
+      });
+    }
 
     if (hasPermission('tasks:read')) {
       menuItems.push({
@@ -420,6 +435,12 @@ export const AdminLayout: React.FC = () => {
     </div>
   );
 
+  const activeMenuKey =
+    location.pathname === '/tickets/list' ||
+    (location.pathname.startsWith('/tickets/') && location.pathname !== '/tickets/dashboard')
+      ? '/tickets'
+      : location.pathname;
+
   return (
     <Layout hasSider className="h-[100dvh] w-full bg-gray-50 overflow-hidden">
       {/* Desktop Sidebar */}
@@ -438,7 +459,7 @@ export const AdminLayout: React.FC = () => {
               theme="dark"
               mode="inline"
               inlineCollapsed={collapsed}
-              selectedKeys={[location.pathname]}
+              selectedKeys={[activeMenuKey]}
               items={menuItems}
               className="bg-gray-900 border-none pt-2"
             />
@@ -519,7 +540,7 @@ export const AdminLayout: React.FC = () => {
             <Menu
               theme="dark"
               mode="inline"
-              selectedKeys={[location.pathname]}
+              selectedKeys={[activeMenuKey]}
               items={menuItems}
               className="bg-gray-900 border-none"
             />

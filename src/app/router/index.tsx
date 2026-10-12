@@ -19,6 +19,7 @@ import { TeamsPage } from '@/features/teams/pages/TeamsPage';
 import { TeamDetailsPage } from '@/features/teams/pages/TeamDetailsPage';
 import { UsersPage } from '@/features/users/pages/UsersPage';
 import { TicketListPage } from '@/features/tickets/pages/TicketListPage';
+import { TicketDashboardPage } from '@/features/tickets/pages/TicketDashboardPage';
 import { TicketDetailsPage } from '@/features/tickets/pages/TicketDetailsPage';
 import { CreateTicketPage } from '@/features/tickets/pages/CreateTicketPage';
 import { TaskListPage } from '@/features/tasks/pages/TaskListPage';
@@ -116,7 +117,15 @@ export const router = createBrowserRouter([
             element: <TaskListPage />,
           },
           {
+            path: '/tickets/dashboard',
+            element: <TicketDashboardPage />,
+          },
+          {
             path: '/tickets',
+            element: <TicketListPage />,
+          },
+          {
+            path: '/tickets/list',
             element: <TicketListPage />,
           },
           {

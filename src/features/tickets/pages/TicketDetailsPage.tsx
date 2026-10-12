@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, message as antMessage } from 'antd';
+import { Card, Tag, Button, Space, Divider, Typography, Avatar, Select, Modal, Popover, Image, Drawer, Input, message as antMessage } from 'antd';
 import {
   UserOutlined,
   SendOutlined,
@@ -26,7 +26,9 @@ import {
   FilePdfOutlined,
   FileWordOutlined,
   CustomerServiceOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { useTicketStore } from '../store/ticket.store';
 import { ticketService, type MentionUser } from '../api/ticket.service';
@@ -38,6 +40,7 @@ import { FormattedMessageContent } from '@/shared/utils/linkify';
 import { compressImage } from '@/shared/utils/imageCompressor';
 import { AudioPreviewPlayer } from '../components/AudioPreviewPlayer';
 import { AttachmentPreviewList, formatFileSize } from '../components/AttachmentPreviewList';
+import { computeTicketEscalationTiming, canUserExtendTicketEscalation } from '../utils/escalation-time.util';
 import EmojiPicker from 'emoji-picker-react';
 
 const { Title, Text, Paragraph } = Typography;
@@ -64,13 +67,34 @@ const AIInsightsPanel = React.memo(({ summary, confidence }: { summary: string; 
 export const TicketDetailsPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentTicket: ticket, loading, fetchTicket, addMessage, updateStatus, joinTicketRoom, leaveTicketRoom, toggleReaction, addAssignee, editMessage, deleteMessage } = useTicketStore();
+  const {
+    currentTicket: ticket,
+    loading,
+    holidayDates,
+    fetchTicket,
+    fetchHolidayDates,
+    extendEscalationTime,
+    addMessage,
+    updateStatus,
+    joinTicketRoom,
+    leaveTicketRoom,
+    toggleReaction,
+    addAssignee,
+    editMessage,
+    deleteMessage,
+  } = useTicketStore();
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
   const [message, setMessage] = useState('');
   const [showResolvePrompt, setShowResolvePrompt] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string, name: string, content: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
+
+  // Escalation Time Extension State
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+  const [extendMinutes, setExtendMinutes] = useState<number>(60);
+  const [extendReason, setExtendReason] = useState<string>('');
+  const [isExtendingEscalation, setIsExtendingEscalation] = useState(false);
 
   // Message Edit & Delete State
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -80,13 +104,19 @@ export const TicketDetailsPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
-  // 10-second tick interval to dynamically refresh 7-minute eligibility
+  // 10-second tick interval to dynamically refresh 7-minute eligibility and escalation countdown
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
     }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (typeof fetchHolidayDates === 'function') {
+      fetchHolidayDates();
+    }
+  }, [fetchHolidayDates]);
 
   const isWithin7Minutes = useCallback((createdAt: string) => {
     if (!createdAt) return false;
@@ -724,6 +754,65 @@ export const TicketDetailsPage: React.FC = () => {
   const isAdmin = authUser?.role?.name === 'Super Admin' || authUser?.type === 'super_admin';
   const canAddAssignee = Boolean(isCreator || isAssignee || isAdmin);
   const canEditStatus = Boolean(isAssignee || isAdmin || isCreator);
+  const canExtendEscalation = Boolean(canUserExtendTicketEscalation(ticket, authUserId));
+
+  const escalationTiming = useMemo(
+    () => computeTicketEscalationTiming(ticket, new Date(currentTime), 'Asia/Kolkata', holidayDates),
+    [ticket, currentTime, holidayDates]
+  );
+
+  const projectedExtensionTiming = useMemo(() => {
+    if (!ticket || !escalationTiming.isApplicable) return null;
+    const validAddMins = Math.max(1, Math.min(43200, Math.floor(Number(extendMinutes) || 0)));
+    const currentExtended = Number(ticket.escalationExtendedMinutes || 0);
+    // Match backend behavior: if already overdue, extend relative to elapsed + validAddMins
+    const elapsedTotalMs = escalationTiming.thresholdMs - escalationTiming.remainingMs;
+    const effectiveNewExtended = escalationTiming.isOverdue
+      ? Math.max(
+          currentExtended + validAddMins,
+          Math.ceil(Math.max(0, elapsedTotalMs - 2 * 60 * 60 * 1000) / (60 * 1000)) + validAddMins
+        )
+      : currentExtended + validAddMins;
+
+    return computeTicketEscalationTiming(
+      { ...ticket, escalationExtendedMinutes: effectiveNewExtended },
+      new Date(currentTime),
+      'Asia/Kolkata',
+      holidayDates
+    );
+  }, [ticket, escalationTiming, extendMinutes, currentTime, holidayDates]);
+
+  const handleConfirmExtendEscalation = async () => {
+    if (!id || !ticket) return;
+    const mins = Math.floor(Number(extendMinutes));
+    if (!Number.isFinite(mins) || mins <= 0 || mins > 43200) {
+      antMessage.warning('Please enter a valid extension duration between 1 and 43200 minutes.');
+      return;
+    }
+
+    try {
+      setIsExtendingEscalation(true);
+      const trimmedReason = extendReason.trim() || undefined;
+      if (typeof extendEscalationTime === 'function') {
+        await extendEscalationTime(id, mins, trimmedReason);
+      } else {
+        await ticketService.extendEscalationTime(id, {
+          additionalMinutes: mins,
+          reason: trimmedReason,
+        });
+        await fetchTicket(id);
+      }
+      antMessage.success('Escalation time extended successfully');
+      setIsExtendModalOpen(false);
+      setExtendReason('');
+    } catch (err: any) {
+      antMessage.error(
+        err?.response?.data?.message || err?.message || 'Failed to extend escalation time'
+      );
+    } finally {
+      setIsExtendingEscalation(false);
+    }
+  };
 
   // Check if a user is already an associated participant (creator or assignee)
   const isParticipant = (userId: string) => {
@@ -1654,6 +1743,74 @@ export const TicketDetailsPage: React.FC = () => {
                 <Text>{ticket.team?.name || 'N/A'}</Text>
               </div>
 
+              {escalationTiming.isApplicable && (
+                <>
+                  <Divider />
+                  <div
+                    data-testid="ticket-details-escalation-section"
+                    className="p-3 rounded-lg border border-gray-200 bg-gray-50/70 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                        <ClockCircleOutlined className="text-indigo-600" />
+                        Escalation Timer
+                      </span>
+                      {escalationTiming.extendedMinutes > 0 && (
+                        <Tag color="blue" className="!m-0 text-[10px]">
+                          +{escalationTiming.extendedMinutes}m extended
+                        </Tag>
+                      )}
+                    </div>
+
+                    <div
+                      data-testid="ticket-details-escalation-remaining"
+                      className={`text-sm font-semibold ${
+                        escalationTiming.isOverdue
+                          ? 'text-red-600'
+                          : escalationTiming.isPaused
+                          ? 'text-slate-700'
+                          : escalationTiming.remainingMs <= 30 * 60 * 1000
+                          ? 'text-amber-600'
+                          : 'text-indigo-700'
+                      }`}
+                    >
+                      {escalationTiming.formattedRemaining}
+                    </div>
+
+                    {escalationTiming.deadlineAt && (
+                      <div className="text-xs text-gray-500">
+                        <span className="font-medium text-gray-600">Escalation deadline: </span>
+                        <span data-testid="ticket-details-escalation-deadline">
+                          {dayjs(escalationTiming.deadlineAt).format('MMM D, YYYY h:mm A')}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="text-[11px] text-gray-400 leading-snug">
+                      Active hours: 10:30 AM – 6:30 PM (excl. Sundays &amp; holidays)
+                    </div>
+
+                    {canExtendEscalation && (
+                      <Button
+                        size="small"
+                        type="default"
+                        block
+                        icon={<ClockCircleOutlined />}
+                        data-testid="extend-escalation-btn"
+                        onClick={() => {
+                          setExtendMinutes(60);
+                          setExtendReason('');
+                          setIsExtendModalOpen(true);
+                        }}
+                        className="mt-1 font-medium text-indigo-700 border-indigo-300 bg-indigo-50/60 hover:!bg-indigo-100 hover:!border-indigo-400"
+                      >
+                        Extend Escalation Time
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+
               <Divider />
 
               <TicketAssigneesSection 
@@ -1664,6 +1821,112 @@ export const TicketDetailsPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Extend Escalation Time Modal (Assignee & Assignor only) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <ClockCircleOutlined className="text-indigo-600" />
+            <span>Extend Escalation Time</span>
+          </div>
+        }
+        open={isExtendModalOpen}
+        onCancel={() => !isExtendingEscalation && setIsExtendModalOpen(false)}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => setIsExtendModalOpen(false)}
+            disabled={isExtendingEscalation}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={isExtendingEscalation}
+            data-testid="confirm-extend-escalation-btn"
+            onClick={handleConfirmExtendEscalation}
+          >
+            Extend Time
+          </Button>,
+        ]}
+        centered
+        width={460}
+      >
+        <div data-testid="extend-escalation-modal" className="py-2 space-y-4">
+          <p className="text-xs text-gray-500 leading-relaxed mb-0">
+            Extend the active working-hour escalation window for this ticket. Escalation calculations
+            automatically respect working hours (10:30 AM – 6:30 PM), Sundays, and designated holidays.
+          </p>
+
+          <div>
+            <Text strong className="block text-xs text-gray-700 mb-2">
+              Quick Presets (Active Working Time)
+            </Text>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: '+30m', value: 30 },
+                { label: '+1h', value: 60 },
+                { label: '+2h', value: 120 },
+                { label: '+4h', value: 240 },
+                { label: '+1 Day (8h)', value: 480 },
+              ].map((preset) => (
+                <Button
+                  key={preset.value}
+                  size="small"
+                  type={extendMinutes === preset.value ? 'primary' : 'default'}
+                  data-testid={`extend-preset-${preset.value}`}
+                  onClick={() => setExtendMinutes(preset.value)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Text strong className="block text-xs text-gray-700 mb-1">
+              Additional Minutes (1 – 43,200)
+            </Text>
+            <Input
+              type="number"
+              min={1}
+              max={43200}
+              value={extendMinutes}
+              data-testid="extend-escalation-minutes-input"
+              onChange={(e) => setExtendMinutes(parseInt(e.target.value || '0', 10))}
+              suffix="minutes"
+            />
+          </div>
+
+          <div>
+            <Text strong className="block text-xs text-gray-700 mb-1">
+              Reason (Optional)
+            </Text>
+            <Input.TextArea
+              rows={2}
+              maxLength={300}
+              placeholder="e.g. Waiting for vendor confirmation or scheduled maintenance window..."
+              value={extendReason}
+              data-testid="extend-escalation-reason-input"
+              onChange={(e) => setExtendReason(e.target.value)}
+            />
+          </div>
+
+          {projectedExtensionTiming && projectedExtensionTiming.deadlineAt && (
+            <div className="p-3 rounded-lg bg-indigo-50/70 border border-indigo-200 text-xs space-y-1">
+              <div className="font-semibold text-indigo-900">
+                New Projected Escalation Deadline:
+              </div>
+              <div className="text-indigo-700 font-medium" data-testid="projected-escalation-deadline">
+                {dayjs(projectedExtensionTiming.deadlineAt).format('MMM D, YYYY h:mm A')} (
+                {projectedExtensionTiming.shortRemaining})
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
       <Modal
         title="Ticket is Resolved"
         open={showResolvePrompt}
@@ -1907,6 +2170,64 @@ export const TicketDetailsPage: React.FC = () => {
               <Text type="secondary" className="block mb-1">Team</Text>
               <Text>{ticket.team?.name || 'N/A'}</Text>
             </div>
+
+            {escalationTiming.isApplicable && (
+              <>
+                <Divider />
+                <div className="p-3 rounded-lg border border-gray-200 bg-gray-50/70 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <ClockCircleOutlined className="text-indigo-600" />
+                      Escalation Timer
+                    </span>
+                    {escalationTiming.extendedMinutes > 0 && (
+                      <Tag color="blue" className="!m-0 text-[10px]">
+                        +{escalationTiming.extendedMinutes}m extended
+                      </Tag>
+                    )}
+                  </div>
+
+                  <div
+                    className={`text-sm font-semibold ${
+                      escalationTiming.isOverdue
+                        ? 'text-red-600'
+                        : escalationTiming.isPaused
+                        ? 'text-slate-700'
+                        : escalationTiming.remainingMs <= 30 * 60 * 1000
+                        ? 'text-amber-600'
+                        : 'text-indigo-700'
+                    }`}
+                  >
+                    {escalationTiming.formattedRemaining}
+                  </div>
+
+                  {escalationTiming.deadlineAt && (
+                    <div className="text-xs text-gray-500">
+                      <span className="font-medium text-gray-600">Escalation deadline: </span>
+                      <span>{dayjs(escalationTiming.deadlineAt).format('MMM D, YYYY h:mm A')}</span>
+                    </div>
+                  )}
+
+                  {canExtendEscalation && (
+                    <Button
+                      size="small"
+                      type="default"
+                      block
+                      icon={<ClockCircleOutlined />}
+                      onClick={() => {
+                        setMobileDrawerOpen(false);
+                        setExtendMinutes(60);
+                        setExtendReason('');
+                        setIsExtendModalOpen(true);
+                      }}
+                      className="mt-1 font-medium text-indigo-700 border-indigo-300 bg-indigo-50/60"
+                    >
+                      Extend Escalation Time
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
 
             <Divider />
 

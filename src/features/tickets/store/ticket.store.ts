@@ -223,11 +223,14 @@ interface TicketState {
   currentTicket: Ticket | null;
   activeListParams: any;
   myGroupMembers: any[];
+  holidayDates: string[];
   setActiveListParams: (params: any) => void;
   setMyGroupMembers: (members: any[]) => void;
+  fetchHolidayDates: () => Promise<string[]>;
   fetchTickets: (params?: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
   markTicketAsRead: (id: string, currentUserId?: string) => Promise<void>;
+  extendEscalationTime: (ticketId: string, additionalMinutes: number, reason?: string) => Promise<any>;
   createTicket: (payload: { 
     title: string; 
     description?: string; 
@@ -274,6 +277,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     unread: false,
   },
   myGroupMembers: [],
+  holidayDates: [],
 
   setActiveListParams: (params) => {
     set({ activeListParams: params });
@@ -281,6 +285,20 @@ export const useTicketStore = create<TicketState>((set, get) => ({
 
   setMyGroupMembers: (members) => {
     set({ myGroupMembers: Array.isArray(members) ? members : [] });
+  },
+
+  fetchHolidayDates: async () => {
+    try {
+      if (typeof ticketService.getHolidayDates === 'function') {
+        const dates = await ticketService.getHolidayDates();
+        const normalized = Array.isArray(dates) ? dates : [];
+        set({ holidayDates: normalized });
+        return normalized;
+      }
+    } catch {
+      // Fallback safely to current holidayDates if endpoint is unreachable
+    }
+    return get().holidayDates;
   },
 
   fetchTickets: async (params) => {
@@ -355,6 +373,29 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     } catch {
       // Non-blocking: getTicket on the details page also marks the ticket as read
     }
+  },
+
+  extendEscalationTime: async (ticketId, additionalMinutes, reason) => {
+    const res = await ticketService.extendEscalationTime(ticketId, {
+      additionalMinutes,
+      reason,
+    });
+    const updatedTicket = res?.data;
+    if (updatedTicket) {
+      const ct = get().currentTicket;
+      if (ct && ct.id === ticketId) {
+        set({
+          currentTicket: {
+            ...ct,
+            ...updatedTicket,
+            messages:
+              updatedTicket.messages !== undefined ? updatedTicket.messages : ct.messages,
+          },
+        });
+      }
+      get().handleTicketUpdatedRealtime(updatedTicket);
+    }
+    return updatedTicket;
   },
 
   createTicket: async (payload) => {

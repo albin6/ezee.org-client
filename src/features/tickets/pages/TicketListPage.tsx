@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Tag, Input, Select, DatePicker, Avatar, Modal, Tooltip, Pagination, Empty, Badge } from 'antd';
-import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, FilterOutlined, AlertOutlined, ReloadOutlined, CloseCircleOutlined, CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { PageContainer } from '@/shared/components/PageContainer';
@@ -17,6 +17,7 @@ import { useUserStore } from '@/features/users/store/user.store';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { HolidayCalendarModal } from '../components/HolidayCalendarModal';
 import { socketService } from '@/shared/services/socket.service';
+import { computeTicketEscalationTiming } from '../utils/escalation-time.util';
 
 const STATUS_CONFIG: Record<string, {
   label: string;
@@ -89,7 +90,9 @@ export const TicketListPage: React.FC = () => {
     tickets,
     loading,
     total,
+    holidayDates,
     fetchTickets,
+    fetchHolidayDates,
     setActiveListParams,
     setMyGroupMembers: setStoreMyGroupMembers,
     handleTicketCreatedRealtime,
@@ -101,7 +104,7 @@ export const TicketListPage: React.FC = () => {
   const currentUserId = (user as any)?.id || (user as any)?.sub;
   const isSuperAdmin = (user as any)?.role?.name === 'Super Admin' || (user as any)?.type === 'super_admin';
 
-  // Live clock tick so 30-minute "New / Unread" tags and top-of-list promotions expire automatically without reload
+  // Live clock tick so 30-minute "New / Unread" tags, top-of-list promotions, and escalation countdowns update automatically
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => {
@@ -109,6 +112,12 @@ export const TicketListPage: React.FC = () => {
     }, 10_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (typeof fetchHolidayDates === 'function') {
+      fetchHolidayDates();
+    }
+  }, [fetchHolidayDates]);
 
   const [searchMode, setSearchMode] = useState<'semantic' | 'keyword'>(() => {
     if (searchParams.has('searchMode')) {
@@ -832,6 +841,12 @@ export const TicketListPage: React.FC = () => {
               const config = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.OPEN;
               const slaStatus = getTicketSLAStatus(ticket);
               const isNewlyAssigned = isTicketNewlyAssignedForUser(ticket, currentUserId, nowMs);
+              const escalationTiming = computeTicketEscalationTiming(
+                ticket,
+                new Date(nowMs),
+                'Asia/Kolkata',
+                holidayDates
+              );
 
               return (
                 <div
@@ -911,9 +926,59 @@ export const TicketListPage: React.FC = () => {
 
                     {/* Optional Team / Creator Context */}
                     {(ticket.team?.name || ticket.createdBy?.name) && (
-                      <p className="text-xs text-gray-500 truncate mb-3">
+                      <p className="text-xs text-gray-500 truncate mb-2">
                         {ticket.team?.name ? `${ticket.team.name} • ` : ''}By {ticket.createdBy?.name || 'Unknown'}
                       </p>
+                    )}
+
+                    {/* Escalation Time Remaining Pill */}
+                    {escalationTiming.isApplicable && (
+                      <div className="mb-2">
+                        <Tooltip
+                          title={
+                            <div className="text-xs space-y-0.5">
+                              <div className="font-semibold">{escalationTiming.formattedRemaining}</div>
+                              {escalationTiming.deadlineAt && (
+                                <div>
+                                  Escalation deadline:{' '}
+                                  {dayjs(escalationTiming.deadlineAt).format('MMM D, YYYY h:mm A')}
+                                </div>
+                              )}
+                              {escalationTiming.extendedMinutes > 0 && (
+                                <div>Extended by +{escalationTiming.extendedMinutes}m</div>
+                              )}
+                              <div className="opacity-80">
+                                Active hours: 10:30 AM – 6:30 PM (excl. Sundays &amp; holidays)
+                              </div>
+                            </div>
+                          }
+                        >
+                          <span
+                            data-testid={`escalation-remaining-${ticket.id}`}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                              escalationTiming.isOverdue
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : escalationTiming.isPaused
+                                ? 'bg-slate-50 text-slate-600 border-slate-200'
+                                : escalationTiming.remainingMs <= 30 * 60 * 1000
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-indigo-50/70 text-indigo-700 border-indigo-200'
+                            }`}
+                          >
+                            <ClockCircleOutlined className="text-[10px]" />
+                            <span>
+                              {escalationTiming.isOverdue
+                                ? escalationTiming.shortRemaining
+                                : `Escalates in ${escalationTiming.shortRemaining}`}
+                            </span>
+                            {escalationTiming.extendedMinutes > 0 && (
+                              <span className="text-[10px] opacity-80 font-semibold">
+                                (+{escalationTiming.extendedMinutes}m)
+                              </span>
+                            )}
+                          </span>
+                        </Tooltip>
+                      </div>
                     )}
                   </div>
 
@@ -1026,7 +1091,12 @@ export const TicketListPage: React.FC = () => {
       {isSuperAdmin && (
         <HolidayCalendarModal
           open={isHolidayModalOpen}
-          onClose={() => setIsHolidayModalOpen(false)}
+          onClose={() => {
+            setIsHolidayModalOpen(false);
+            if (typeof fetchHolidayDates === 'function') {
+              fetchHolidayDates();
+            }
+          }}
         />
       )}
     </PageContainer>

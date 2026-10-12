@@ -15,6 +15,9 @@ export interface Ticket {
   inProgressAt?: string;
   lastEscalatedAt?: string;
   escalationLevel?: number;
+  escalationExtendedMinutes?: number;
+  escalationDeadlineAt?: string;
+  escalationRemainingMs?: number;
   aiSummary?: string;
   aiConfidence?: number;
   createdBy?: { id: string; name: string; email: string };
@@ -188,6 +191,19 @@ export const ticketService = {
   getHolidays: async (params?: { year?: number; month?: number }): Promise<EscalationHoliday[]> => {
     const { data } = await apiClient.get('/tickets/holidays', { params });
     return data.data || [];
+  },
+
+  getHolidayDates: async (): Promise<string[]> => {
+    const { data } = await apiClient.get('/tickets/holiday-dates');
+    return Array.isArray(data?.data) ? data.data : [];
+  },
+
+  extendEscalationTime: async (
+    ticketId: string,
+    payload: { additionalMinutes: number; reason?: string }
+  ) => {
+    const { data } = await apiClient.post(`/tickets/${ticketId}/extend-escalation`, payload);
+    return data;
   },
 
   addHoliday: async (payload: { date: string; description?: string }): Promise<EscalationHoliday> => {
