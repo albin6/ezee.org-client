@@ -19,7 +19,7 @@ export interface Ticket {
   aiConfidence?: number;
   createdBy?: { id: string; name: string; email: string };
   team?: { id: string; name: string };
-  assignees?: { userId?: string; createdAt?: string; user: { id: string; name: string; email: string } }[];
+  assignees?: { userId?: string; createdAt?: string; readAt?: string | null; user: { id: string; name: string; email: string } }[];
   messages?: { 
     id: string; 
     content: string; 
@@ -65,6 +65,11 @@ export const ticketService = {
 
   getTicket: async (id: string) => {
     const { data } = await apiClient.get(`/tickets/${id}`);
+    return data;
+  },
+
+  markTicketAsRead: async (id: string) => {
+    const { data } = await apiClient.patch(`/tickets/${id}/read`);
     return data;
   },
 

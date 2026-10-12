@@ -11,6 +11,35 @@ const PRIORITY_WEIGHT: Record<string, number> = {
   LOW: 1,
 };
 
+export const NEW_ASSIGNMENT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+export function getUserAssignmentForTicket(
+  ticket: Ticket,
+  userId?: string
+): { userId?: string; createdAt?: string; readAt?: string | null; user?: any } | undefined {
+  if (!ticket || !userId || !Array.isArray(ticket.assignees)) return undefined;
+  return ticket.assignees.find((a: any) => (a?.userId || a?.user?.id) === userId);
+}
+
+export function isTicketUnreadForUser(ticket: Ticket, userId?: string): boolean {
+  const assignment = getUserAssignmentForTicket(ticket, userId);
+  if (!assignment) return false;
+  return !assignment.readAt;
+}
+
+export function isTicketNewlyAssignedForUser(
+  ticket: Ticket,
+  userId?: string,
+  nowMs: number = Date.now()
+): boolean {
+  const assignment = getUserAssignmentForTicket(ticket, userId);
+  if (!assignment || assignment.readAt || !assignment.createdAt) return false;
+  const assignedAtMs = new Date(assignment.createdAt).getTime();
+  if (Number.isNaN(assignedAtMs)) return false;
+  const elapsedMs = nowMs - assignedAtMs;
+  return elapsedMs >= -60_000 && elapsedMs < NEW_ASSIGNMENT_WINDOW_MS;
+}
+
 export function isStaleTicketEvent(existing: Ticket, incoming: Partial<Ticket>): boolean {
   if (!existing || !incoming) return false;
   if (typeof existing.version === 'number' && typeof incoming.version === 'number') {
@@ -36,8 +65,9 @@ export function doesTicketMatchListParams(
   if (!ticket || !ticket.id) return false;
   const activeParams = params || {};
 
-  const myGroup = Boolean(activeParams.myGroup);
-  const myTickets = myGroup
+  const unread = Boolean(activeParams.unread);
+  const myGroup = unread ? false : Boolean(activeParams.myGroup);
+  const myTickets = (unread || myGroup)
     ? false
     : activeParams.myTickets !== undefined
     ? Boolean(activeParams.myTickets)
@@ -50,7 +80,11 @@ export function doesTicketMatchListParams(
         .filter((id: any): id is string => Boolean(id))
     : [];
 
-  if (myGroup) {
+  if (unread) {
+    if (!currentUserId || !isTicketUnreadForUser(ticket, currentUserId)) {
+      return false;
+    }
+  } else if (myGroup) {
     if (!Array.isArray(myGroupMembers) || myGroupMembers.length === 0) {
       return false;
     }
@@ -140,11 +174,24 @@ export function doesTicketMatchListParams(
   return true;
 }
 
-export function sortTicketsList(tickets: Ticket[], params?: any): Ticket[] {
+export function sortTicketsList(
+  tickets: Ticket[],
+  params?: any,
+  currentUserId?: string,
+  nowMs: number = Date.now()
+): Ticket[] {
   const sortBy = params?.sortBy || 'priority';
   const sortOrder = params?.sortOrder || 'desc';
 
   return [...tickets].sort((a, b) => {
+    if (currentUserId) {
+      const aNew = isTicketNewlyAssignedForUser(a, currentUserId, nowMs) ? 1 : 0;
+      const bNew = isTicketNewlyAssignedForUser(b, currentUserId, nowMs) ? 1 : 0;
+      if (aNew !== bNew) {
+        return bNew - aNew;
+      }
+    }
+
     if (sortBy === 'priority') {
       const weightA = PRIORITY_WEIGHT[a.priority] ?? 0;
       const weightB = PRIORITY_WEIGHT[b.priority] ?? 0;
@@ -180,6 +227,7 @@ interface TicketState {
   setMyGroupMembers: (members: any[]) => void;
   fetchTickets: (params?: any) => Promise<void>;
   fetchTicket: (id: string) => Promise<void>;
+  markTicketAsRead: (id: string, currentUserId?: string) => Promise<void>;
   createTicket: (payload: { 
     title: string; 
     description?: string; 
@@ -223,6 +271,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     sortOrder: 'desc',
     myTickets: true,
     myGroup: false,
+    unread: false,
   },
   myGroupMembers: [],
 
@@ -252,9 +301,59 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const response = await ticketService.getTicket(id);
-      set({ currentTicket: response.data, loading: false });
+      const fetchedTicket = response.data;
+      set((state) => {
+        const updatedTickets = state.tickets.map((t) =>
+          t.id === id && fetchedTicket?.assignees
+            ? { ...t, assignees: fetchedTicket.assignees }
+            : t
+        );
+        return {
+          currentTicket: fetchedTicket,
+          tickets: updatedTickets,
+          loading: false,
+        };
+      });
     } catch (error: any) {
       set({ error: error.message || 'Failed to fetch ticket', loading: false });
+    }
+  },
+
+  markTicketAsRead: async (id, currentUserId) => {
+    const readAtIso = new Date().toISOString();
+    // Optimistically update local ticket state for this user
+    if (currentUserId) {
+      const { tickets, total, activeListParams } = get();
+      const target = tickets.find((t) => t.id === id);
+      if (target && Array.isArray(target.assignees)) {
+        const updatedAssignees = target.assignees.map((a: any) =>
+          (a?.userId || a?.user?.id) === currentUserId
+            ? { ...a, readAt: a.readAt || readAtIso }
+            : a
+        );
+        const updatedTicket = { ...target, assignees: updatedAssignees };
+        if (activeListParams?.unread) {
+          set({
+            tickets: tickets.filter((t) => t.id !== id),
+            total: Math.max(0, total - 1),
+          });
+        } else {
+          set({
+            tickets: sortTicketsList(
+              tickets.map((t) => (t.id === id ? updatedTicket : t)),
+              activeListParams,
+              currentUserId
+            ),
+          });
+        }
+      }
+    }
+    try {
+      if (typeof ticketService.markTicketAsRead === 'function') {
+        await ticketService.markTicketAsRead(id);
+      }
+    } catch {
+      // Non-blocking: getTicket on the details page also marks the ticket as read
     }
   },
 
@@ -500,7 +599,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
         idx === existingIndex ? { ...t, ...incomingTicket } : t
       );
       set({
-        tickets: sortTicketsList(merged, activeListParams),
+        tickets: sortTicketsList(merged, activeListParams, currentUserId),
       });
       return;
     }
@@ -511,7 +610,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     const limit = Number(activeListParams?.limit) || 12;
 
     if (page === 1) {
-      const nextTickets = sortTicketsList([incomingTicket, ...tickets], activeListParams).slice(
+      const nextTickets = sortTicketsList([incomingTicket, ...tickets], activeListParams, currentUserId).slice(
         0,
         limit
       );
@@ -561,7 +660,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
         idx === existingIndex ? mergedTicket : t
       );
       set({
-        tickets: sortTicketsList(updatedList, activeListParams),
+        tickets: sortTicketsList(updatedList, activeListParams, currentUserId),
       });
       return;
     }
@@ -570,7 +669,7 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       const page = Number(activeListParams?.page) || 1;
       const limit = Number(activeListParams?.limit) || 12;
       if (page === 1) {
-        const nextTickets = sortTicketsList([mergedTicket, ...tickets], activeListParams).slice(
+        const nextTickets = sortTicketsList([mergedTicket, ...tickets], activeListParams, currentUserId).slice(
           0,
           limit
         );

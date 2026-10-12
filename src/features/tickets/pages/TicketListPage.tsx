@@ -5,7 +5,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { PageContainer } from '@/shared/components/PageContainer';
 import { PageHeader } from '@/shared/components/PageHeader';
-import { useTicketStore } from '../store/ticket.store';
+import {
+  useTicketStore,
+  isTicketNewlyAssignedForUser,
+  sortTicketsList,
+} from '../store/ticket.store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { teamService } from '@/features/teams/api/team.service';
 import { ticketService } from '../api/ticket.service';
@@ -94,7 +98,17 @@ export const TicketListPage: React.FC = () => {
   const { user } = useAuthStore();
   const { hasPermission } = usePermissions();
 
+  const currentUserId = (user as any)?.id || (user as any)?.sub;
   const isSuperAdmin = (user as any)?.role?.name === 'Super Admin' || (user as any)?.type === 'super_admin';
+
+  // Live clock tick so 30-minute "New / Unread" tags and top-of-list promotions expire automatically without reload
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [searchMode, setSearchMode] = useState<'semantic' | 'keyword'>(() => {
     if (searchParams.has('searchMode')) {
@@ -113,8 +127,9 @@ export const TicketListPage: React.FC = () => {
   const [params, setParams] = useState<any>(() => {
     const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
     if (hasAnyUrlParam) {
-      const urlMyGroup = searchParams.get('myGroup') === 'true';
-      const urlMyTickets = urlMyGroup
+      const urlUnread = searchParams.get('unread') === 'true';
+      const urlMyGroup = !urlUnread && searchParams.get('myGroup') === 'true';
+      const urlMyTickets = (urlUnread || urlMyGroup)
         ? false
         : (searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true);
 
@@ -133,6 +148,7 @@ export const TicketListPage: React.FC = () => {
         sortOrder: searchParams.has('sortOrder') ? searchParams.get('sortOrder') || undefined : 'desc',
         myTickets: urlMyTickets,
         myGroup: urlMyGroup,
+        unread: urlUnread,
       };
     }
 
@@ -140,8 +156,9 @@ export const TicketListPage: React.FC = () => {
       const saved = sessionStorage.getItem(TICKET_FILTERS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const savedMyGroup = parsed.myGroup === true;
-        const savedMyTickets = savedMyGroup
+        const savedUnread = parsed.unread === true;
+        const savedMyGroup = !savedUnread && parsed.myGroup === true;
+        const savedMyTickets = (savedUnread || savedMyGroup)
           ? false
           : (parsed.myTickets !== undefined ? parsed.myTickets : true);
 
@@ -160,6 +177,7 @@ export const TicketListPage: React.FC = () => {
           sortOrder: parsed.sortOrder || 'desc',
           myTickets: savedMyTickets,
           myGroup: savedMyGroup,
+          unread: savedUnread,
         };
       }
     } catch {}
@@ -179,6 +197,7 @@ export const TicketListPage: React.FC = () => {
       sortOrder: 'desc',
       myTickets: true,
       myGroup: false,
+      unread: false,
     };
   });
 
@@ -221,7 +240,9 @@ export const TicketListPage: React.FC = () => {
     fetchTickets(nextListParams);
 
     const newSp = new URLSearchParams();
-    if (params.myGroup) {
+    if (params.unread) {
+      newSp.set('unread', 'true');
+    } else if (params.myGroup) {
       newSp.set('myGroup', 'true');
     } else {
       newSp.set('myTickets', params.myTickets ? 'true' : 'false');
@@ -311,8 +332,9 @@ export const TicketListPage: React.FC = () => {
     const hasAnyUrlParam = Array.from(searchParams.keys()).length > 0;
     if (!hasAnyUrlParam) return;
 
-    const urlMyGroup = searchParams.get('myGroup') === 'true';
-    const urlMyTickets = urlMyGroup
+    const urlUnread = searchParams.get('unread') === 'true';
+    const urlMyGroup = !urlUnread && searchParams.get('myGroup') === 'true';
+    const urlMyTickets = (urlUnread || urlMyGroup)
       ? false
       : (searchParams.has('myTickets') ? searchParams.get('myTickets') === 'true' : true);
     const urlMode = (searchParams.get('searchMode') as 'semantic' | 'keyword') || 'semantic';
@@ -331,6 +353,7 @@ export const TicketListPage: React.FC = () => {
 
     setParams((prev: any) => {
       if (
+        prev.unread === urlUnread &&
         prev.myTickets === urlMyTickets &&
         prev.myGroup === urlMyGroup &&
         prev.page === urlPage &&
@@ -350,6 +373,7 @@ export const TicketListPage: React.FC = () => {
       }
       return {
         ...prev,
+        unread: urlUnread,
         myTickets: urlMyTickets,
         myGroup: urlMyGroup,
         page: urlPage,
@@ -386,10 +410,16 @@ export const TicketListPage: React.FC = () => {
     if (params.createdById) count++;
     if (params.assigneeId) count++;
     if (params.dateFrom || params.dateTo) count++;
-    if (params.myGroup) count++;
+    if (params.unread) count++;
+    else if (params.myGroup) count++;
     else if (params.myTickets === false) count++;
     return count;
   }, [params]);
+
+  const displayedTickets = useMemo(() => {
+    if (!Array.isArray(tickets)) return [];
+    return sortTicketsList(tickets, params, currentUserId, nowMs);
+  }, [tickets, params, currentUserId, nowMs]);
 
   const resetFilters = () => {
     const defaultState = {
@@ -407,6 +437,7 @@ export const TicketListPage: React.FC = () => {
       sortOrder: 'desc',
       myTickets: true,
       myGroup: false,
+      unread: false,
     };
     setParams(defaultState);
     setSearchMode('semantic');
@@ -443,8 +474,9 @@ export const TicketListPage: React.FC = () => {
           type={params.myTickets ? 'primary' : 'default'}
           onClick={() => setParams((prev: any) => ({
             ...prev,
-            myTickets: !prev.myTickets,
+            myTickets: prev.unread || prev.myGroup ? true : !prev.myTickets,
             myGroup: false,
+            unread: false,
             page: 1,
           }))}
           className={
@@ -462,7 +494,38 @@ export const TicketListPage: React.FC = () => {
               : 'Click to view only your tickets (created by or assigned to you).'
           }
         >
-          <span>{params.myTickets ? 'My Tickets ✓' : (hasGroupMembers ? 'My Tickets' : 'All Visible Tickets')}</span>
+          <span>{params.myTickets ? 'My Tickets ✓' : (hasGroupMembers || params.unread ? 'My Tickets' : 'All Visible Tickets')}</span>
+        </Button>
+
+        <Button
+          type={params.unread ? 'primary' : 'default'}
+          data-testid="unread-tickets-filter-btn"
+          onClick={() => setParams((prev: any) => {
+            const nextUnread = !prev.unread;
+            return {
+              ...prev,
+              unread: nextUnread,
+              myTickets: nextUnread ? false : true,
+              myGroup: false,
+              page: 1,
+            };
+          })}
+          className={
+            isMobile
+              ? `w-full font-medium ${params.unread ? 'bg-emerald-600 text-white' : 'text-gray-700'}`
+              : `min-w-[115px] font-medium flex items-center justify-center gap-1.5 ${
+                  params.unread
+                    ? 'bg-emerald-600 text-white hover:!bg-emerald-700 border-emerald-600'
+                    : 'text-gray-700 hover:text-emerald-600 border-gray-300'
+                }`
+          }
+          title={
+            params.unread
+              ? 'Currently viewing Unread tickets assigned to you. Click to return to My Tickets.'
+              : 'Click to view only unread tickets assigned to you.'
+          }
+        >
+          <span>{params.unread ? 'Unread ✓' : 'Unread'}</span>
         </Button>
 
         {hasGroupMembers && (
@@ -472,6 +535,7 @@ export const TicketListPage: React.FC = () => {
               ...prev,
               myGroup: !prev.myGroup,
               myTickets: false,
+              unread: false,
               page: 1,
             }))}
             className={
@@ -609,14 +673,18 @@ export const TicketListPage: React.FC = () => {
             <span>Tickets & Issues</span>
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-                params.myGroup
+                params.unread
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : params.myGroup
                   ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   : params.myTickets
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}
             >
-              {params.myGroup
+              {params.unread
+                ? 'Viewing: Unread Tickets'
+                : params.myGroup
                 ? `Viewing: My Group (${myGroupMembers.length} direct report${myGroupMembers.length > 1 ? 's' : ''})`
                 : params.myTickets
                 ? 'Viewing: My Tickets'
@@ -668,14 +736,16 @@ export const TicketListPage: React.FC = () => {
               <span>Filter Tickets</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
-                  params.myGroup
+                  params.unread
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : params.myGroup
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                     : params.myTickets
                     ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-amber-50 text-amber-700 border-amber-200'
                 }`}
               >
-                {params.myGroup ? 'My Group' : params.myTickets ? 'My Tickets' : 'All Visible'}
+                {params.unread ? 'Unread' : params.myGroup ? 'My Group' : params.myTickets ? 'My Tickets' : 'All Visible'}
               </span>
               {activeFiltersCount > 0 && (
                 <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -756,15 +826,17 @@ export const TicketListPage: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : tickets.length > 0 ? (
+        ) : displayedTickets.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {tickets.map((ticket: any) => {
+            {displayedTickets.map((ticket: any) => {
               const config = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.OPEN;
               const slaStatus = getTicketSLAStatus(ticket);
+              const isNewlyAssigned = isTicketNewlyAssignedForUser(ticket, currentUserId, nowMs);
 
               return (
                 <div
                   key={ticket.id}
+                  data-testid={`ticket-card-${ticket.id}`}
                   onClick={() => navigate(`/tickets/${ticket.id}`)}
                   className={`group relative flex flex-col justify-between p-4 rounded-xl border ${config.cardBorder} bg-white ${config.glowBg} border-t-4 ${config.accentBorder} shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer min-h-[160px]`}
                 >
@@ -788,6 +860,18 @@ export const TicketListPage: React.FC = () => {
                         >
                           {ticket.priority}
                         </Tag>
+
+                        {isNewlyAssigned && (
+                          <Tooltip title="Newly assigned to you and unread (within the last 30 minutes)">
+                            <Tag
+                              color="processing"
+                              data-testid={`new-unread-tag-${ticket.id}`}
+                              className="!m-0 text-[11px] font-semibold rounded-md bg-emerald-50 text-emerald-700 border-emerald-300"
+                            >
+                              New
+                            </Tag>
+                          </Tooltip>
+                        )}
 
                         {slaStatus === 'breached' && (
                           <Tooltip title="SLA Breached!">
