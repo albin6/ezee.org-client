@@ -244,7 +244,15 @@ interface TicketState {
     }
   }) => Promise<any>;
   updateStatus: (id: string, status: string, version?: number) => Promise<void>;
-  addMessage: (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => Promise<void>;
+  addMessage: (
+    id: string,
+    content: string,
+    statusChange?: 'CLOSED' | 'REOPENED',
+    replyToId?: string,
+    audioUrl?: string,
+    attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[],
+    mentions?: { userId: string; name: string }[]
+  ) => Promise<void>;
   toggleReaction: (ticketId: string, messageId: string, reaction: string) => Promise<void>;
   addAssignee: (ticketId: string, userId: string) => Promise<any>;
   editMessage: (ticketId: string, messageId: string, content: string) => Promise<any>;
@@ -424,14 +432,18 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     }
   },
 
-  addMessage: async (id: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => {
+  addMessage: async (
+    id: string,
+    content: string,
+    statusChange?: 'CLOSED' | 'REOPENED',
+    replyToId?: string,
+    audioUrl?: string,
+    attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[],
+    mentions?: { userId: string; name: string }[]
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await ticketService.addMessage(id, content, statusChange, replyToId, audioUrl, attachments);
-      // Let the socket handle real-time append if connected, but also update local state as fallback
-      // Actually, response.data returns the full ticket in the API. 
-      // But since we have websockets, NEW_MESSAGE will append it anyway.
-      // To prevent duplicate UI issues, we can just let NEW_MESSAGE handle it, but for safety:
+      const response = await ticketService.addMessage(id, content, statusChange, replyToId, audioUrl, attachments, mentions);
       set({ currentTicket: response.data, loading: false });
     } catch (error: any) {
       set({ error: error.message || 'Failed to add message', loading: false });

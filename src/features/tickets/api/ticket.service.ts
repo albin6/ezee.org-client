@@ -33,6 +33,7 @@ export interface Ticket {
     user: { id: string; name: string }; 
     replyTo?: any; 
     reactions?: any[];
+    mentions?: { userId: string; name: string }[];
     isEdited?: boolean;
     editedAt?: string;
     isDeleted?: boolean;
@@ -134,12 +135,21 @@ export const ticketService = {
     return data;
   },
 
-  addMessage: async (ticketId: string, content: string, statusChange?: 'CLOSED' | 'REOPENED', replyToId?: string, audioUrl?: string, attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[]) => {
+  addMessage: async (
+    ticketId: string,
+    content: string,
+    statusChange?: 'CLOSED' | 'REOPENED',
+    replyToId?: string,
+    audioUrl?: string,
+    attachments?: { fileUrl: string; fileName: string; fileType: string; fileSize: number }[],
+    mentions?: { userId: string; name: string }[]
+  ) => {
     const payload: any = { content };
     if (statusChange) payload.statusChange = statusChange;
     if (replyToId) payload.replyToId = replyToId;
     if (audioUrl) payload.audioUrl = audioUrl;
     if (attachments && attachments.length > 0) payload.attachments = attachments;
+    if (mentions && mentions.length > 0) payload.mentions = mentions;
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages`, payload);
     return data;
   },

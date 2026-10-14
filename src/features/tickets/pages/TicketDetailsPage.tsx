@@ -191,6 +191,10 @@ export const TicketDetailsPage: React.FC = () => {
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const [isAddingAssignee, setIsAddingAssignee] = useState(false);
+  const [trackedMentions, setTrackedMentions] = useState<{ userId: string; name: string }[]>([]);
+  const [pendingAssignees, setPendingAssignees] = useState<MentionUser[]>([]);
+
+  const escapeRegExp = useCallback((str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), []);
 
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -437,61 +441,116 @@ export const TicketDetailsPage: React.FC = () => {
     const trimmed = message.trim();
     if ((!trimmed && !audioBlob && attachments.length === 0) || !id || isSending || isUploadingAttachments) return;
 
-    // Intercept standalone @mention / assignee command (e.g. "@Albin", "@Vineesh")
-    const standaloneMentionMatch = !audioBlob && attachments.length === 0 && trimmed.match(/^@([a-zA-Z0-9\s._-]+)$/);
+    // 1. Process pending non-participant assignees (selected from suggestions or typed standalone)
+    const nonParticipantPending = pendingAssignees.filter((u) => {
+      const pattern = new RegExp(`@${escapeRegExp(u.name)}\\b`, 'i');
+      return pattern.test(trimmed) && !isParticipant(u.id);
+    });
+
+    // Check if the entire message is strictly a standalone user handle/command (e.g. "@Bob" or "@Bob Assignee")
+    const standaloneMentionMatch =
+      !audioBlob &&
+      attachments.length === 0 &&
+      trimmed.match(/^@([a-zA-Z0-9._-]+(?:\s+[a-zA-Z0-9._-]+){0,2})$/);
+
+    let standaloneAssigneeUser: MentionUser | null = null;
+    let standaloneMatchedParticipant: MentionUser | null = null;
+
     if (standaloneMentionMatch) {
       const queryName = standaloneMentionMatch[1].trim().toLowerCase();
-      const targetUser =
+      const matchedUser =
         mentionUsers.find(
           (u) =>
             u.name.toLowerCase() === queryName ||
-            u.email.toLowerCase() === queryName ||
-            u.name.toLowerCase().startsWith(queryName)
-        ) || mentionUsers.find((u) => u.name.toLowerCase().includes(queryName));
+            u.email.toLowerCase() === queryName
+        ) ||
+        mentionUsers.find((u) => u.name.toLowerCase().startsWith(queryName));
 
-      if (targetUser) {
-        const isPart = isParticipant(targetUser.id);
-        if (isPart) {
-          antMessage.info(`${targetUser.name} is already assigned to this ticket`);
-          setMessage('');
-          setMentionDropdownOpen(false);
-          setMentionQuery(null);
-          focusInput();
-          return;
+      if (matchedUser) {
+        if (!isParticipant(matchedUser.id)) {
+          standaloneAssigneeUser = matchedUser;
+        } else {
+          standaloneMatchedParticipant = matchedUser;
         }
+      }
+    }
 
-        if (canAddAssignee && ticket?.id) {
-          try {
-            setIsAddingAssignee(true);
+    const assigneesToAdd: MentionUser[] = [];
+    if (standaloneAssigneeUser) {
+      assigneesToAdd.push(standaloneAssigneeUser);
+    }
+    for (const u of nonParticipantPending) {
+      if (!assigneesToAdd.some((a) => a.id === u.id)) {
+        assigneesToAdd.push(u);
+      }
+    }
+
+    if (assigneesToAdd.length > 0) {
+      if (!canAddAssignee) {
+        antMessage.warning('Only ticket creator or current assignees can add new assignees');
+        setMessage('');
+        setPendingAssignees([]);
+        setMentionDropdownOpen(false);
+        setMentionQuery(null);
+        focusInput();
+        return;
+      }
+
+      if (ticket?.id) {
+        try {
+          setIsAddingAssignee(true);
+          for (const targetUser of assigneesToAdd) {
             await addAssignee(ticket.id, targetUser.id);
             antMessage.success(`Added ${targetUser.name} as an assignee`);
-          } catch (err: any) {
-            antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
-          } finally {
-            setIsAddingAssignee(false);
-            setMessage('');
-            setMentionDropdownOpen(false);
-            setMentionQuery(null);
-            focusInput();
           }
-          return;
-        } else {
-          antMessage.warning('Only ticket creator or current assignees can add new assignees');
-          setMessage('');
-          setMentionDropdownOpen(false);
-          setMentionQuery(null);
-          focusInput();
-          return;
+        } catch (err: any) {
+          antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
+        } finally {
+          setIsAddingAssignee(false);
         }
-      } else {
-        antMessage.error(`User "${standaloneMentionMatch[1].trim()}" not found`);
+      }
+
+      // If the message was solely an assignee command (standalone "@name" or exactly matching the assignee mention),
+      // finish assignment and do not post an empty / bare assignee message bubble
+      const isSolelyAssigneeCommand =
+        Boolean(standaloneAssigneeUser) ||
+        (assigneesToAdd.length === 1 && trimmed === `@${assigneesToAdd[0].name}`);
+
+      if (isSolelyAssigneeCommand) {
         setMessage('');
+        setPendingAssignees([]);
+        setTrackedMentions([]);
         setMentionDropdownOpen(false);
         setMentionQuery(null);
         focusInput();
         return;
       }
     }
+
+    // If user explicitly typed a standalone @name that does not exist in the system and no pending assignees
+    if (standaloneMentionMatch && !standaloneAssigneeUser && !standaloneMatchedParticipant && pendingAssignees.length === 0) {
+      antMessage.error(`User "${standaloneMentionMatch[1].trim()}" not found`);
+      setMessage('');
+      setMentionDropdownOpen(false);
+      setMentionQuery(null);
+      focusInput();
+      return;
+    }
+
+    // 2. Identify active mentions for existing participants to persist with the message
+    const allMentionCandidates = [...trackedMentions];
+    for (const u of mentionUsers) {
+      if (isParticipant(u.id)) {
+        const pattern = new RegExp(`(?:^|[\\s(])@${escapeRegExp(u.name)}(?=[.,!?;:]?(?:\\s|$|[)]))`, 'i');
+        if (pattern.test(trimmed) && !allMentionCandidates.some((m) => m.userId === u.id)) {
+          allMentionCandidates.push({ userId: u.id, name: u.name });
+        }
+      }
+    }
+    const finalMentions = allMentionCandidates.filter((m) => {
+      const pattern = new RegExp(`@${escapeRegExp(m.name)}`, 'i');
+      return pattern.test(trimmed);
+    });
 
     const authUser: any = user;
     const authUserId = authUser?.id || authUser?.sub;
@@ -535,8 +594,29 @@ export const TicketDetailsPage: React.FC = () => {
         finalAudioUrl = url;
       }
       const finalMessage = message.trim() || (attachments.length > 0 ? (attachments.length === 1 ? `📁 ${attachments[0].name}` : `📁 ${attachments.length} attachments`) : '🎤 Voice Message');
-      await addMessage(id, finalMessage, undefined, replyingTo?.id, finalAudioUrl, finalAttachments);
+      if (finalMentions.length > 0) {
+        await addMessage(
+          id,
+          finalMessage,
+          undefined,
+          replyingTo?.id,
+          finalAudioUrl,
+          finalAttachments,
+          finalMentions
+        );
+      } else {
+        await addMessage(
+          id,
+          finalMessage,
+          undefined,
+          replyingTo?.id,
+          finalAudioUrl,
+          finalAttachments
+        );
+      }
       setMessage('');
+      setTrackedMentions([]);
+      setPendingAssignees([]);
       setReplyingTo(null);
       setAttachments([]);
       cancelRecording();
@@ -898,9 +978,12 @@ export const TicketDetailsPage: React.FC = () => {
     setMessage(val);
 
     const rawArea = e.target;
-    const cursorPos = rawArea.selectionStart;
+    const cursorPos =
+      rawArea && rawArea.selectionStart !== undefined && rawArea.selectionStart > 0
+        ? rawArea.selectionStart
+        : val.length;
     const textBeforeCursor = val.slice(0, cursorPos);
-    const atMatch = textBeforeCursor.match(/@([\w\s]*)$/);
+    const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9._-]*(?:\s[a-zA-Z0-9._-]*)?)$/);
 
     if (atMatch) {
       setMentionQuery(atMatch[1]);
@@ -913,7 +996,7 @@ export const TicketDetailsPage: React.FC = () => {
   };
 
   // Select user from autocomplete: context-aware for mention vs assignee addition
-  const handleSelectMentionUser = async (selectedUser: MentionUser) => {
+  const handleSelectMentionUser = (selectedUser: MentionUser) => {
     justSelectedMentionRef.current = true;
     setTimeout(() => {
       justSelectedMentionRef.current = false;
@@ -925,65 +1008,42 @@ export const TicketDetailsPage: React.FC = () => {
     const textBeforeCursor = message.slice(0, cursorPos);
     const textAfterCursor = message.slice(cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf('@');
-    const isOnlyMentionQuery = atIndex === 0 && textAfterCursor.trim() === '';
 
-    // New-assignee intent: if user is not yet a participant and current user can add assignees
-    if (!isPart && canAddAssignee && ticket?.id) {
-      try {
-        setIsAddingAssignee(true);
-        await addAssignee(ticket.id, selectedUser.id);
-        antMessage.success(`Added ${selectedUser.name} as an assignee`);
+    const mentionInsert = `@${selectedUser.name} `;
+    let newText = '';
+    let newCursorPos = 0;
 
-        // If the message was solely an assignee search command at the start (e.g. "@John" or "@" with nothing else),
-        // clear the search text so unfinished assignment text is not sent as a message.
-        if (isOnlyMentionQuery) {
-          setMessage('');
-        } else {
-          // If part of a larger message, replace `@query` with `@UserName `
-          const newText = textBeforeCursor.slice(0, atIndex) + `@${selectedUser.name} ` + textAfterCursor;
-          setMessage(newText);
-        }
-      } catch (err: any) {
-        antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
-      } finally {
-        setIsAddingAssignee(false);
-        setMentionDropdownOpen(false);
-        setMentionQuery(null);
-        setTimeout(() => {
-          rawArea?.focus();
-        }, 50);
-      }
+    if (atIndex !== -1) {
+      newText = textBeforeCursor.slice(0, atIndex) + mentionInsert + textAfterCursor;
+      newCursorPos = atIndex + mentionInsert.length;
     } else {
-      // Existing-user mention intent (already participant or cannot add)
-      if (atIndex !== -1) {
-        if (isPart && isOnlyMentionQuery) {
-          antMessage.info(`${selectedUser.name} is already assigned to this ticket`);
-          setMessage('');
-          setMentionDropdownOpen(false);
-          setMentionQuery(null);
-          return;
-        }
-
-        if (!isPart && !canAddAssignee && isOnlyMentionQuery) {
-          antMessage.warning('Only ticket creator or current assignees can add new assignees');
-          setMessage('');
-          setMentionDropdownOpen(false);
-          setMentionQuery(null);
-          return;
-        }
-
-        const newText = textBeforeCursor.slice(0, atIndex) + `@${selectedUser.name} ` + textAfterCursor;
-        setMessage(newText);
-        setMentionDropdownOpen(false);
-        setMentionQuery(null);
-
-        setTimeout(() => {
-          rawArea?.focus();
-          const newPos = atIndex + selectedUser.name.length + 2;
-          rawArea?.setSelectionRange(newPos, newPos);
-        }, 50);
-      }
+      newText = message + mentionInsert;
+      newCursorPos = newText.length;
     }
+
+    setMessage(newText);
+
+    if (isPart) {
+      // Existing ticket participant: record as mention entity
+      setTrackedMentions((prev) => {
+        if (prev.some((m) => m.userId === selectedUser.id)) return prev;
+        return [...prev, { userId: selectedUser.id, name: selectedUser.name }];
+      });
+    } else {
+      // Non-participant: record as pending assignee to be added upon message send
+      setPendingAssignees((prev) => {
+        if (prev.some((u) => u.id === selectedUser.id)) return prev;
+        return [...prev, selectedUser];
+      });
+    }
+
+    setMentionDropdownOpen(false);
+    setMentionQuery(null);
+
+    setTimeout(() => {
+      rawArea?.focus();
+      rawArea?.setSelectionRange(newCursorPos, newCursorPos);
+    }, 50);
   };
 
   // Keyboard navigation for mention autocomplete
@@ -1219,7 +1279,7 @@ export const TicketDetailsPage: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col">
-                              <FormattedMessageContent content={msg.content} isMe={isMe} />
+                              <FormattedMessageContent content={msg.content} isMe={isMe} mentions={msg.mentions} />
                               {msg.audioUrl && (
                                 <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
                                   <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />
@@ -1459,6 +1519,7 @@ export const TicketDetailsPage: React.FC = () => {
                   {mentionDropdownOpen && filteredMentionUsers.length > 0 && (
                     <div
                       ref={mentionDropdownRef}
+                      data-testid="mention-autocomplete-dropdown"
                       className="absolute bottom-full mb-2 left-2 right-2 sm:left-14 sm:right-auto sm:w-[380px] bg-white rounded-xl shadow-2xl border border-gray-200 py-1.5 z-50 animate-fadeIn"
                       style={{ maxHeight: '280px' }}
                     >
@@ -1503,8 +1564,8 @@ export const TicketDetailsPage: React.FC = () => {
 
                               <div className="shrink-0 flex items-center">
                                 {isPart ? (
-                                  <Tag color="default" className="text-[10px] rounded-full mr-0 text-gray-500 bg-gray-100 border-gray-200">
-                                    Already added
+                                  <Tag color="green" className="text-[10px] rounded-full mr-0 text-[#075e54] bg-[#dcf8c6] border-emerald-300 font-medium">
+                                    Mention
                                   </Tag>
                                 ) : canAddAssignee ? (
                                   <Tag color="cyan" className="text-[10px] rounded-full mr-0 text-teal-700 bg-teal-50 border-teal-200 font-medium flex items-center gap-1">

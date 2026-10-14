@@ -75,4 +75,101 @@ describe('linkify utility', () => {
     expect(link.className).toContain('text-blue-600');
     expect(link.className).toContain('underline');
   });
+
+  describe('mentions parsing and rendering', () => {
+    it('parses multi-word mentions when mentions metadata is provided', () => {
+      const mentions = [
+        { userId: 'u1', name: 'Albin Aji' },
+        { userId: 'u2', name: 'Sarah Connor' },
+      ];
+      const text = 'Hello @Albin Aji and @Sarah Connor please review';
+      const tokens = parseMessageText(text, mentions);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'Hello ' },
+        { type: 'mention', text: '@Albin Aji', userId: 'u1' },
+        { type: 'text', text: ' and ' },
+        { type: 'mention', text: '@Sarah Connor', userId: 'u2' },
+        { type: 'text', text: ' please review' },
+      ]);
+    });
+
+    it('correctly handles mentions followed by trailing punctuation', () => {
+      const mentions = [{ userId: 'u1', name: 'Albin Aji' }];
+      const text = 'Hey @Albin Aji, can you check this?';
+      const tokens = parseMessageText(text, mentions);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'Hey ' },
+        { type: 'mention', text: '@Albin Aji', userId: 'u1' },
+        { type: 'text', text: ', can you check this?' },
+      ]);
+    });
+
+    it('parses fallback single-word mentions when mentions parameter is omitted', () => {
+      const text = 'Welcome @John to the ticket';
+      const tokens = parseMessageText(text);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'Welcome ' },
+        { type: 'mention', text: '@John' },
+        { type: 'text', text: ' to the ticket' },
+      ]);
+    });
+
+    it('does not treat email addresses as mentions', () => {
+      const text = 'Send email to contact@ezee.org for support';
+      const tokens = parseMessageText(text);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'Send email to contact@ezee.org for support' },
+      ]);
+    });
+
+    it('parses mixed text with both mentions and URLs seamlessly', () => {
+      const mentions = [{ userId: 'u1', name: 'Albin Aji' }];
+      const text = 'Hi @Albin Aji please visit https://ezee.org for details';
+      const tokens = parseMessageText(text, mentions);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'Hi ' },
+        { type: 'mention', text: '@Albin Aji', userId: 'u1' },
+        { type: 'text', text: ' please visit ' },
+        { type: 'link', text: 'https://ezee.org', href: 'https://ezee.org' },
+        { type: 'text', text: ' for details' },
+      ]);
+    });
+
+    it('renders mention with WhatsApp light green styling in FormattedMessageContent', () => {
+      const mentions = [{ userId: 'u1', name: 'Albin Aji' }];
+      const { container } = render(
+        <FormattedMessageContent
+          content="Great job @Albin Aji on this"
+          mentions={mentions}
+        />
+      );
+
+      const mentionSpan = container.querySelector('[data-testid="message-mention"]');
+      expect(mentionSpan).toBeInTheDocument();
+      expect(mentionSpan?.textContent).toBe('@Albin Aji');
+      expect(mentionSpan?.className).toContain('bg-[#dcf8c6]');
+      expect(mentionSpan?.className).toContain('text-[#075e54]');
+    });
+
+    it('renders mention with WhatsApp sender styling when isMe is true', () => {
+      const mentions = [{ userId: 'u1', name: 'Albin Aji' }];
+      const { container } = render(
+        <FormattedMessageContent
+          content="Assigned to @Albin Aji"
+          mentions={mentions}
+          isMe={true}
+        />
+      );
+
+      const mentionSpan = container.querySelector('[data-testid="message-mention"]');
+      expect(mentionSpan).toBeInTheDocument();
+      expect(mentionSpan?.className).toContain('bg-[#cbf3b6]');
+      expect(mentionSpan?.className).toContain('text-[#075e54]');
+    });
+  });
 });
