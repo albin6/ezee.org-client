@@ -441,7 +441,7 @@ export const TicketDetailsPage: React.FC = () => {
     const trimmed = message.trim();
     if ((!trimmed && !audioBlob && attachments.length === 0) || !id || isSending || isUploadingAttachments) return;
 
-    // 1. Process pending non-participant assignees (selected from suggestions or typed standalone)
+    // 1. Process pending non-participant assignees (selected from suggestions or typed in message)
     const nonParticipantPending = pendingAssignees.filter((u) => {
       const pattern = new RegExp(`@${escapeRegExp(u.name)}\\b`, 'i');
       return pattern.test(trimmed) && !isParticipant(u.id);
@@ -485,11 +485,20 @@ export const TicketDetailsPage: React.FC = () => {
       }
     }
 
+    // Also detect any non-participant user mentioned anywhere in message text
+    for (const u of mentionUsers) {
+      const pattern = new RegExp(`(?:^|[\\s(])@${escapeRegExp(u.name)}(?=[.,!?;:]?(?:\\s|$|[)]))`, 'i');
+      if (pattern.test(trimmed) && !isParticipant(u.id)) {
+        if (!assigneesToAdd.some((a) => a.id === u.id)) {
+          assigneesToAdd.push(u);
+        }
+      }
+    }
+
     if (assigneesToAdd.length > 0) {
       if (!canAddAssignee) {
         antMessage.warning('Only ticket creator or current assignees can add new assignees');
-        setMessage('');
-        setPendingAssignees([]);
+        // Preserve author's input on authorization failure
         setMentionDropdownOpen(false);
         setMentionQuery(null);
         focusInput();
@@ -504,47 +513,37 @@ export const TicketDetailsPage: React.FC = () => {
             antMessage.success(`Added ${targetUser.name} as an assignee`);
           }
         } catch (err: any) {
+          console.error('Failed to add assignee:', err);
           antMessage.error(err?.response?.data?.message || err?.message || 'Failed to add assignee');
+          // If the system fails to add the user as an assignee, display error notification,
+          // do not send the message, and preserve the author's input.
+          setIsAddingAssignee(false);
+          focusInput();
+          return;
         } finally {
           setIsAddingAssignee(false);
         }
-      }
-
-      // If the message was solely an assignee command (standalone "@name" or exactly matching the assignee mention),
-      // finish assignment and do not post an empty / bare assignee message bubble
-      const isSolelyAssigneeCommand =
-        Boolean(standaloneAssigneeUser) ||
-        (assigneesToAdd.length === 1 && trimmed === `@${assigneesToAdd[0].name}`);
-
-      if (isSolelyAssigneeCommand) {
-        setMessage('');
-        setPendingAssignees([]);
-        setTrackedMentions([]);
-        setMentionDropdownOpen(false);
-        setMentionQuery(null);
-        focusInput();
-        return;
       }
     }
 
     // If user explicitly typed a standalone @name that does not exist in the system and no pending assignees
     if (standaloneMentionMatch && !standaloneAssigneeUser && !standaloneMatchedParticipant && pendingAssignees.length === 0) {
       antMessage.error(`User "${standaloneMentionMatch[1].trim()}" not found`);
-      setMessage('');
-      setMentionDropdownOpen(false);
-      setMentionQuery(null);
       focusInput();
       return;
     }
 
-    // 2. Identify active mentions for existing participants to persist with the message
+    // 2. Identify active mentions (for both existing participants and newly added assignees) to persist with the message
     const allMentionCandidates = [...trackedMentions];
+    for (const u of assigneesToAdd) {
+      if (!allMentionCandidates.some((m) => m.userId === u.id)) {
+        allMentionCandidates.push({ userId: u.id, name: u.name });
+      }
+    }
     for (const u of mentionUsers) {
-      if (isParticipant(u.id)) {
-        const pattern = new RegExp(`(?:^|[\\s(])@${escapeRegExp(u.name)}(?=[.,!?;:]?(?:\\s|$|[)]))`, 'i');
-        if (pattern.test(trimmed) && !allMentionCandidates.some((m) => m.userId === u.id)) {
-          allMentionCandidates.push({ userId: u.id, name: u.name });
-        }
+      const pattern = new RegExp(`(?:^|[\\s(])@${escapeRegExp(u.name)}(?=[.,!?;:]?(?:\\s|$|[)]))`, 'i');
+      if (pattern.test(trimmed) && !allMentionCandidates.some((m) => m.userId === u.id)) {
+        allMentionCandidates.push({ userId: u.id, name: u.name });
       }
     }
     const finalMentions = allMentionCandidates.filter((m) => {
@@ -1023,13 +1022,13 @@ export const TicketDetailsPage: React.FC = () => {
 
     setMessage(newText);
 
-    if (isPart) {
-      // Existing ticket participant: record as mention entity
-      setTrackedMentions((prev) => {
-        if (prev.some((m) => m.userId === selectedUser.id)) return prev;
-        return [...prev, { userId: selectedUser.id, name: selectedUser.name }];
-      });
-    } else {
+    // Record mention entity for all mentioned users so mention metadata is never lost
+    setTrackedMentions((prev) => {
+      if (prev.some((m) => m.userId === selectedUser.id)) return prev;
+      return [...prev, { userId: selectedUser.id, name: selectedUser.name }];
+    });
+
+    if (!isPart) {
       // Non-participant: record as pending assignee to be added upon message send
       setPendingAssignees((prev) => {
         if (prev.some((u) => u.id === selectedUser.id)) return prev;
@@ -1279,7 +1278,7 @@ export const TicketDetailsPage: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col">
-                              <FormattedMessageContent content={msg.content} isMe={isMe} mentions={msg.mentions} />
+                              <FormattedMessageContent content={msg.content} isMe={isMe} mentions={msg.mentions} knownUsers={mentionUsers} />
                               {msg.audioUrl && (
                                 <div className="mt-2 mb-1 w-full sm:max-w-[320px]">
                                   <VoiceMessagePlayer src={msg.audioUrl} isMe={isMe} />

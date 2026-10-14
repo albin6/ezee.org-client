@@ -171,5 +171,41 @@ describe('linkify utility', () => {
       expect(mentionSpan?.className).toContain('bg-[#cbf3b6]');
       expect(mentionSpan?.className).toContain('text-[#075e54]');
     });
+
+    it('highlights multi-word user names even when mentions array is empty [] by resolving knownUsers', () => {
+      const knownUsers = [{ id: 'exec-3', name: 'Executive User 3' }];
+      const text = 'hello @Executive User 3 please note this';
+      const tokens = parseMessageText(text, [], knownUsers);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'hello ' },
+        { type: 'mention', text: '@Executive User 3', userId: 'exec-3' },
+        { type: 'text', text: ' please note this' },
+      ]);
+
+      const { container } = render(
+        <FormattedMessageContent
+          content={text}
+          mentions={[]}
+          knownUsers={knownUsers}
+        />
+      );
+
+      const mentionSpan = container.querySelector('[data-testid="message-mention"]');
+      expect(mentionSpan).toBeInTheDocument();
+      expect(mentionSpan?.textContent).toBe('@Executive User 3');
+      expect(mentionSpan?.className).toContain('text-[#075e54]');
+    });
+
+    it('supports fallback tokenization when mentions is empty [] and no knownUsers provided', () => {
+      const text = 'hello @Bob please check';
+      const tokens = parseMessageText(text, []);
+
+      expect(tokens).toEqual([
+        { type: 'text', text: 'hello ' },
+        { type: 'mention', text: '@Bob' },
+        { type: 'text', text: ' please check' },
+      ]);
+    });
   });
 });

@@ -23,7 +23,8 @@ function escapeRegExp(string: string) {
  */
 export function parseMessageText(
   text: string,
-  mentions?: { userId: string; name: string }[]
+  mentions?: { userId?: string; id?: string; name: string }[],
+  knownUsers?: { userId?: string; id?: string; name: string }[]
 ): TextToken[] {
   if (!text) return [];
 
@@ -80,12 +81,47 @@ export function parseMessageText(
   }
 
   // 2. Identify Mention spans
-  if (mentions && mentions.length > 0) {
+  // Collect all known mention targets from mentions and knownUsers
+  const targetMentions: { userId?: string; name: string }[] = [];
+  const seenNames = new Set<string>();
+
+  if (Array.isArray(mentions)) {
+    for (const m of mentions) {
+      if (m?.name && typeof m.name === 'string' && m.name.trim()) {
+        const trimmed = m.name.trim();
+        const key = trimmed.toLowerCase();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          targetMentions.push({
+            userId: m.userId || m.id,
+            name: trimmed,
+          });
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(knownUsers)) {
+    for (const u of knownUsers) {
+      if (u?.name && typeof u.name === 'string' && u.name.trim()) {
+        const trimmed = u.name.trim();
+        const key = trimmed.toLowerCase();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          targetMentions.push({
+            userId: u.userId || u.id,
+            name: trimmed,
+          });
+        }
+      }
+    }
+  }
+
+  if (targetMentions.length > 0) {
     // Sort names longest first so partial substrings don't preempt longer names
-    const sorted = [...mentions].sort((a, b) => b.name.length - a.name.length);
+    const sorted = [...targetMentions].sort((a, b) => b.name.length - a.name.length);
     for (const m of sorted) {
-      if (!m.name) continue;
-      const escaped = escapeRegExp(m.name.trim());
+      const escaped = escapeRegExp(m.name);
       // Match @Name preceded by start of string, whitespace, or (
       const mentionRegex = new RegExp(`(?:^|[\\s(])(@${escaped})(?=[.,!?;:]?(?:\\s|$|[)]))`, 'gi');
       let mMatch: RegExpExecArray | null;
@@ -106,25 +142,25 @@ export function parseMessageText(
         });
       }
     }
-  } else if (mentions === undefined) {
-    // Fallback for previews/tests: match standard single or double word @Mention
-    const fallbackRegex = /(?:^|[\s(])(@[a-zA-Z0-9._-]+)(?=[.,!?;:]?(?:\s|$|[)]))/gi;
-    let fMatch: RegExpExecArray | null;
-    while ((fMatch = fallbackRegex.exec(text)) !== null) {
-      const fullMatch = fMatch[0];
-      const atMention = fMatch[1];
-      const atOffset = fullMatch.indexOf(atMention);
-      const start = fMatch.index + atOffset;
-      const end = start + atMention.length;
-      candidates.push({
-        start,
-        end,
-        token: {
-          type: 'mention',
-          text: text.slice(start, end),
-        },
-      });
-    }
+  }
+
+  // Fallback regex for standard single or multi-word @Mention (e.g. preview, tests, or unlisted users)
+  const fallbackRegex = /(?:^|[\s(])(@[a-zA-Z0-9._-]+)(?=[.,!?;:]?(?:\s|$|[)]))/gi;
+  let fMatch: RegExpExecArray | null;
+  while ((fMatch = fallbackRegex.exec(text)) !== null) {
+    const fullMatch = fMatch[0];
+    const atMention = fMatch[1];
+    const atOffset = fullMatch.indexOf(atMention);
+    const start = fMatch.index + atOffset;
+    const end = start + atMention.length;
+    candidates.push({
+      start,
+      end,
+      token: {
+        type: 'mention',
+        text: text.slice(start, end),
+      },
+    });
   }
 
   // 3. Sort candidate spans and resolve collisions
@@ -171,7 +207,8 @@ interface FormattedMessageContentProps {
   content: string;
   className?: string;
   isMe?: boolean;
-  mentions?: { userId: string; name: string }[];
+  mentions?: { userId?: string; id?: string; name: string }[];
+  knownUsers?: { userId?: string; id?: string; name: string }[];
 }
 
 /**
@@ -184,10 +221,11 @@ export const FormattedMessageContent: React.FC<FormattedMessageContentProps> = (
   className = 'whitespace-pre-wrap break-words text-[15px] leading-snug',
   isMe = false,
   mentions,
+  knownUsers,
 }) => {
   if (!content) return null;
 
-  const tokens = parseMessageText(content, mentions);
+  const tokens = parseMessageText(content, mentions, knownUsers);
 
   return (
     <span className={className}>

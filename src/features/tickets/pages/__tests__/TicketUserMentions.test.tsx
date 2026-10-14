@@ -247,4 +247,202 @@ describe('Ticket User Mentions & Assignee Separation', () => {
       expect(mockAddAssignee).toHaveBeenCalledWith('ticket-1', 'external-user-1');
     });
   });
+
+  it('automatically adds non-participant as assignee AND sends message with mention highlighted', async () => {
+    renderComponent();
+
+    const textarea = screen.getByPlaceholderText(/Type a message or @name to mention\/assign/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@Charlie' } });
+
+    await waitFor(() => {
+      const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+      expect(within(dropdown).getByText('Charlie External')).toBeInTheDocument();
+    });
+
+    const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+    fireEvent.click(within(dropdown).getByText('Charlie External'));
+
+    // Append additional message text
+    fireEvent.change(textarea, { target: { value: 'hello @Charlie External please note this' } });
+
+    // Submit message
+    const sendButton = screen.getByTitle(/Send message \(Enter\)/i);
+    fireEvent.click(sendButton);
+
+    // 1. addAssignee must be called first
+    await waitFor(() => {
+      expect(mockAddAssignee).toHaveBeenCalledWith('ticket-1', 'external-user-1');
+    });
+
+    // 2. addMessage must be called immediately after, containing the mention entity for Charlie External
+    await waitFor(() => {
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        'ticket-1',
+        'hello @Charlie External please note this',
+        undefined,
+        undefined,
+        undefined,
+        [],
+        [{ userId: 'external-user-1', name: 'Charlie External' }]
+      );
+    });
+  });
+
+  it('preserves user input and does not send message when addAssignee fails', async () => {
+    mockAddAssignee.mockRejectedValueOnce(new Error('Database error adding assignee'));
+
+    renderComponent();
+
+    const textarea = screen.getByPlaceholderText(/Type a message or @name to mention\/assign/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@Charlie' } });
+
+    await waitFor(() => {
+      const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+      expect(within(dropdown).getByText('Charlie External')).toBeInTheDocument();
+    });
+
+    const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+    fireEvent.click(within(dropdown).getByText('Charlie External'));
+
+    fireEvent.change(textarea, { target: { value: 'hello @Charlie External please review' } });
+
+    // Submit
+    const sendButton = screen.getByTitle(/Send message \(Enter\)/i);
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(mockAddAssignee).toHaveBeenCalledWith('ticket-1', 'external-user-1');
+    });
+
+    // Message must NOT be sent
+    expect(mockAddMessage).not.toHaveBeenCalled();
+
+    // Input text must be preserved so user does not lose their typed message
+    expect(textarea.value).toBe('hello @Charlie External please review');
+  });
+
+  it('prevents unauthorized users from adding assignees via mentions and preserves input', async () => {
+    // Current user is an unauthorized regular user (not creator, not assignee, not admin)
+    useAuthStore.setState({
+      user: {
+        type: 'user',
+        id: 'unauthorized-user',
+        email: 'unauthorized@example.com',
+        name: 'Unauthorized User',
+      } as any,
+      isAuthenticated: true,
+      accessToken: 'test-token',
+    });
+
+    renderComponent();
+
+    const textarea = screen.getByPlaceholderText(/Type a message or @name to mention\/assign/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@Charlie' } });
+
+    await waitFor(() => {
+      const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+      expect(within(dropdown).getByText('Charlie External')).toBeInTheDocument();
+    });
+
+    const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+    fireEvent.click(within(dropdown).getByText('Charlie External'));
+
+    fireEvent.change(textarea, { target: { value: 'hello @Charlie External please check' } });
+
+    // Submit
+    const sendButton = screen.getByTitle(/Send message \(Enter\)/i);
+    fireEvent.click(sendButton);
+
+    // addAssignee and addMessage must NOT be called
+    expect(mockAddAssignee).not.toHaveBeenCalled();
+    expect(mockAddMessage).not.toHaveBeenCalled();
+
+    // Author's input is preserved
+    expect(textarea.value).toBe('hello @Charlie External please check');
+  });
+
+  it('allows unauthorized users to mention existing participants without adding assignees', async () => {
+    useAuthStore.setState({
+      user: {
+        type: 'user',
+        id: 'unauthorized-user',
+        email: 'unauthorized@example.com',
+        name: 'Unauthorized User',
+      } as any,
+      isAuthenticated: true,
+      accessToken: 'test-token',
+    });
+
+    renderComponent();
+
+    const textarea = screen.getByPlaceholderText(/Type a message or @name to mention\/assign/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@Bob' } });
+
+    await waitFor(() => {
+      const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+      expect(within(dropdown).getByText('Bob Assignee')).toBeInTheDocument();
+    });
+
+    const dropdown = screen.getByTestId('mention-autocomplete-dropdown');
+    fireEvent.click(within(dropdown).getByText('Bob Assignee'));
+
+    fireEvent.change(textarea, { target: { value: 'hello @Bob Assignee please note' } });
+
+    const sendButton = screen.getByTitle(/Send message \(Enter\)/i);
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        'ticket-1',
+        'hello @Bob Assignee please note',
+        undefined,
+        undefined,
+        undefined,
+        [],
+        [{ userId: 'assignee-1', name: 'Bob Assignee' }]
+      );
+    });
+
+    // Assignee addition was not triggered
+    expect(mockAddAssignee).not.toHaveBeenCalled();
+  });
+
+  it('highlights mentions in existing messages even when msg.mentions is []', async () => {
+    useTicketStore.setState({
+      currentTicket: {
+        id: 'ticket-1',
+        title: 'Test Mentions Array Bug',
+        description: 'Bug verification',
+        status: 'OPEN',
+        priority: 'MEDIUM',
+        createdById: 'creator-1',
+        createdBy: { id: 'creator-1', name: 'Alice Creator' },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        assignees: [],
+        messages: [
+          {
+            id: 'msg-empty-mentions',
+            content: 'hello @Alice Creator please note this',
+            mentions: [], // Postgres default '[]'::jsonb
+            createdAt: new Date().toISOString(),
+            isSystem: false,
+            user: { id: 'assignee-1', name: 'Bob Assignee' },
+          },
+        ],
+      } as any,
+    });
+
+    const { container } = renderComponent();
+
+    // Alice Creator is in mockUsers (loaded via getUsersMentionLookup)
+    // The mention must still be highlighted with data-testid="message-mention"
+    await waitFor(() => {
+      const mentionPill = container.querySelector('[data-testid="message-mention"]');
+      expect(mentionPill).toBeInTheDocument();
+      expect(mentionPill?.textContent).toBe('@Alice Creator');
+      expect(mentionPill?.className).toContain('text-[#075e54]');
+    });
+  });
 });
