@@ -41,6 +41,7 @@ import { compressImage } from '@/shared/utils/imageCompressor';
 import { AudioPreviewPlayer } from '../components/AudioPreviewPlayer';
 import { AttachmentPreviewList, formatFileSize } from '../components/AttachmentPreviewList';
 import { computeTicketEscalationTiming, canUserExtendTicketEscalation } from '../utils/escalation-time.util';
+import { MessageReactionDetailsModal } from '../components/MessageReactionDetailsModal';
 import EmojiPicker from 'emoji-picker-react';
 
 const { Title, Text, Paragraph } = Typography;
@@ -291,6 +292,59 @@ export const TicketDetailsPage: React.FC = () => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [openReactionPopoverId, setOpenReactionPopoverId] = useState<string | null>(null);
+  const [reactionDetailsModal, setReactionDetailsModal] = useState<{
+    open: boolean;
+    messageId: string | null;
+    initialEmoji?: string | null;
+    fetchedReactions?: any[];
+    loading?: boolean;
+  }>({
+    open: false,
+    messageId: null,
+    initialEmoji: null,
+    fetchedReactions: [],
+    loading: false,
+  });
+
+  const handleOpenReactionDetails = async (messageId: string, emoji?: string) => {
+    setReactionDetailsModal({
+      open: true,
+      messageId,
+      initialEmoji: emoji || null,
+      fetchedReactions: [],
+      loading: false,
+    });
+
+    const currentMsg = ticket?.messages?.find((m: any) => m.id === messageId);
+    const needsFetch = !currentMsg?.reactions || currentMsg.reactions.some((r: any) => !r.user?.name);
+
+    if (id && needsFetch) {
+      setReactionDetailsModal((prev) => ({ ...prev, loading: true }));
+      try {
+        const reactionsData = await ticketService.getMessageReactions(id, messageId);
+        setReactionDetailsModal((prev) => ({
+          ...prev,
+          fetchedReactions: reactionsData || [],
+          loading: false,
+        }));
+      } catch (err) {
+        setReactionDetailsModal((prev) => ({ ...prev, loading: false }));
+      }
+    }
+  };
+
+  const activeReactionMessage = useMemo(() => {
+    if (!reactionDetailsModal.messageId) return null;
+    return ticket?.messages?.find((m: any) => m.id === reactionDetailsModal.messageId) || null;
+  }, [ticket?.messages, reactionDetailsModal.messageId]);
+
+  const activeModalReactions = useMemo(() => {
+    if (reactionDetailsModal.fetchedReactions && reactionDetailsModal.fetchedReactions.length > 0) {
+      return reactionDetailsModal.fetchedReactions;
+    }
+    return activeReactionMessage?.reactions || [];
+  }, [reactionDetailsModal.fetchedReactions, activeReactionMessage?.reactions]);
+
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -1092,11 +1146,18 @@ export const TicketDetailsPage: React.FC = () => {
                   }
 
                   const isMe = msg.user.id === authUserId;
-                  const groupedReactions = msg.reactions?.reduce((acc: any, curr: any) => {
+                  const msgReactions = msg.reactions || [];
+                  const totalReactions = msgReactions.length;
+                  const reactionGroups = msgReactions.reduce((acc: Record<string, any[]>, curr: any) => {
                     if (!acc[curr.reaction]) acc[curr.reaction] = [];
                     acc[curr.reaction].push(curr);
                     return acc;
                   }, {});
+                  const sortedReactionEmojis = Object.entries(reactionGroups)
+                    .sort((a, b) => (b[1] as any[]).length - (a[1] as any[]).length)
+                    .map(([emoji]) => emoji);
+                  const topReactionEmojis = sortedReactionEmojis.slice(0, 4);
+                  const hasUserReacted = msgReactions.some((r: any) => (r.userId || r.user?.id) === authUserId);
 
                   return (
                     <div key={msg.id} className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -1245,16 +1306,36 @@ export const TicketDetailsPage: React.FC = () => {
                         
                         {/* Reactions and action menu */}
                         {!msg.isDeleted && (
-                          <div className={`flex gap-1 mt-0.5 items-center ${isMe ? 'justify-end' : 'justify-start'}`}>
-                            {groupedReactions && Object.entries(groupedReactions).map(([emoji, reacts]: [string, any]) => (
+                          <div className={`flex gap-1.5 mt-0.5 items-center ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            {totalReactions > 0 && (
                               <button 
-                                key={emoji}
-                                className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-pointer flex items-center gap-1 ${reacts.some((r: any) => r.userId === authUserId) ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
-                                onClick={() => id && toggleReaction(id, msg.id, emoji)}
+                                type="button"
+                                data-testid={`reaction-pill-${msg.id}`}
+                                title={`View ${totalReactions} ${totalReactions === 1 ? 'reaction' : 'reactions'}`}
+                                className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer flex items-center gap-1.5 transition-all hover:scale-105 shadow-xs ${
+                                  hasUserReacted
+                                    ? 'bg-blue-50/95 border-blue-200 text-blue-700 font-medium'
+                                    : 'bg-white/95 border-gray-200 text-gray-700 hover:bg-gray-50'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReactionDetails(msg.id, sortedReactionEmojis.length === 1 ? sortedReactionEmojis[0] : 'ALL');
+                                }}
                               >
-                                <span>{emoji}</span> <span>{reacts.length}</span>
+                                <span className="flex items-center -space-x-0.5">
+                                  {topReactionEmojis.map((emoji) => (
+                                    <span key={emoji} className="text-xs leading-none">
+                                      {emoji}
+                                    </span>
+                                  ))}
+                                </span>
+                                {totalReactions > 1 && (
+                                  <span className="text-[11px] font-semibold text-gray-600 leading-none">
+                                    {totalReactions}
+                                  </span>
+                                )}
                               </button>
-                            ))}
+                            )}
                             
                             <div className="flex items-center gap-1">
                               <Popover 
@@ -2238,6 +2319,30 @@ export const TicketDetailsPage: React.FC = () => {
           </div>
         </div>
       </Drawer>
+
+      <MessageReactionDetailsModal
+        open={reactionDetailsModal.open}
+        onClose={() =>
+          setReactionDetailsModal({
+            open: false,
+            messageId: null,
+            initialEmoji: null,
+            fetchedReactions: [],
+            loading: false,
+          })
+        }
+        messageId={reactionDetailsModal.messageId}
+        ticketId={id || ''}
+        initialEmoji={reactionDetailsModal.initialEmoji}
+        reactions={activeModalReactions}
+        currentUserId={authUserId}
+        onToggleReaction={(emoji) => {
+          if (id && reactionDetailsModal.messageId) {
+            toggleReaction(id, reactionDetailsModal.messageId, emoji);
+          }
+        }}
+        loading={reactionDetailsModal.loading}
+      />
     </PageContainer>
   );
 };

@@ -52,6 +52,19 @@ export interface MentionUser {
   teamName: string;
 }
 
+export interface MessageReactionMember {
+  messageId: string;
+  userId: string;
+  reaction: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+    designation?: string | null;
+  } | null;
+}
+
 export interface EscalationHoliday {
   id: string;
   date: string; // YYYY-MM-DD
@@ -182,6 +195,13 @@ export const ticketService = {
   toggleReaction: async (ticketId: string, messageId: string, reaction: string) => {
     const { data } = await apiClient.post(`/tickets/${ticketId}/messages/${messageId}/reactions`, { reaction });
     return data;
+  },
+
+  getMessageReactions: async (ticketId: string, messageId: string): Promise<MessageReactionMember[]> => {
+    const { data } = await apiClient.get<{ status: string; data: MessageReactionMember[] }>(
+      `/tickets/${ticketId}/messages/${messageId}/reactions`
+    );
+    return data.data;
   },
 
   addAssignee: async (ticketId: string, userId: string) => {
